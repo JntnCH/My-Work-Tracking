@@ -7,6 +7,7 @@ type Props = {
   name: string;
   email: string;
   userId: string;
+  isGuest: boolean;
   faceEnrolled: boolean;
   faceSupported: boolean;
   onFaceChanged: () => void;
@@ -19,6 +20,7 @@ export function AppHeader({
   name,
   email,
   userId,
+  isGuest,
   faceEnrolled,
   faceSupported,
   onFaceChanged,
@@ -66,6 +68,14 @@ export function AppHeader({
           <div className="min-w-0">
             <h1 className="truncate text-lg leading-tight font-bold">Work Tracker</h1>
             <p className="truncate text-xs opacity-80">{name || "ระบบบันทึกงาน & Check-in"}</p>
+            {isGuest && (
+              <p
+                className="mt-0.5 max-w-[15rem] text-[10px] leading-tight text-primary-foreground/70 sm:max-w-none"
+                title="โหมดทดลอง: ข้อมูลจะเก็บไว้ในเบราว์เซอร์ของเครื่องนี้เท่านั้น ไม่ซิงก์ข้ามเครื่อง หากต้องการสำรองข้อมูลหรือใช้งานหลายเครื่อง กรุณาเข้าสู่ระบบด้วยบัญชีผู้ใช้"
+              >
+                โหมดทดลอง: ข้อมูลเก็บในเครื่องนี้เท่านั้น ไม่ซิงก์ข้ามเครื่อง
+              </p>
+            )}
           </div>
         </div>
 

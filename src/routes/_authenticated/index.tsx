@@ -154,6 +154,7 @@ function Index() {
         <AppHeader
           name={displayName(user)}
           email={user?.email ?? ""}
+          isGuest={isGuest}
           faceEnrolled={lock.enrolled}
           faceSupported={lock.supported}
           userId={userId}
