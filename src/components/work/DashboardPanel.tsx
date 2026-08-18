@@ -100,7 +100,7 @@ export function DashboardPanel({
 
         <SummarySection title="บันทึกการทำงาน">
           <div className="space-y-3">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
               <Stat
                 compact
                 icon={<CalendarCheck className="h-4 w-4" />}
@@ -123,7 +123,7 @@ export function DashboardPanel({
                 testId="stat-days-without-ot"
               />
             </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
               <Stat
                 compact
                 icon={<ListChecks className="h-4 w-4" />}
@@ -150,7 +150,7 @@ export function DashboardPanel({
         </SummarySection>
 
         <SummarySection title="รายรับเสริมและรายการหัก">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
             <Stat
               compact
               icon={<TrendingUp className="h-4 w-4" />}
