@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { EngineWorkingAnimation } from "@/components/ui/engine-working-animation";
+import { toast } from "sonner";
 import type { GPSPoint, RateSettings, WorkLog, ActiveCheckIn } from "@/lib/work-log";
 import {
   OT_OPTIONS,
@@ -102,41 +103,47 @@ export function CheckInPanel({
     return () => clearInterval(id);
   }, [active]);
 
-  const fetchGPS = useCallback(async () => {
+  const fetchGPS = useCallback((): Promise<GPSPoint | null> => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
       setGps({ ...EMPTY_GPS, text: "อุปกรณ์ไม่รองรับ GPS" });
-      return;
+      return Promise.resolve(null);
     }
     if (typeof window !== "undefined" && !window.isSecureContext) {
       setGps({ ...EMPTY_GPS, text: "ต้องเปิดผ่าน https จึงจะขอพิกัดได้" });
-      return;
+      return Promise.resolve(null);
     }
+
     setGpsLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const lat = pos.coords.latitude.toFixed(6);
-        const lng = pos.coords.longitude.toFixed(6);
-        const addressName = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
-        setGps({ lat, lng, text: `Lat: ${lat}, Lng: ${lng}`, addressName });
-        setGpsLoading(false);
-      },
-      (err) => {
-        const embedded = typeof window !== "undefined" && window.self !== window.top;
-        let text = "ไม่สามารถเข้าถึงพิกัดได้";
-        if (err.code === err.PERMISSION_DENIED) {
-          text = embedded
-            ? "ถูกบล็อกในหน้าตัวอย่าง — เปิดเว็บในแท็บใหม่ของ Safari แล้วลองอีกครั้ง"
-            : "ปฏิเสธสิทธิ์ — เปิด ตั้งค่า > Safari > ตำแหน่งที่ตั้ง เป็น “ถาม” แล้วโหลดหน้าใหม่";
-        } else if (err.code === err.POSITION_UNAVAILABLE) {
-          text = "หาสัญญาณตำแหน่งไม่ได้ — เปิด Location Services แล้วลองใหม่";
-        } else if (err.code === err.TIMEOUT) {
-          text = "หมดเวลาในการขอพิกัด — แตะไอคอนเป้าเพื่อลองอีกครั้ง";
-        }
-        setGps({ ...EMPTY_GPS, text });
-        setGpsLoading(false);
-      },
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 30000 },
-    );
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const lat = pos.coords.latitude.toFixed(6);
+          const lng = pos.coords.longitude.toFixed(6);
+          const addressName = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
+          const nextGPS = { lat, lng, text: `Lat: ${lat}, Lng: ${lng}`, addressName };
+          setGps(nextGPS);
+          setGpsLoading(false);
+          resolve(nextGPS);
+        },
+        (err) => {
+          const embedded = typeof window !== "undefined" && window.self !== window.top;
+          let text = "ไม่สามารถเข้าถึงพิกัดได้";
+          if (err.code === err.PERMISSION_DENIED) {
+            text = embedded
+              ? "ถูกบล็อกในหน้าตัวอย่าง — เปิดเว็บในแท็บใหม่ของ Safari แล้วลองอีกครั้ง"
+              : "ปฏิเสธสิทธิ์ — เปิด ตั้งค่า > Safari > ตำแหน่งที่ตั้ง เป็น “ถาม” แล้วโหลดหน้าใหม่";
+          } else if (err.code === err.POSITION_UNAVAILABLE) {
+            text = "หาสัญญาณตำแหน่งไม่ได้ — เปิด Location Services แล้วลองใหม่";
+          } else if (err.code === err.TIMEOUT) {
+            text = "หมดเวลาในการขอพิกัด — แตะไอคอนเป้าเพื่อลองอีกครั้ง";
+          }
+          setGps({ ...EMPTY_GPS, text });
+          setGpsLoading(false);
+          resolve(null);
+        },
+        { enableHighAccuracy: true, timeout: 20000, maximumAge: 30000 },
+      );
+    });
   }, []);
 
   // iOS Safari blocks silent location prompts; only auto-fetch when already granted.
@@ -214,8 +221,19 @@ export function CheckInPanel({
     resetPhoto();
   };
 
-  const doCheckOut = () => {
-    onCheckOut(gps, photo);
+  const doCheckOut = async () => {
+    if (!active || gpsLoading) return;
+
+    // Always read a fresh position at the moment of Check-out; do not reuse Check-in GPS.
+    const checkoutGPS = await fetchGPS();
+    if (!checkoutGPS) {
+      toast.error("ยังบันทึก Check-out ไม่ได้", {
+        description: "ไม่พบพิกัด GPS ณ เวลาจบงาน กรุณาเปิดสิทธิ์ตำแหน่งแล้วลองใหม่",
+      });
+      return;
+    }
+
+    onCheckOut(checkoutGPS, photo);
     setTaskInput("");
     resetPhoto();
   };
@@ -596,11 +614,11 @@ export function CheckInPanel({
             <LogIn className="h-5 w-5" /> Check-in เริ่มงาน
           </button>
           <button
-            onClick={doCheckOut}
-            disabled={!active}
+            onClick={() => void doCheckOut()}
+            disabled={!active || gpsLoading}
             className="flex items-center justify-center gap-2 rounded-xl bg-destructive py-4 text-lg font-bold text-destructive-foreground shadow-lg transition active:scale-95 disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
           >
-            <LogOut className="h-5 w-5" /> Check-out จบงาน
+            <LogOut className="h-5 w-5" /> {gpsLoading ? "กำลังบันทึกพิกัด…" : "Check-out จบงาน"}
           </button>
         </div>
         {active ? (
