@@ -1,25 +1,30 @@
-import { useEffect, useImperativeHandle, useRef, useState, forwardRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
   Check,
   GripVertical,
   Monitor,
+  Redo2,
   RefreshCw,
   RotateCcw,
   Smartphone,
+  Undo2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useEditorHistory } from "@/hooks/use-editor-history";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import {
+  createDefaultDashboardLayout,
   getDashboardCards,
   reorderDashboardCards,
+  updateDashboardCard,
   type DashboardCardGroup,
   type DashboardCardLayout,
   type DashboardLayout,
   type DashboardViewport,
-  updateDashboardCard,
 } from "@/lib/dashboard-layout";
+import { createDashboardLayoutTransaction, dashboardLayoutsEqual } from "@/lib/editor-history";
 
 type Props = {
   userId: string;
@@ -28,9 +33,19 @@ type Props = {
   onDirtyChange?: (isDirty: boolean) => void;
 };
 
+export type DashboardLayoutDraftStatus = {
+  mobileDirty: boolean;
+  desktopDirty: boolean;
+  isDirty: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
+};
+
 export type DashboardLayoutEditorHandle = {
   saveDraft: () => Promise<void>;
   cancelDraft: () => void;
+  clearHistory: () => void;
+  getDraftStatus: () => DashboardLayoutDraftStatus;
 };
 
 const GROUPS: Array<{ id: DashboardCardGroup; label: string }> = [
@@ -63,6 +78,24 @@ export const DashboardLayoutEditor = forwardRef<DashboardLayoutEditorHandle, Pro
     const [draggingId, setDraggingId] = useState<string | null>(null);
     const mobile = useDashboardLayout(userId, isGuest, "mobile");
     const desktop = useDashboardLayout(userId, isGuest, "desktop");
+    const mobileHistory = useEditorHistory();
+    const desktopHistory = useEditorHistory();
+    const {
+      canUndo: canUndoMobile,
+      canRedo: canRedoMobile,
+      push: pushMobileHistory,
+      undo: undoMobileHistory,
+      redo: redoMobileHistory,
+      clear: clearMobileHistory,
+    } = mobileHistory;
+    const {
+      canUndo: canUndoDesktop,
+      canRedo: canRedoDesktop,
+      push: pushDesktopHistory,
+      undo: undoDesktopHistory,
+      redo: redoDesktopHistory,
+      clear: clearDesktopHistory,
+    } = desktopHistory;
     const mobileSnapshotRef = useRef<DashboardLayout>(mobile.layout);
     const desktopSnapshotRef = useRef<DashboardLayout>(desktop.layout);
     const mobileSnapshotReadyRef = useRef(false);
@@ -71,27 +104,35 @@ export const DashboardLayoutEditor = forwardRef<DashboardLayoutEditorHandle, Pro
     useEffect(() => {
       mobileSnapshotReadyRef.current = false;
       desktopSnapshotReadyRef.current = false;
-    }, [isGuest, userId]);
+      clearMobileHistory();
+      clearDesktopHistory();
+    }, [clearDesktopHistory, clearMobileHistory, isGuest, userId]);
 
     useEffect(() => {
       if (!mobile.loaded || mobileSnapshotReadyRef.current) return;
-      mobileSnapshotRef.current = mobile.layout;
+      mobileSnapshotRef.current = cloneLayout(mobile.layout);
       mobileSnapshotReadyRef.current = true;
-    }, [mobile.layout, mobile.loaded]);
+      clearMobileHistory();
+    }, [clearMobileHistory, mobile.layout, mobile.loaded]);
 
     useEffect(() => {
       if (!desktop.loaded || desktopSnapshotReadyRef.current) return;
-      desktopSnapshotRef.current = desktop.layout;
+      desktopSnapshotRef.current = cloneLayout(desktop.layout);
       desktopSnapshotReadyRef.current = true;
-    }, [desktop.layout, desktop.loaded]);
+      clearDesktopHistory();
+    }, [clearDesktopHistory, desktop.layout, desktop.loaded]);
 
     const mobileDirty =
-      mobile.loaded && JSON.stringify(mobile.layout) !== JSON.stringify(mobileSnapshotRef.current);
+      mobile.loaded &&
+      mobileSnapshotReadyRef.current &&
+      !dashboardLayoutsEqual(mobile.layout, mobileSnapshotRef.current);
     const desktopDirty =
       desktop.loaded &&
-      JSON.stringify(desktop.layout) !== JSON.stringify(desktopSnapshotRef.current);
+      desktopSnapshotReadyRef.current &&
+      !dashboardLayoutsEqual(desktop.layout, desktopSnapshotRef.current);
     const isDirty = mobileDirty || desktopDirty;
     const selected = selectedViewport === "mobile" ? mobile : desktop;
+    const selectedHistory = selectedViewport === "mobile" ? mobileHistory : desktopHistory;
 
     useEffect(() => {
       onDirtyChange?.(isDirty);
@@ -102,25 +143,61 @@ export const DashboardLayoutEditor = forwardRef<DashboardLayoutEditorHandle, Pro
       () => ({
         async saveDraft() {
           if (!mobileDirty && !desktopDirty) return;
+
           if (mobileDirty) {
             await mobile.saveLayout();
-            mobileSnapshotRef.current = mobile.layout;
+            mobileSnapshotRef.current = cloneLayout(mobile.layout);
           }
           if (desktopDirty) {
             await desktop.saveLayout();
-            desktopSnapshotRef.current = desktop.layout;
+            desktopSnapshotRef.current = cloneLayout(desktop.layout);
           }
+
+          clearMobileHistory();
+          clearDesktopHistory();
           toast.success(
             isGuest ? "บันทึก Layout สำหรับ Session นี้แล้ว" : "บันทึก Layout ลง Supabase แล้ว",
           );
         },
         cancelDraft() {
-          if (mobileDirty) mobile.updateLayout(() => mobileSnapshotRef.current);
-          if (desktopDirty) desktop.updateLayout(() => desktopSnapshotRef.current);
+          if (mobileDirty && mobileSnapshotReadyRef.current) {
+            mobile.updateLayout(() => cloneLayout(mobileSnapshotRef.current));
+          }
+          if (desktopDirty && desktopSnapshotReadyRef.current) {
+            desktop.updateLayout(() => cloneLayout(desktopSnapshotRef.current));
+          }
+          clearMobileHistory();
+          clearDesktopHistory();
           setDraggingId(null);
         },
+        clearHistory() {
+          clearMobileHistory();
+          clearDesktopHistory();
+        },
+        getDraftStatus() {
+          return {
+            mobileDirty,
+            desktopDirty,
+            isDirty,
+            canUndo: canUndoMobile || canUndoDesktop,
+            canRedo: canRedoMobile || canRedoDesktop,
+          };
+        },
       }),
-      [desktop, desktopDirty, isGuest, mobile, mobileDirty],
+      [
+        canRedoDesktop,
+        canRedoMobile,
+        canUndoDesktop,
+        canUndoMobile,
+        clearDesktopHistory,
+        clearMobileHistory,
+        desktop,
+        desktopDirty,
+        isDirty,
+        isGuest,
+        mobile,
+        mobileDirty,
+      ],
     );
 
     const handleViewportChange = (nextViewport: DashboardViewport) => {
@@ -129,20 +206,64 @@ export const DashboardLayoutEditor = forwardRef<DashboardLayoutEditorHandle, Pro
       setSelectedViewport(nextViewport);
     };
 
+    const applySelectedLayout = (
+      label: string,
+      updater: (current: DashboardLayout) => DashboardLayout,
+      mergeKey?: string,
+    ) => {
+      if (disabled || !selected.loaded) return false;
+      const before = selected.layout;
+      const after = updater(before);
+      const transaction = createDashboardLayoutTransaction(
+        before,
+        after,
+        selectedViewport,
+        label,
+        mergeKey,
+      );
+      if (!transaction) return false;
+
+      selected.updateLayout(() => after);
+      (selectedViewport === "mobile" ? pushMobileHistory : pushDesktopHistory)(transaction);
+      return true;
+    };
+
     const handleDrop = (group: DashboardCardGroup, targetId: DashboardCardLayout["id"]) => {
-      if (!draggingId || draggingId === targetId || disabled) return;
-      selected.updateLayout((current) =>
-        reorderDashboardCards(current, group, draggingId as DashboardCardLayout["id"], targetId),
+      if (!draggingId || draggingId === targetId) return;
+      applySelectedLayout(
+        `เลื่อน ${CARD_LABELS[draggingId as DashboardCardLayout["id"]]} ในกลุ่ม ${group}`,
+        (current) =>
+          reorderDashboardCards(current, group, draggingId as DashboardCardLayout["id"], targetId),
       );
       setDraggingId(null);
     };
 
-    const resetSelectedLayout = () => {
-      selected.resetLayout();
+    const handleUndo = () => {
+      if (disabled) return;
+      const entry = (selectedViewport === "mobile" ? undoMobileHistory : undoDesktopHistory)();
+      if (!entry) return;
+      selected.updateLayout(() => cloneLayout(entry.before));
       setDraggingId(null);
-      toast.info(
-        `แสดงตัวอย่าง Layout ${selectedViewport === "mobile" ? "มือถือ" : "Desktop"} ค่าเริ่มต้นแล้ว กด Save เพื่อบันทึก`,
+    };
+
+    const handleRedo = () => {
+      if (disabled) return;
+      const entry = (selectedViewport === "mobile" ? redoMobileHistory : redoDesktopHistory)();
+      if (!entry) return;
+      selected.updateLayout(() => cloneLayout(entry.after));
+      setDraggingId(null);
+    };
+
+    const resetSelectedLayout = () => {
+      const changed = applySelectedLayout(`รีเซ็ต Layout ${selectedViewport}`, () =>
+        createDefaultDashboardLayout(selectedViewport),
       );
+      setDraggingId(null);
+      if (changed) {
+        toast.info(
+          `แสดงตัวอย่าง Layout ${selectedViewport === "mobile" ? "มือถือ" : "Desktop"} ค่าเริ่มต้นแล้ว กด Save เพื่อบันทึก`,
+        );
+      }
     };
 
     return (
@@ -167,31 +288,56 @@ export const DashboardLayoutEditor = forwardRef<DashboardLayoutEditorHandle, Pro
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-secondary/50 p-2">
-          <div className="flex items-center gap-1 rounded-lg bg-card p-1">
-            <button
-              type="button"
-              onClick={() => handleViewportChange("mobile")}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-semibold transition ${
-                selectedViewport === "mobile"
-                  ? "bg-primary text-primary-foreground shadow"
-                  : "text-muted-foreground hover:bg-accent"
-              }`}
-            >
-              <Smartphone className="h-3.5 w-3.5" /> Mobile
-            </button>
-            <button
-              type="button"
-              onClick={() => handleViewportChange("desktop")}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-semibold transition ${
-                selectedViewport === "desktop"
-                  ? "bg-primary text-primary-foreground shadow"
-                  : "text-muted-foreground hover:bg-accent"
-              }`}
-            >
-              <Monitor className="h-3.5 w-3.5" /> Desktop
-            </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1 rounded-lg bg-card p-1">
+              <button
+                type="button"
+                onClick={() => handleViewportChange("mobile")}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-semibold transition ${
+                  selectedViewport === "mobile"
+                    ? "bg-primary text-primary-foreground shadow"
+                    : "text-muted-foreground hover:bg-accent"
+                }`}
+              >
+                <Smartphone className="h-3.5 w-3.5" /> Mobile
+              </button>
+              <button
+                type="button"
+                onClick={() => handleViewportChange("desktop")}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-semibold transition ${
+                  selectedViewport === "desktop"
+                    ? "bg-primary text-primary-foreground shadow"
+                    : "text-muted-foreground hover:bg-accent"
+                }`}
+              >
+                <Monitor className="h-3.5 w-3.5" /> Desktop
+              </button>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={handleUndo}
+                disabled={disabled || !selectedHistory.canUndo}
+                aria-label="ย้อนกลับการแก้ไข Layout ล่าสุด"
+                className="rounded-lg border border-border bg-card p-2 text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                <Undo2 className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={handleRedo}
+                disabled={disabled || !selectedHistory.canRedo}
+                aria-label="ทำซ้ำการแก้ไข Layout ล่าสุด"
+                className="rounded-lg border border-border bg-card p-2 text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                <Redo2 className="h-4 w-4" />
+              </button>
+            </div>
           </div>
-          <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+          <span
+            className="flex items-center gap-1 text-[11px] text-muted-foreground"
+            aria-live="polite"
+          >
             {selected.loading ? (
               <>
                 <RefreshCw className="h-3.5 w-3.5 animate-spin" /> กำลังโหลด Layout…
@@ -226,16 +372,28 @@ export const DashboardLayoutEditor = forwardRef<DashboardLayoutEditorHandle, Pro
                       onDragStart={() => setDraggingId(card.id)}
                       onDragEnd={() => setDraggingId(null)}
                       onDrop={() => handleDrop(group.id, card.id)}
-                      onMoveUp={() => moveCard(group.id, card.id, -1, selected.updateLayout)}
-                      onMoveDown={() => moveCard(group.id, card.id, 1, selected.updateLayout)}
+                      onMoveUp={() =>
+                        applySelectedLayout(`เลื่อน ${CARD_LABELS[card.id]} ขึ้น`, (current) =>
+                          moveCard(current, group.id, card.id, -1),
+                        )
+                      }
+                      onMoveDown={() =>
+                        applySelectedLayout(`เลื่อน ${CARD_LABELS[card.id]} ลง`, (current) =>
+                          moveCard(current, group.id, card.id, 1),
+                        )
+                      }
                       onWidthChange={(width) =>
-                        selected.updateLayout((current) =>
-                          updateDashboardCard(current, card.id, { width }),
+                        applySelectedLayout(
+                          `ปรับความกว้าง ${CARD_LABELS[card.id]}`,
+                          (current) => updateDashboardCard(current, card.id, { width }),
+                          `resize-width:${selectedViewport}:${card.id}`,
                         )
                       }
                       onHeightChange={(height) =>
-                        selected.updateLayout((current) =>
-                          updateDashboardCard(current, card.id, { height }),
+                        applySelectedLayout(
+                          `ปรับความสูง ${CARD_LABELS[card.id]}`,
+                          (current) => updateDashboardCard(current, card.id, { height }),
+                          `resize-height:${selectedViewport}:${card.id}`,
                         )
                       }
                     />
@@ -347,16 +505,21 @@ function LayoutCardRow({
 }
 
 function moveCard(
+  layout: DashboardLayout,
   group: DashboardCardGroup,
   cardId: DashboardCardLayout["id"],
   direction: -1 | 1,
-  updateLayout: (updater: (current: DashboardLayout) => DashboardLayout) => void,
-) {
-  updateLayout((current) => {
-    const cards = getDashboardCards(current, group);
-    const index = cards.findIndex((card) => card.id === cardId);
-    const target = cards[index + direction];
-    if (!target) return current;
-    return reorderDashboardCards(current, group, cardId, target.id);
-  });
+): DashboardLayout {
+  const cards = getDashboardCards(layout, group);
+  const index = cards.findIndex((card) => card.id === cardId);
+  const target = cards[index + direction];
+  if (!target) return layout;
+  return reorderDashboardCards(layout, group, cardId, target.id);
+}
+
+function cloneLayout(layout: DashboardLayout): DashboardLayout {
+  return {
+    version: layout.version,
+    cards: layout.cards.map((card) => ({ ...card })),
+  };
 }

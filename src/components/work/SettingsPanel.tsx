@@ -40,6 +40,7 @@ import {
 } from "@/lib/theme";
 import { extractSpreadsheetId, OT_OPTIONS, type RateSettings, type WorkLog } from "@/lib/work-log";
 import { SheetsPanel } from "@/components/work/SheetsPanel";
+import { createSaveCoordinator, type SaveScope } from "@/lib/save-coordinator";
 import { AuthenticationSettings } from "@/components/work/AuthenticationSettings";
 import {
   DashboardLayoutEditor,
@@ -73,7 +74,7 @@ type Props = {
   onSelectBranch: (id: string | null) => void;
   onSaveBranchSettings: (settings: BranchSettings) => Promise<void>;
   onSaveThemeSettings: (settings: CustomColors) => Promise<void>;
-  onSetSpreadsheetId: (id: string) => void;
+  onSetSpreadsheetId: (id: string) => Promise<void>;
   onSyncAirtableAll: () => Promise<void>;
   airtableSyncing?: boolean;
   onSignOut: (scope?: "local" | "global") => Promise<void>;
@@ -286,46 +287,110 @@ export function SettingsPanel({
     return normalized;
   };
 
-  const handleThemeSave = async () => {
-    await onSaveThemeSettings(draftColors);
-    setSavedColors(draftColors);
+  const commitSavedScopes = (savedScopes: readonly SaveScope[], normalizedSheetId: string) => {
+    if (savedScopes.includes("theme")) setSavedColors(draftColors);
+    if (savedScopes.includes("rates")) setSavedRateForm(rateForm);
+    if (savedScopes.includes("spreadsheet")) {
+      setSheetIdInput(normalizedSheetId);
+      setSavedSheetId(normalizedSheetId);
+    }
+    if (savedScopes.includes("branch-rates")) setSavedBranchRateForm(branchRateForm);
+    if (savedScopes.includes("branch-profile")) {
+      setSavedBranchNameInput(branchNameInput);
+      setSavedBranchCodeInput(branchCodeInput);
+    }
   };
 
   const handleRatesSave = async () => {
-    const normalizedSheetId = normalizeSheetId();
-    await onSaveRates(rateForm);
-    onSetSpreadsheetId(normalizedSheetId);
-    setSheetIdInput(normalizedSheetId);
-    setSavedRateForm(rateForm);
-    setSavedSheetId(normalizedSheetId);
+    setIsSaving(true);
+    try {
+      const normalizedSheetId = normalizeSheetId();
+      const coordinator = createSaveCoordinator([
+        {
+          scope: "rates",
+          dirty: JSON.stringify(rateForm) !== JSON.stringify(savedRateForm),
+          save: () => onSaveRates(rateForm),
+        },
+        {
+          scope: "spreadsheet",
+          dirty: sheetIdInput !== savedSheetId,
+          save: () => onSetSpreadsheetId(normalizedSheetId),
+        },
+      ]);
+      const result = await coordinator.save();
+      commitSavedScopes(result.savedScopes, normalizedSheetId);
+      if (result.error) throw result.error;
+      toast.success("บันทึกค่าแรงและ Google Sheets ID แล้ว");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "บันทึกค่าแรงไม่สำเร็จ");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleSaveAll = async () => {
     setIsSaving(true);
     try {
       const normalizedSheetId = normalizeSheetId();
-      await handleThemeSave();
-      await onSaveRates(rateForm);
-      await layoutEditorRef.current?.saveDraft();
-      onSetSpreadsheetId(normalizedSheetId);
-      if (activeBranchId) {
-        if (
-          branchNameInput.trim() &&
-          (branchNameInput !== savedBranchNameInput || branchCodeInput !== savedBranchCodeInput)
-        ) {
-          await onUpdateBranch(activeBranchId, { name: branchNameInput, code: branchCodeInput });
-        }
-        if (JSON.stringify(branchRateForm) !== JSON.stringify(savedBranchRateForm)) {
-          await onSaveBranchSettings(branchRateForm);
-        }
+      const branchProfileDirty = Boolean(
+        activeBranchId &&
+        (branchNameInput !== savedBranchNameInput || branchCodeInput !== savedBranchCodeInput),
+      );
+      const branchRatesDirty = Boolean(
+        activeBranchId && JSON.stringify(branchRateForm) !== JSON.stringify(savedBranchRateForm),
+      );
+      const coordinator = createSaveCoordinator([
+        {
+          scope: "theme",
+          dirty: JSON.stringify(draftColors) !== JSON.stringify(savedColors),
+          save: () => onSaveThemeSettings(draftColors),
+        },
+        {
+          scope: "rates",
+          dirty: JSON.stringify(rateForm) !== JSON.stringify(savedRateForm),
+          save: () => onSaveRates(rateForm),
+        },
+        {
+          scope: "spreadsheet",
+          dirty: sheetIdInput !== savedSheetId,
+          save: () => onSetSpreadsheetId(normalizedSheetId),
+        },
+        {
+          scope: "branch-profile",
+          dirty: branchProfileDirty,
+          validate: () => {
+            if (!branchNameInput.trim()) throw new Error("กรุณากรอกชื่อสาขาก่อนบันทึก");
+          },
+          save: async () => {
+            await onUpdateBranch(activeBranchId as string, {
+              name: branchNameInput,
+              code: branchCodeInput,
+            });
+          },
+        },
+        {
+          scope: "branch-rates",
+          dirty: branchRatesDirty,
+          save: () => onSaveBranchSettings(branchRateForm),
+        },
+        {
+          scope: "layout",
+          dirty: layoutDirty,
+          save: async () => {
+            await layoutEditorRef.current?.saveDraft();
+          },
+        },
+      ]);
+      const result = await coordinator.save();
+      commitSavedScopes(result.savedScopes, normalizedSheetId);
+
+      if (result.error) {
+        const scopeLabel = result.failedScope ? ` (${result.failedScope})` : "";
+        throw new Error(
+          `${result.error instanceof Error ? result.error.message : "บันทึกไม่สำเร็จ"}${scopeLabel}`,
+        );
       }
-      setSavedColors(draftColors);
-      setSavedRateForm(rateForm);
-      setSavedSheetId(normalizedSheetId);
-      setSavedBranchRateForm(branchRateForm);
-      setSavedBranchNameInput(branchNameInput);
-      setSavedBranchCodeInput(branchCodeInput);
-      setLayoutDirty(false);
+
       setIsLocked(true);
       toast.success("บันทึกการตั้งค่าทั้งหมดลง Supabase เรียบร้อยแล้ว");
     } catch (err) {

@@ -527,11 +527,11 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
   );
 
   const setSpreadsheetId = useCallback(
-    (id: string) => {
+    async (id: string) => {
       setSpreadsheetIdState(id);
       storage.setSheetId(id);
       if (useSupabase && userId) {
-        void saveDBUserSettings(userId, { spreadsheet_id: id });
+        await saveDBUserSettings(userId, { spreadsheet_id: id });
       }
     },
     [useSupabase, userId],
