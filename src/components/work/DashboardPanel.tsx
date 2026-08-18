@@ -1,10 +1,13 @@
+import { useEffect, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import {
   CalendarCheck,
   Clock,
   Coins,
+  GripVertical,
   ListChecks,
   MinusCircle,
   RefreshCw,
+  Scaling,
   TrendingUp,
 } from "lucide-react";
 import {
@@ -18,6 +21,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import {
+  reorderDashboardCards,
+  updateDashboardCard,
+  type DashboardCardGroup,
+  type DashboardCardId,
+  type DashboardCardLayout,
+} from "@/lib/dashboard-layout";
+import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { type WorkLog, formatTHB, summarizeMonth } from "@/lib/work-log";
 
 const axisTick = { fill: "var(--muted-foreground)", fontSize: 11 };
@@ -38,8 +49,20 @@ const PIE_COLORS = [
   "var(--chart-5)",
 ];
 
+type DashboardInteraction = {
+  type: "drag" | "resize";
+  cardId: DashboardCardId;
+  group: DashboardCardGroup;
+  startX: number;
+  startY: number;
+  startWidth: number;
+  startHeight: number;
+};
+
 type Props = {
   logs: WorkLog[];
+  userId: string | null;
+  isGuest: boolean;
   chartColors?: string[];
   month: string;
   onMonthChange: (m: string) => void;
@@ -50,6 +73,8 @@ type Props = {
 
 export function DashboardPanel({
   logs,
+  userId,
+  isGuest,
   chartColors,
   month,
   onMonthChange,
@@ -61,9 +86,100 @@ export function DashboardPanel({
   const colors = chartColors?.length
     ? chartColors
     : ["#60a5fa", "#34d399", "#fbbf24", "#f87171", "#a78bfa"];
+  const {
+    layout,
+    viewport,
+    loading: layoutLoading,
+    saving: layoutSaving,
+    updateLayout,
+  } = useDashboardLayout(userId, isGuest);
+  const [activeInteraction, setActiveInteraction] = useState<DashboardInteraction | null>(null);
+  useEffect(() => {
+    if (!activeInteraction) return;
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (activeInteraction.type === "drag") {
+        const target = document
+          .elementFromPoint(event.clientX, event.clientY)
+          ?.closest<HTMLElement>("[data-dashboard-card-id]");
+        const overId = target?.dataset.dashboardCardId as DashboardCardId | undefined;
+        const group = target?.dataset.dashboardCardGroup as DashboardCardGroup | undefined;
+        if (overId && group === activeInteraction.group && overId !== activeInteraction.cardId) {
+          updateLayout((current) =>
+            reorderDashboardCards(
+              current,
+              activeInteraction.group,
+              activeInteraction.cardId,
+              overId,
+            ),
+          );
+        }
+        return;
+      }
+
+      const columns = getGridColumns(activeInteraction.group, viewport);
+      const widthDelta = Math.round((event.clientX - activeInteraction.startX) / 120);
+      const heightDelta = Math.round((event.clientY - activeInteraction.startY) / 96);
+      updateLayout((current) =>
+        updateDashboardCard(current, activeInteraction.cardId, {
+          width: clamp(activeInteraction.startWidth + widthDelta, 1, columns),
+          height: clamp(activeInteraction.startHeight + heightDelta, 1, 8),
+        }),
+      );
+    };
+
+    const handlePointerUp = () => setActiveInteraction(null);
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp, { once: true });
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [activeInteraction, updateLayout, viewport]);
+
+  const beginInteraction = (
+    type: DashboardInteraction["type"],
+    card: DashboardCardLayout,
+    event: ReactPointerEvent,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    setActiveInteraction({
+      type,
+      cardId: card.id,
+      group: card.group,
+      startX: event.clientX,
+      startY: event.clientY,
+      startWidth: card.width,
+      startHeight: card.height,
+    });
+  };
+
+  const cardMap = new Map(layout.cards.map((card) => [card.id, card]));
+  const renderCard = (id: DashboardCardId, content: ReactNode) => {
+    const card = cardMap.get(id);
+    if (!card) return null;
+    return (
+      <EditableDashboardCard
+        key={id}
+        card={card}
+        viewport={viewport}
+        active={activeInteraction?.cardId === id}
+        onPointerDown={beginInteraction}
+      >
+        {content}
+      </EditableDashboardCard>
+    );
+  };
 
   return (
-    <div className="space-y-5">
+    <div
+      className="space-y-5"
+      data-dashboard-viewport={viewport}
+      data-dashboard-layout-loading={layoutLoading ? "true" : "false"}
+      data-dashboard-layout-saving={layoutSaving ? "true" : "false"}
+    >
       <section className="surface-card mx-auto max-w-3xl p-4 sm:p-5">
         <header className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
@@ -85,200 +201,308 @@ export function DashboardPanel({
           />
         </header>
 
-        <div className="mt-5 flex flex-col items-center rounded-xl bg-secondary/60 p-4 text-center sm:p-5">
-          <div className="flex items-center justify-center gap-1.5 text-xs leading-5 text-muted-foreground">
-            <Coins className="h-4 w-4" />
-            รายได้สุทธิรวม
-          </div>
-          <div
-            className="mt-1 break-words text-3xl leading-tight font-bold text-success sm:text-4xl"
-            data-testid="stat-net"
-          >
-            {formatTHB(s.totalNet)}
-          </div>
+        <div className="mt-5 grid grid-cols-1 gap-3">
+          {renderCard(
+            "net-income",
+            <div className="flex h-full min-h-24 flex-col items-center justify-center rounded-xl bg-secondary/60 p-4 text-center sm:p-5">
+              <div className="flex items-center justify-center gap-1.5 text-xs leading-5 text-muted-foreground">
+                <Coins className="h-4 w-4" />
+                รายได้สุทธิรวม
+              </div>
+              <div
+                className="mt-1 break-words text-3xl leading-tight font-bold text-success sm:text-4xl"
+                data-testid="stat-net"
+              >
+                {formatTHB(s.totalNet)}
+              </div>
+            </div>,
+          )}
         </div>
 
         <SummarySection title="บันทึกการทำงาน">
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
-              <Stat
-                compact
-                icon={<CalendarCheck className="h-4 w-4" />}
-                label="วันทำงานทั้งหมด"
-                value={`${s.workDays} วัน`}
-                testId="stat-days"
-              />
-              <Stat
-                compact
-                icon={<TrendingUp className="h-4 w-4" />}
-                label="วันที่มี OT"
-                value={`${s.daysWithOt} วัน`}
-                testId="stat-days-with-ot"
-              />
-              <Stat
-                compact
-                icon={<CalendarCheck className="h-4 w-4" />}
-                label="วันที่ไม่มี OT"
-                value={`${s.daysWithoutOt} วัน`}
-                testId="stat-days-without-ot"
-              />
+              {renderCard(
+                "work-days",
+                <Stat
+                  compact
+                  icon={<CalendarCheck className="h-4 w-4" />}
+                  label="วันทำงานทั้งหมด"
+                  value={`${s.workDays} วัน`}
+                  testId="stat-days"
+                />,
+              )}
+              {renderCard(
+                "days-with-ot",
+                <Stat
+                  compact
+                  icon={<TrendingUp className="h-4 w-4" />}
+                  label="วันที่มี OT"
+                  value={`${s.daysWithOt} วัน`}
+                  testId="stat-days-with-ot"
+                />,
+              )}
+              {renderCard(
+                "days-without-ot",
+                <Stat
+                  compact
+                  icon={<CalendarCheck className="h-4 w-4" />}
+                  label="วันที่ไม่มี OT"
+                  value={`${s.daysWithoutOt} วัน`}
+                  testId="stat-days-without-ot"
+                />,
+              )}
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
-              <Stat
-                compact
-                icon={<ListChecks className="h-4 w-4" />}
-                label="งานที่ทำเสร็จ"
-                value={`${s.totalTasks} งาน`}
-                testId="stat-tasks"
-              />
-              <Stat
-                compact
-                icon={<ListChecks className="h-4 w-4" />}
-                label="เฉลี่ยต่อวัน"
-                value={`${s.avgTasksPerDay} งาน/วัน`}
-                testId="stat-tasks-avg"
-              />
-              <Stat
-                compact
-                icon={<Clock className="h-4 w-4" />}
-                label="ชั่วโมงรวม"
-                value={`${s.totalHours.toFixed(1)} ชม.`}
-                testId="stat-hours"
-              />
+              {renderCard(
+                "tasks",
+                <Stat
+                  compact
+                  icon={<ListChecks className="h-4 w-4" />}
+                  label="งานที่ทำเสร็จ"
+                  value={`${s.totalTasks} งาน`}
+                  testId="stat-tasks"
+                />,
+              )}
+              {renderCard(
+                "tasks-average",
+                <Stat
+                  compact
+                  icon={<ListChecks className="h-4 w-4" />}
+                  label="เฉลี่ยต่อวัน"
+                  value={`${s.avgTasksPerDay} งาน/วัน`}
+                  testId="stat-tasks-avg"
+                />,
+              )}
+              {renderCard(
+                "hours",
+                <Stat
+                  compact
+                  icon={<Clock className="h-4 w-4" />}
+                  label="ชั่วโมงรวม"
+                  value={`${s.totalHours.toFixed(1)} ชม.`}
+                  testId="stat-hours"
+                />,
+              )}
             </div>
           </div>
         </SummarySection>
 
         <SummarySection title="รายรับเสริมและรายการหัก">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
-            <Stat
-              compact
-              icon={<TrendingUp className="h-4 w-4" />}
-              label={`OT ${s.totalOtHours.toFixed(1)} ชม.`}
-              value={formatTHB(s.totalOtIncome)}
-              testId="stat-ot"
-            />
-            <Stat
-              compact
-              icon={<Coins className="h-4 w-4" />}
-              label="เบี้ยเลี้ยง/รายรับอื่น"
-              value={formatTHB(s.totalAllowances)}
-              testId="stat-allowance"
-            />
-            <Stat
-              compact
-              icon={<MinusCircle className="h-4 w-4" />}
-              label="รายการหักรวม"
-              value={formatTHB(s.totalDeductions)}
-              testId="stat-deduction"
-              tone="destructive"
-            />
+            {renderCard(
+              "ot-income",
+              <Stat
+                compact
+                icon={<TrendingUp className="h-4 w-4" />}
+                label={`OT ${s.totalOtHours.toFixed(1)} ชม.`}
+                value={formatTHB(s.totalOtIncome)}
+                testId="stat-ot"
+              />,
+            )}
+            {renderCard(
+              "allowance",
+              <Stat
+                compact
+                icon={<Coins className="h-4 w-4" />}
+                label="เบี้ยเลี้ยง/รายรับอื่น"
+                value={formatTHB(s.totalAllowances)}
+                testId="stat-allowance"
+              />,
+            )}
+            {renderCard(
+              "deductions",
+              <Stat
+                compact
+                icon={<MinusCircle className="h-4 w-4" />}
+                label="รายการหักรวม"
+                value={formatTHB(s.totalDeductions)}
+                testId="stat-deduction"
+                tone="destructive"
+              />,
+            )}
           </div>
         </SummarySection>
       </section>
 
-      <div className="surface-card p-5">
-        <h3 className="mb-3 text-sm font-bold">รายได้รายวัน</h3>
-        {s.dailyIncome.length === 0 ? (
-          <Empty />
-        ) : (
-          <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={s.dailyIncome}>
-                <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={false} />
-                <YAxis tick={axisTick} tickLine={false} axisLine={false} width={44} />
-                <Tooltip
-                  contentStyle={tooltipStyle}
-                  cursor={tooltipCursor}
-                  formatter={(v: number) => formatTHB(v)}
-                />
-                <Bar dataKey="value" fill={colors[0]} radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </div>
-
-      <div className="surface-card p-5">
-        <h3 className="mb-3 text-sm font-bold">จำนวนงานที่ทำเสร็จรายวัน</h3>
-        {s.dailyTasks.length === 0 ? (
-          <Empty />
-        ) : (
-          <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={s.dailyTasks}>
-                <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={false} />
-                <YAxis
-                  tick={axisTick}
-                  tickLine={false}
-                  axisLine={false}
-                  width={30}
-                  allowDecimals={false}
-                />
-                <Tooltip
-                  contentStyle={tooltipStyle}
-                  cursor={tooltipCursor}
-                  formatter={(v: number) => `${v} งาน`}
-                />
-                <Bar dataKey="value" fill={colors[2]} radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </div>
-
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="surface-card p-5">
-          <h3 className="mb-3 text-sm font-bold">สัดส่วนรายได้ตามประเภทงาน</h3>
-          {s.byWorkType.length === 0 ? (
-            <Empty />
-          ) : (
-            <div className="h-56">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={s.byWorkType}
-                    dataKey="value"
-                    nameKey="name"
-                    outerRadius={80}
-                    stroke="var(--card)"
-                    label={{ fill: "var(--foreground)", fontSize: 11 }}
-                  >
-                    {s.byWorkType.map((_, i) => (
-                      <Cell key={i} fill={colors[i % colors.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={tooltipStyle}
-                    cursor={tooltipCursor}
-                    formatter={(v: number) => formatTHB(v)}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </div>
-
-        <div className="surface-card p-5">
-          <h3 className="mb-3 text-sm font-bold">สถานที่ทำงานบ่อยที่สุด (ครั้ง)</h3>
-          {s.byLocation.length === 0 ? (
-            <Empty />
-          ) : (
-            <div className="h-56">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={s.byLocation} layout="vertical">
-                  <XAxis type="number" tick={axisTick} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" width={90} tick={axisTick} />
-                  <Tooltip contentStyle={tooltipStyle} cursor={tooltipCursor} />
-                  <Bar dataKey="value" fill={colors[1]} radius={[0, 6, 6, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </div>
+        {renderCard(
+          "daily-income",
+          <div className="surface-card h-full p-5">
+            <h3 className="mb-3 text-sm font-bold">รายได้รายวัน</h3>
+            {s.dailyIncome.length === 0 ? (
+              <Empty />
+            ) : (
+              <div className="h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={s.dailyIncome}>
+                    <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={false} />
+                    <YAxis tick={axisTick} tickLine={false} axisLine={false} width={44} />
+                    <Tooltip
+                      contentStyle={tooltipStyle}
+                      cursor={tooltipCursor}
+                      formatter={(v: number) => formatTHB(v)}
+                    />
+                    <Bar dataKey="value" fill={colors[0]} radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>,
+        )}
+        {renderCard(
+          "daily-tasks",
+          <div className="surface-card h-full p-5">
+            <h3 className="mb-3 text-sm font-bold">จำนวนงานที่ทำเสร็จรายวัน</h3>
+            {s.dailyTasks.length === 0 ? (
+              <Empty />
+            ) : (
+              <div className="h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={s.dailyTasks}>
+                    <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={false} />
+                    <YAxis
+                      tick={axisTick}
+                      tickLine={false}
+                      axisLine={false}
+                      width={30}
+                      allowDecimals={false}
+                    />
+                    <Tooltip
+                      contentStyle={tooltipStyle}
+                      cursor={tooltipCursor}
+                      formatter={(v: number) => `${v} งาน`}
+                    />
+                    <Bar dataKey="value" fill={colors[2]} radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>,
+        )}
+        {renderCard(
+          "work-type-income",
+          <div className="surface-card h-full p-5">
+            <h3 className="mb-3 text-sm font-bold">สัดส่วนรายได้ตามประเภทงาน</h3>
+            {s.byWorkType.length === 0 ? (
+              <Empty />
+            ) : (
+              <div className="h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={s.byWorkType}
+                      dataKey="value"
+                      nameKey="name"
+                      outerRadius={80}
+                      stroke="var(--card)"
+                      label={{ fill: "var(--foreground)", fontSize: 11 }}
+                    >
+                      {s.byWorkType.map((_, i) => (
+                        <Cell key={i} fill={colors[i % colors.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={tooltipStyle}
+                      cursor={tooltipCursor}
+                      formatter={(v: number) => formatTHB(v)}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>,
+        )}
+        {renderCard(
+          "frequent-location",
+          <div className="surface-card h-full p-5">
+            <h3 className="mb-3 text-sm font-bold">สถานที่ทำงานบ่อยที่สุด (ครั้ง)</h3>
+            {s.byLocation.length === 0 ? (
+              <Empty />
+            ) : (
+              <div className="h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={s.byLocation} layout="vertical">
+                    <XAxis type="number" tick={axisTick} allowDecimals={false} />
+                    <YAxis type="category" dataKey="name" width={90} tick={axisTick} />
+                    <Tooltip contentStyle={tooltipStyle} cursor={tooltipCursor} />
+                    <Bar dataKey="value" fill={colors[1]} radius={[0, 6, 6, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>,
+        )}
       </div>
     </div>
   );
+}
+
+function EditableDashboardCard({
+  card,
+  viewport,
+  active,
+  onPointerDown,
+  children,
+}: {
+  card: DashboardCardLayout;
+  viewport: "mobile" | "desktop";
+  active: boolean;
+  onPointerDown: (
+    type: DashboardInteraction["type"],
+    card: DashboardCardLayout,
+    event: ReactPointerEvent,
+  ) => void;
+  children: ReactNode;
+}) {
+  const columns = getGridColumns(card.group, viewport);
+  const width = clamp(card.width, 1, columns);
+  const minHeight = card.group === "charts" ? card.height * 96 : card.height * 80;
+
+  return (
+    <article
+      className={`relative min-w-0 ${active ? "z-20" : ""}`}
+      data-dashboard-card-id={card.id}
+      data-dashboard-card-group={card.group}
+      data-testid={`dashboard-card-${card.id}`}
+      style={{
+        order: card.order,
+        gridColumn: `span ${width} / span ${width}`,
+        minHeight: `${minHeight}px`,
+      }}
+    >
+      <div className="relative h-full">
+        {children}
+        <div className="absolute right-2 top-2 z-30 flex items-center gap-1 rounded-lg border border-border/70 bg-card/90 p-1 shadow-sm backdrop-blur">
+          <button
+            type="button"
+            aria-label={`ลากการ์ด ${card.id}`}
+            className="touch-none cursor-grab rounded-md p-1 text-muted-foreground transition hover:bg-accent hover:text-foreground active:cursor-grabbing"
+            onPointerDown={(event) => onPointerDown("drag", card, event)}
+          >
+            <GripVertical className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            aria-label={`ปรับขนาดการ์ด ${card.id}`}
+            className="touch-none cursor-se-resize rounded-md p-1 text-muted-foreground transition hover:bg-accent hover:text-foreground"
+            onPointerDown={(event) => onPointerDown("resize", card, event)}
+          >
+            <Scaling className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function getGridColumns(group: DashboardCardGroup, viewport: "mobile" | "desktop"): number {
+  if (group === "charts") return viewport === "mobile" ? 1 : 2;
+  return viewport === "mobile" ? 2 : 3;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
 }
 
 function Empty() {
@@ -325,7 +549,7 @@ function DashboardControls({
   );
 }
 
-function SummarySection({ title, children }: { title: string; children: React.ReactNode }) {
+function SummarySection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="mt-5 border-t border-border pt-4">
       <h3 className="mb-3 text-xs font-bold text-muted-foreground">{title}</h3>
@@ -342,7 +566,7 @@ function Stat({
   tone,
   compact = false,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   value: string;
   testId: string;
@@ -356,7 +580,7 @@ function Stat({
         ? "text-destructive"
         : "text-foreground";
   return (
-    <div className={`surface-card min-w-0 ${compact ? "p-3" : "p-4"}`}>
+    <div className={`surface-card h-full min-w-0 ${compact ? "p-3" : "p-4"}`}>
       <div className="flex min-w-0 items-start gap-1.5 text-xs leading-5 text-muted-foreground">
         {icon}
         <span className="min-w-0 break-words">{label}</span>

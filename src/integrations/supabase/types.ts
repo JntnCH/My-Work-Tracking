@@ -99,6 +99,13 @@ type BranchSettingsRow = {
   updated_at: string;
 };
 
+type DashboardLayoutRow = {
+  user_id: string;
+  viewport: "mobile" | "desktop";
+  layout: Json;
+  updated_at: string;
+};
+
 export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.15";
@@ -135,6 +142,11 @@ export type Database = {
         BranchSettingsRow,
         Partial<BranchSettingsRow> & Pick<BranchSettingsRow, "branch_id" | "user_id">,
         Partial<BranchSettingsRow>
+      >;
+      dashboard_layouts: TableDefinition<
+        DashboardLayoutRow,
+        Partial<DashboardLayoutRow> & Pick<DashboardLayoutRow, "user_id" | "viewport">,
+        Partial<DashboardLayoutRow>
       >;
     };
     Views: Record<string, never>;

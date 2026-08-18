@@ -215,6 +215,8 @@ function Index() {
         ) : tab === "dashboard" ? (
           <DashboardPanel
             logs={tracker.logs}
+            userId={userId}
+            isGuest={isGuest}
             chartColors={tracker.themeSettings.chartColors}
             month={month}
             onMonthChange={setMonth}
