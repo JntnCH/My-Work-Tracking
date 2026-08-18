@@ -1,7 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import {
-  ArrowDown,
-  ArrowUp,
   Check,
   GripVertical,
   Monitor,
@@ -16,20 +14,21 @@ import { useEditorHistory } from "@/hooks/use-editor-history";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import {
   createDefaultDashboardLayout,
-  getDashboardCards,
-  reorderDashboardCards,
   updateDashboardCard,
-  type DashboardCardGroup,
   type DashboardCardLayout,
   type DashboardLayout,
   type DashboardViewport,
 } from "@/lib/dashboard-layout";
 import { createDashboardLayoutTransaction, dashboardLayoutsEqual } from "@/lib/editor-history";
+import { DashboardCustomizationCanvas } from "@/components/work/DashboardCustomizationCanvas";
+import type { MonthlySummary } from "@/lib/work-log";
 
 type Props = {
   userId: string;
   isGuest: boolean;
   disabled: boolean;
+  summary: MonthlySummary;
+  chartColors?: string[];
   onDirtyChange?: (isDirty: boolean) => void;
 };
 
@@ -47,13 +46,6 @@ export type DashboardLayoutEditorHandle = {
   clearHistory: () => void;
   getDraftStatus: () => DashboardLayoutDraftStatus;
 };
-
-const GROUPS: Array<{ id: DashboardCardGroup; label: string }> = [
-  { id: "net", label: "รายได้สุทธิ" },
-  { id: "work", label: "สถิติการทำงาน" },
-  { id: "income", label: "รายรับและรายการหัก" },
-  { id: "charts", label: "กราฟ" },
-];
 
 const CARD_LABELS: Record<DashboardCardLayout["id"], string> = {
   "net-income": "รายได้สุทธิรวม",
@@ -73,9 +65,12 @@ const CARD_LABELS: Record<DashboardCardLayout["id"], string> = {
 };
 
 export const DashboardLayoutEditor = forwardRef<DashboardLayoutEditorHandle, Props>(
-  function DashboardLayoutEditor({ userId, isGuest, disabled, onDirtyChange }, ref) {
+  function DashboardLayoutEditor(
+    { userId, isGuest, disabled, summary, chartColors, onDirtyChange },
+    ref,
+  ) {
     const [selectedViewport, setSelectedViewport] = useState<DashboardViewport>("mobile");
-    const [draggingId, setDraggingId] = useState<string | null>(null);
+    const [selectedCardId, setSelectedCardId] = useState<DashboardCardLayout["id"] | null>(null);
     const mobile = useDashboardLayout(userId, isGuest, "mobile");
     const desktop = useDashboardLayout(userId, isGuest, "desktop");
     const mobileHistory = useEditorHistory();
@@ -168,7 +163,7 @@ export const DashboardLayoutEditor = forwardRef<DashboardLayoutEditorHandle, Pro
           }
           clearMobileHistory();
           clearDesktopHistory();
-          setDraggingId(null);
+          setSelectedCardId(null);
         },
         clearHistory() {
           clearMobileHistory();
@@ -202,7 +197,7 @@ export const DashboardLayoutEditor = forwardRef<DashboardLayoutEditorHandle, Pro
 
     const handleViewportChange = (nextViewport: DashboardViewport) => {
       if (nextViewport === selectedViewport) return;
-      setDraggingId(null);
+      setSelectedCardId(null);
       setSelectedViewport(nextViewport);
     };
 
@@ -228,14 +223,23 @@ export const DashboardLayoutEditor = forwardRef<DashboardLayoutEditorHandle, Pro
       return true;
     };
 
-    const handleDrop = (group: DashboardCardGroup, targetId: DashboardCardLayout["id"]) => {
-      if (!draggingId || draggingId === targetId) return;
+    const handleCanvasMove = (id: DashboardCardLayout["id"], patch: { x: number; y: number }) => {
       applySelectedLayout(
-        `เลื่อน ${CARD_LABELS[draggingId as DashboardCardLayout["id"]]} ในกลุ่ม ${group}`,
-        (current) =>
-          reorderDashboardCards(current, group, draggingId as DashboardCardLayout["id"], targetId),
+        `ลาก ${CARD_LABELS[id]}`,
+        (current) => updateDashboardCard(current, id, patch),
+        `drag:${selectedViewport}:${id}`,
       );
-      setDraggingId(null);
+    };
+
+    const handleCanvasResize = (
+      id: DashboardCardLayout["id"],
+      patch: { width: number; height: number; x: number; y: number },
+    ) => {
+      applySelectedLayout(
+        `ปรับขนาด ${CARD_LABELS[id]}`,
+        (current) => updateDashboardCard(current, id, patch),
+        `resize:${selectedViewport}:${id}`,
+      );
     };
 
     const handleUndo = () => {
@@ -243,7 +247,7 @@ export const DashboardLayoutEditor = forwardRef<DashboardLayoutEditorHandle, Pro
       const entry = (selectedViewport === "mobile" ? undoMobileHistory : undoDesktopHistory)();
       if (!entry) return;
       selected.updateLayout(() => cloneLayout(entry.before));
-      setDraggingId(null);
+      setSelectedCardId(null);
     };
 
     const handleRedo = () => {
@@ -251,14 +255,14 @@ export const DashboardLayoutEditor = forwardRef<DashboardLayoutEditorHandle, Pro
       const entry = (selectedViewport === "mobile" ? redoMobileHistory : redoDesktopHistory)();
       if (!entry) return;
       selected.updateLayout(() => cloneLayout(entry.after));
-      setDraggingId(null);
+      setSelectedCardId(null);
     };
 
     const resetSelectedLayout = () => {
       const changed = applySelectedLayout(`รีเซ็ต Layout ${selectedViewport}`, () =>
         createDefaultDashboardLayout(selectedViewport),
       );
-      setDraggingId(null);
+      setSelectedCardId(null);
       if (changed) {
         toast.info(
           `แสดงตัวอย่าง Layout ${selectedViewport === "mobile" ? "มือถือ" : "Desktop"} ค่าเริ่มต้นแล้ว กด Save เพื่อบันทึก`,
@@ -354,168 +358,21 @@ export const DashboardLayoutEditor = forwardRef<DashboardLayoutEditorHandle, Pro
           </span>
         </div>
 
-        <fieldset disabled={disabled} className="space-y-5">
-          {GROUPS.map((group) => {
-            const cards = getDashboardCards(selected.layout, group.id);
-            return (
-              <div key={group.id} className="space-y-2">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  {group.label}
-                </h4>
-                <div className="space-y-2">
-                  {cards.map((card) => (
-                    <LayoutCardRow
-                      key={card.id}
-                      card={card}
-                      viewport={selectedViewport}
-                      dragging={draggingId === card.id}
-                      onDragStart={() => setDraggingId(card.id)}
-                      onDragEnd={() => setDraggingId(null)}
-                      onDrop={() => handleDrop(group.id, card.id)}
-                      onMoveUp={() =>
-                        applySelectedLayout(`เลื่อน ${CARD_LABELS[card.id]} ขึ้น`, (current) =>
-                          moveCard(current, group.id, card.id, -1),
-                        )
-                      }
-                      onMoveDown={() =>
-                        applySelectedLayout(`เลื่อน ${CARD_LABELS[card.id]} ลง`, (current) =>
-                          moveCard(current, group.id, card.id, 1),
-                        )
-                      }
-                      onWidthChange={(width) =>
-                        applySelectedLayout(
-                          `ปรับความกว้าง ${CARD_LABELS[card.id]}`,
-                          (current) => updateDashboardCard(current, card.id, { width }),
-                          `resize-width:${selectedViewport}:${card.id}`,
-                        )
-                      }
-                      onHeightChange={(height) =>
-                        applySelectedLayout(
-                          `ปรับความสูง ${CARD_LABELS[card.id]}`,
-                          (current) => updateDashboardCard(current, card.id, { height }),
-                          `resize-height:${selectedViewport}:${card.id}`,
-                        )
-                      }
-                    />
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </fieldset>
+        <DashboardCustomizationCanvas
+          layout={selected.layout}
+          viewport={selectedViewport}
+          summary={summary}
+          chartColors={chartColors}
+          disabled={disabled || selected.loading}
+          selectedCardId={selectedCardId}
+          onSelectCard={setSelectedCardId}
+          onMoveCard={handleCanvasMove}
+          onResizeCard={handleCanvasResize}
+        />
       </section>
     );
   },
 );
-
-function LayoutCardRow({
-  card,
-  viewport,
-  dragging,
-  onDragStart,
-  onDragEnd,
-  onDrop,
-  onMoveUp,
-  onMoveDown,
-  onWidthChange,
-  onHeightChange,
-}: {
-  card: DashboardCardLayout;
-  viewport: DashboardViewport;
-  dragging: boolean;
-  onDragStart: () => void;
-  onDragEnd: () => void;
-  onDrop: () => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
-  onWidthChange: (width: number) => void;
-  onHeightChange: (height: number) => void;
-}) {
-  const maxWidth =
-    card.group === "charts" ? (viewport === "mobile" ? 1 : 2) : viewport === "mobile" ? 2 : 3;
-  const maxHeight = card.group === "charts" ? 6 : 3;
-  return (
-    <div
-      draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      onDragOver={(event) => event.preventDefault()}
-      onDrop={(event) => {
-        event.preventDefault();
-        onDrop();
-      }}
-      className={`flex flex-col gap-3 rounded-xl border bg-card p-3 transition sm:flex-row sm:items-center ${
-        dragging ? "border-primary bg-primary/5 opacity-60" : "border-border"
-      }`}
-    >
-      <div className="flex min-w-0 flex-1 items-center gap-2">
-        <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <span className="min-w-0 truncate text-sm font-semibold">{CARD_LABELS[card.id]}</span>
-      </div>
-      <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
-        <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          กว้าง
-          <select
-            value={card.width}
-            onChange={(event) => onWidthChange(Number(event.target.value))}
-            className="rounded-lg border border-input bg-secondary px-2 py-1.5 text-xs text-foreground"
-          >
-            {Array.from({ length: maxWidth }, (_, index) => index + 1).map((value) => (
-              <option key={value} value={value}>
-                {value}/{maxWidth}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          สูง
-          <select
-            value={card.height}
-            onChange={(event) => onHeightChange(Number(event.target.value))}
-            className="rounded-lg border border-input bg-secondary px-2 py-1.5 text-xs text-foreground"
-          >
-            {Array.from({ length: maxHeight }, (_, index) => index + 1).map((value) => (
-              <option key={value} value={value}>
-                {value} แถว
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="col-span-2 flex items-center justify-end gap-1 sm:col-span-1">
-          <button
-            type="button"
-            onClick={onMoveUp}
-            aria-label={`เลื่อน ${CARD_LABELS[card.id]} ขึ้น`}
-            className="rounded-lg p-1.5 text-muted-foreground transition hover:bg-accent hover:text-foreground"
-          >
-            <ArrowUp className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={onMoveDown}
-            aria-label={`เลื่อน ${CARD_LABELS[card.id]} ลง`}
-            className="rounded-lg p-1.5 text-muted-foreground transition hover:bg-accent hover:text-foreground"
-          >
-            <ArrowDown className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function moveCard(
-  layout: DashboardLayout,
-  group: DashboardCardGroup,
-  cardId: DashboardCardLayout["id"],
-  direction: -1 | 1,
-): DashboardLayout {
-  const cards = getDashboardCards(layout, group);
-  const index = cards.findIndex((card) => card.id === cardId);
-  const target = cards[index + direction];
-  if (!target) return layout;
-  return reorderDashboardCards(layout, group, cardId, target.id);
-}
 
 function cloneLayout(layout: DashboardLayout): DashboardLayout {
   return {

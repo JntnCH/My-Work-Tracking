@@ -261,6 +261,7 @@ function Index() {
             themeSettings={tracker.themeSettings}
             spreadsheetId={tracker.spreadsheetId}
             logs={tracker.logs}
+            previewMonth={month}
             onAddWorkType={tracker.addWorkType}
             onEditWorkType={tracker.editWorkType}
             onToggleWorkType={tracker.toggleWorkType}

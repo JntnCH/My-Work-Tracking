@@ -38,7 +38,13 @@ import {
   type DensityOption,
   type ThemeMode,
 } from "@/lib/theme";
-import { extractSpreadsheetId, OT_OPTIONS, type RateSettings, type WorkLog } from "@/lib/work-log";
+import {
+  extractSpreadsheetId,
+  OT_OPTIONS,
+  summarizeMonth,
+  type RateSettings,
+  type WorkLog,
+} from "@/lib/work-log";
 import { SheetsPanel } from "@/components/work/SheetsPanel";
 import { createSaveCoordinator, type SaveScope } from "@/lib/save-coordinator";
 import { AuthenticationSettings } from "@/components/work/AuthenticationSettings";
@@ -57,6 +63,7 @@ type Props = {
   themeSettings: CustomColors;
   spreadsheetId: string;
   logs: WorkLog[];
+  previewMonth: string;
   onAddWorkType: (name: string) => Promise<void>;
   onEditWorkType: (id: string, name: string) => Promise<void>;
   onToggleWorkType: (id: string) => Promise<void>;
@@ -101,6 +108,7 @@ export function SettingsPanel({
   themeSettings,
   spreadsheetId,
   logs,
+  previewMonth,
   onAddWorkType,
   onEditWorkType,
   onToggleWorkType,
@@ -1217,7 +1225,11 @@ export function SettingsPanel({
                           label="ค่าแรง/วัน"
                           value={branchRateForm.dailyRate}
                           onChange={(value) =>
-                            setBranchRateForm({ ...branchRateForm, dailyRate: value })
+                            setBranchRateForm((current) =>
+                              value === undefined
+                                ? omitBranchRateField(current, "dailyRate")
+                                : { ...current, dailyRate: value },
+                            )
                           }
                         />
                         <div>
@@ -1227,11 +1239,11 @@ export function SettingsPanel({
                           <select
                             value={String(branchRateForm.defaultOtType ?? "")}
                             onChange={(e) =>
-                              setBranchRateForm({
-                                ...branchRateForm,
-                                defaultOtType:
-                                  e.target.value === "" ? undefined : Number(e.target.value),
-                              })
+                              setBranchRateForm((current) =>
+                                e.target.value === ""
+                                  ? omitBranchRateField(current, "defaultOtType")
+                                  : { ...current, defaultOtType: Number(e.target.value) },
+                              )
                             }
                             className="w-full rounded-xl border border-input bg-background p-2.5 text-sm"
                           >
@@ -1247,28 +1259,44 @@ export function SettingsPanel({
                           label="ค่าเดินทาง"
                           value={branchRateForm.travelCost}
                           onChange={(value) =>
-                            setBranchRateForm({ ...branchRateForm, travelCost: value })
+                            setBranchRateForm((current) =>
+                              value === undefined
+                                ? omitBranchRateField(current, "travelCost")
+                                : { ...current, travelCost: value },
+                            )
                           }
                         />
                         <BranchNumberField
                           label="ค่าอาหาร"
                           value={branchRateForm.foodCost}
                           onChange={(value) =>
-                            setBranchRateForm({ ...branchRateForm, foodCost: value })
+                            setBranchRateForm((current) =>
+                              value === undefined
+                                ? omitBranchRateField(current, "foodCost")
+                                : { ...current, foodCost: value },
+                            )
                           }
                         />
                         <BranchNumberField
                           label="รายรับอื่น"
                           value={branchRateForm.otherIncome}
                           onChange={(value) =>
-                            setBranchRateForm({ ...branchRateForm, otherIncome: value })
+                            setBranchRateForm((current) =>
+                              value === undefined
+                                ? omitBranchRateField(current, "otherIncome")
+                                : { ...current, otherIncome: value },
+                            )
                           }
                         />
                         <BranchNumberField
                           label="รายการหัก"
                           value={branchRateForm.otherDeductions}
                           onChange={(value) =>
-                            setBranchRateForm({ ...branchRateForm, otherDeductions: value })
+                            setBranchRateForm((current) =>
+                              value === undefined
+                                ? omitBranchRateField(current, "otherDeductions")
+                                : { ...current, otherDeductions: value },
+                            )
                           }
                         />
                       </div>
@@ -1343,6 +1371,8 @@ export function SettingsPanel({
           userId={_userId}
           isGuest={isGuest}
           disabled={isLocked}
+          summary={summarizeMonth(logs, previewMonth)}
+          chartColors={draftColors.chartColors}
           onDirtyChange={setLayoutDirty}
         />
       )}
@@ -1422,6 +1452,15 @@ export function SettingsPanel({
   );
 }
 
+function omitBranchRateField<K extends keyof BranchSettings>(
+  current: BranchSettings,
+  key: K,
+): BranchSettings {
+  const next = { ...current };
+  delete next[key];
+  return next;
+}
+
 function BranchNumberField({
   label,
   value,
@@ -1455,7 +1494,7 @@ function ColorPickerField({
   onChange,
 }: {
   label: string;
-  hint?: string;
+  hint?: string | undefined;
   value: string;
   onChange: (val: string) => void;
 }) {

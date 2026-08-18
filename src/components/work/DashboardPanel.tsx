@@ -1,60 +1,24 @@
 import { useEffect, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import {
-  CalendarCheck,
-  Clock,
-  Coins,
-  ListChecks,
-  MinusCircle,
-  RefreshCw,
-  TrendingUp,
-} from "lucide-react";
-import {
-  Bar,
-  BarChart,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { RefreshCw } from "lucide-react";
 import {
   type DashboardCardGroup,
   type DashboardCardId,
   type DashboardCardLayout,
 } from "@/lib/dashboard-layout";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
-import { type WorkLog, formatTHB, summarizeMonth } from "@/lib/work-log";
-
-const axisTick = { fill: "var(--muted-foreground)", fontSize: 11 };
-const tooltipStyle = {
-  backgroundColor: "var(--popover)",
-  border: "1px solid var(--border)",
-  borderRadius: "0.75rem",
-  color: "var(--popover-foreground)",
-  fontSize: "12px",
-};
-const tooltipCursor = { fill: "color-mix(in oklab, var(--muted-foreground) 12%, transparent)" };
-
-const PIE_COLORS = [
-  "var(--chart-1)",
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-4)",
-  "var(--chart-5)",
-];
+import { type WorkLog, summarizeMonth } from "@/lib/work-log";
+import { DEFAULT_CHART_COLORS, renderDashboardCardContent } from "@/lib/dashboard-card-content";
 
 type Props = {
   logs: WorkLog[];
   userId: string | null;
   isGuest: boolean;
-  chartColors?: string[];
+  chartColors: string[] | undefined;
   month: string;
   onMonthChange: (m: string) => void;
-  spreadsheetId?: string;
-  syncing?: boolean;
-  onRefresh?: () => void;
+  spreadsheetId: string | undefined;
+  syncing: boolean | undefined;
+  onRefresh: (() => void) | undefined;
 };
 
 export function DashboardPanel({
@@ -69,9 +33,7 @@ export function DashboardPanel({
   onRefresh,
 }: Props) {
   const s = summarizeMonth(logs, month);
-  const colors = chartColors?.length
-    ? chartColors
-    : ["#60a5fa", "#34d399", "#fbbf24", "#f87171", "#a78bfa"];
+  const colors = chartColors?.length ? chartColors : DEFAULT_CHART_COLORS;
   const { layout, viewport, loading: layoutLoading } = useDashboardLayout(userId, isGuest);
 
   const cardMap = new Map(layout.cards.map((card) => [card.id, card]));
@@ -113,236 +75,43 @@ export function DashboardPanel({
         </header>
 
         <div className="mt-5 grid grid-cols-1 gap-3">
-          {renderCard(
-            "net-income",
-            <div className="flex h-full min-h-24 flex-col items-center justify-center rounded-xl bg-secondary/60 p-4 text-center sm:p-5">
-              <div className="flex items-center justify-center gap-1.5 text-xs leading-5 text-muted-foreground">
-                <Coins className="h-4 w-4" />
-                รายได้สุทธิรวม
-              </div>
-              <div
-                className="mt-1 break-words text-3xl leading-tight font-bold text-success sm:text-4xl"
-                data-testid="stat-net"
-              >
-                {formatTHB(s.totalNet)}
-              </div>
-            </div>,
-          )}
+          {renderCard("net-income", renderDashboardCardContent("net-income", s, colors))}
         </div>
 
         <SummarySection title="บันทึกการทำงาน">
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
-              {renderCard(
-                "work-days",
-                <Stat
-                  compact
-                  icon={<CalendarCheck className="h-4 w-4" />}
-                  label="วันทำงานทั้งหมด"
-                  value={`${s.workDays} วัน`}
-                  testId="stat-days"
-                />,
-              )}
-              {renderCard(
-                "days-with-ot",
-                <Stat
-                  compact
-                  icon={<TrendingUp className="h-4 w-4" />}
-                  label="วันที่มี OT"
-                  value={`${s.daysWithOt} วัน`}
-                  testId="stat-days-with-ot"
-                />,
-              )}
+              {renderCard("work-days", renderDashboardCardContent("work-days", s, colors))}
+              {renderCard("days-with-ot", renderDashboardCardContent("days-with-ot", s, colors))}
               {renderCard(
                 "days-without-ot",
-                <Stat
-                  compact
-                  icon={<CalendarCheck className="h-4 w-4" />}
-                  label="วันที่ไม่มี OT"
-                  value={`${s.daysWithoutOt} วัน`}
-                  testId="stat-days-without-ot"
-                />,
+                renderDashboardCardContent("days-without-ot", s, colors),
               )}
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
-              {renderCard(
-                "tasks",
-                <Stat
-                  compact
-                  icon={<ListChecks className="h-4 w-4" />}
-                  label="งานที่ทำเสร็จ"
-                  value={`${s.totalTasks} งาน`}
-                  testId="stat-tasks"
-                />,
-              )}
-              {renderCard(
-                "tasks-average",
-                <Stat
-                  compact
-                  icon={<ListChecks className="h-4 w-4" />}
-                  label="เฉลี่ยต่อวัน"
-                  value={`${s.avgTasksPerDay} งาน/วัน`}
-                  testId="stat-tasks-avg"
-                />,
-              )}
-              {renderCard(
-                "hours",
-                <Stat
-                  compact
-                  icon={<Clock className="h-4 w-4" />}
-                  label="ชั่วโมงรวม"
-                  value={`${s.totalHours.toFixed(1)} ชม.`}
-                  testId="stat-hours"
-                />,
-              )}
+              {renderCard("tasks", renderDashboardCardContent("tasks", s, colors))}
+              {renderCard("tasks-average", renderDashboardCardContent("tasks-average", s, colors))}
+              {renderCard("hours", renderDashboardCardContent("hours", s, colors))}
             </div>
           </div>
         </SummarySection>
 
         <SummarySection title="รายรับเสริมและรายการหัก">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
-            {renderCard(
-              "ot-income",
-              <Stat
-                compact
-                icon={<TrendingUp className="h-4 w-4" />}
-                label={`OT ${s.totalOtHours.toFixed(1)} ชม.`}
-                value={formatTHB(s.totalOtIncome)}
-                testId="stat-ot"
-              />,
-            )}
-            {renderCard(
-              "allowance",
-              <Stat
-                compact
-                icon={<Coins className="h-4 w-4" />}
-                label="เบี้ยเลี้ยง/รายรับอื่น"
-                value={formatTHB(s.totalAllowances)}
-                testId="stat-allowance"
-              />,
-            )}
-            {renderCard(
-              "deductions",
-              <Stat
-                compact
-                icon={<MinusCircle className="h-4 w-4" />}
-                label="รายการหักรวม"
-                value={formatTHB(s.totalDeductions)}
-                testId="stat-deduction"
-                tone="destructive"
-              />,
-            )}
+            {renderCard("ot-income", renderDashboardCardContent("ot-income", s, colors))}
+            {renderCard("allowance", renderDashboardCardContent("allowance", s, colors))}
+            {renderCard("deductions", renderDashboardCardContent("deductions", s, colors))}
           </div>
         </SummarySection>
       </section>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {renderCard(
-          "daily-income",
-          <div className="surface-card h-full p-5">
-            <h3 className="mb-3 text-sm font-bold">รายได้รายวัน</h3>
-            {s.dailyIncome.length === 0 ? (
-              <Empty />
-            ) : (
-              <div className="h-56">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={s.dailyIncome}>
-                    <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={false} />
-                    <YAxis tick={axisTick} tickLine={false} axisLine={false} width={44} />
-                    <Tooltip
-                      contentStyle={tooltipStyle}
-                      cursor={tooltipCursor}
-                      formatter={(v: number) => formatTHB(v)}
-                    />
-                    <Bar dataKey="value" fill={colors[0]} radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </div>,
-        )}
-        {renderCard(
-          "daily-tasks",
-          <div className="surface-card h-full p-5">
-            <h3 className="mb-3 text-sm font-bold">จำนวนงานที่ทำเสร็จรายวัน</h3>
-            {s.dailyTasks.length === 0 ? (
-              <Empty />
-            ) : (
-              <div className="h-56">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={s.dailyTasks}>
-                    <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={false} />
-                    <YAxis
-                      tick={axisTick}
-                      tickLine={false}
-                      axisLine={false}
-                      width={30}
-                      allowDecimals={false}
-                    />
-                    <Tooltip
-                      contentStyle={tooltipStyle}
-                      cursor={tooltipCursor}
-                      formatter={(v: number) => `${v} งาน`}
-                    />
-                    <Bar dataKey="value" fill={colors[2]} radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </div>,
-        )}
-        {renderCard(
-          "work-type-income",
-          <div className="surface-card h-full p-5">
-            <h3 className="mb-3 text-sm font-bold">สัดส่วนรายได้ตามประเภทงาน</h3>
-            {s.byWorkType.length === 0 ? (
-              <Empty />
-            ) : (
-              <div className="h-56">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={s.byWorkType}
-                      dataKey="value"
-                      nameKey="name"
-                      outerRadius={80}
-                      stroke="var(--card)"
-                      label={{ fill: "var(--foreground)", fontSize: 11 }}
-                    >
-                      {s.byWorkType.map((_, i) => (
-                        <Cell key={i} fill={colors[i % colors.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={tooltipStyle}
-                      cursor={tooltipCursor}
-                      formatter={(v: number) => formatTHB(v)}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </div>,
-        )}
+        {renderCard("daily-income", renderDashboardCardContent("daily-income", s, colors))}
+        {renderCard("daily-tasks", renderDashboardCardContent("daily-tasks", s, colors))}
+        {renderCard("work-type-income", renderDashboardCardContent("work-type-income", s, colors))}
         {renderCard(
           "frequent-location",
-          <div className="surface-card h-full p-5">
-            <h3 className="mb-3 text-sm font-bold">สถานที่ทำงานบ่อยที่สุด (ครั้ง)</h3>
-            {s.byLocation.length === 0 ? (
-              <Empty />
-            ) : (
-              <div className="h-56">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={s.byLocation} layout="vertical">
-                    <XAxis type="number" tick={axisTick} allowDecimals={false} />
-                    <YAxis type="category" dataKey="name" width={90} tick={axisTick} />
-                    <Tooltip contentStyle={tooltipStyle} cursor={tooltipCursor} />
-                    <Bar dataKey="value" fill={colors[1]} radius={[0, 6, 6, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </div>,
+          renderDashboardCardContent("frequent-location", s, colors),
         )}
       </div>
     </div>
@@ -388,12 +157,6 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-function Empty() {
-  return (
-    <p className="py-10 text-center text-xs text-muted-foreground">ไม่มีข้อมูลในเดือนที่เลือก</p>
-  );
-}
-
 function DashboardControls({
   spreadsheetId,
   syncing,
@@ -401,9 +164,9 @@ function DashboardControls({
   month,
   onMonthChange,
 }: {
-  spreadsheetId?: string;
-  syncing?: boolean;
-  onRefresh?: () => void;
+  spreadsheetId: string | undefined;
+  syncing: boolean | undefined;
+  onRefresh: (() => void) | undefined;
   month: string;
   onMonthChange: (month: string) => void;
 }) {
@@ -438,42 +201,5 @@ function SummarySection({ title, children }: { title: string; children: ReactNod
       <h3 className="mb-3 text-xs font-bold text-muted-foreground">{title}</h3>
       {children}
     </section>
-  );
-}
-
-function Stat({
-  icon,
-  label,
-  value,
-  testId,
-  tone,
-  compact = false,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-  testId: string;
-  tone?: "success" | "destructive";
-  compact?: boolean;
-}) {
-  const toneCls =
-    tone === "success"
-      ? "text-success"
-      : tone === "destructive"
-        ? "text-destructive"
-        : "text-foreground";
-  return (
-    <div className={`surface-card h-full min-w-0 ${compact ? "p-3" : "p-4"}`}>
-      <div className="flex min-w-0 items-start gap-1.5 text-xs leading-5 text-muted-foreground">
-        {icon}
-        <span className="min-w-0 break-words">{label}</span>
-      </div>
-      <div
-        className={`mt-1 break-words text-xl leading-tight font-bold ${toneCls}`}
-        data-testid={testId}
-      >
-        {value}
-      </div>
-    </div>
   );
 }

@@ -52,7 +52,9 @@ export function dashboardLayoutsEqual(a: DashboardLayout, b: DashboardLayout): b
       card.group === other.group &&
       card.order === other.order &&
       card.width === other.width &&
-      card.height === other.height
+      card.height === other.height &&
+      card.x === other.x &&
+      card.y === other.y
     );
   });
 }

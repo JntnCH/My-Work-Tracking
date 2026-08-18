@@ -26,6 +26,10 @@ export type DashboardCardLayout = {
   order: number;
   width: number;
   height: number;
+  /** Horizontal position as a percentage of the customization canvas. */
+  x: number;
+  /** Vertical position as a percentage of the customization canvas. */
+  y: number;
 };
 
 export type DashboardLayout = {
@@ -59,20 +63,68 @@ export function createDefaultDashboardLayout(viewport: DashboardViewport): Dashb
   return {
     version: 1,
     cards: [
-      { id: "net-income", group: "net", order: 0, width: fullWidth, height: 1 },
-      { id: "work-days", group: "work", order: 0, width: 1, height: 1 },
-      { id: "days-with-ot", group: "work", order: 1, width: 1, height: 1 },
-      { id: "days-without-ot", group: "work", order: 2, width: 1, height: 1 },
-      { id: "tasks", group: "work", order: 3, width: 1, height: 1 },
-      { id: "tasks-average", group: "work", order: 4, width: 1, height: 1 },
-      { id: "hours", group: "work", order: 5, width: 1, height: 1 },
-      { id: "ot-income", group: "income", order: 0, width: 1, height: 1 },
-      { id: "allowance", group: "income", order: 1, width: 1, height: 1 },
-      { id: "deductions", group: "income", order: 2, width: 1, height: 1 },
-      { id: "daily-income", group: "charts", order: 0, width: 1, height: 3 },
-      { id: "daily-tasks", group: "charts", order: 1, width: 1, height: 3 },
-      { id: "work-type-income", group: "charts", order: 2, width: 1, height: 3 },
-      { id: "frequent-location", group: "charts", order: 3, width: 1, height: 3 },
+      { id: "net-income", group: "net", order: 0, width: fullWidth, height: 1, x: 0, y: 0 },
+      { id: "work-days", group: "work", order: 0, width: 1, height: 1, x: 0, y: 9 },
+      {
+        id: "days-with-ot",
+        group: "work",
+        order: 1,
+        width: 1,
+        height: 1,
+        x: mobile ? 50 : 33.333,
+        y: 9,
+      },
+      { id: "days-without-ot", group: "work", order: 2, width: 1, height: 1, x: 0, y: 15 },
+      { id: "tasks", group: "work", order: 3, width: 1, height: 1, x: mobile ? 50 : 0, y: 15 },
+      { id: "tasks-average", group: "work", order: 4, width: 1, height: 1, x: 0, y: 21 },
+      { id: "hours", group: "work", order: 5, width: 1, height: 1, x: mobile ? 50 : 33.333, y: 21 },
+      { id: "ot-income", group: "income", order: 0, width: 1, height: 1, x: 0, y: 27 },
+      {
+        id: "allowance",
+        group: "income",
+        order: 1,
+        width: 1,
+        height: 1,
+        x: mobile ? 50 : 33.333,
+        y: 27,
+      },
+      {
+        id: "deductions",
+        group: "income",
+        order: 2,
+        width: 1,
+        height: 1,
+        x: mobile ? 0 : 66.667,
+        y: 33,
+      },
+      { id: "daily-income", group: "charts", order: 0, width: 1, height: 3, x: 0, y: 40 },
+      {
+        id: "daily-tasks",
+        group: "charts",
+        order: 1,
+        width: 1,
+        height: 3,
+        x: mobile ? 0 : 50,
+        y: mobile ? 55 : 40,
+      },
+      {
+        id: "work-type-income",
+        group: "charts",
+        order: 2,
+        width: 1,
+        height: 3,
+        x: 0,
+        y: mobile ? 70 : 62,
+      },
+      {
+        id: "frequent-location",
+        group: "charts",
+        order: 3,
+        width: 1,
+        height: 3,
+        x: mobile ? 0 : 50,
+        y: mobile ? 85 : 62,
+      },
     ],
   };
 }
@@ -87,7 +139,7 @@ export function getDashboardCards(
 export function updateDashboardCard(
   layout: DashboardLayout,
   id: DashboardCardId,
-  patch: Partial<Pick<DashboardCardLayout, "order" | "width" | "height">>,
+  patch: Partial<Pick<DashboardCardLayout, "order" | "width" | "height" | "x" | "y">>,
 ): DashboardLayout {
   return {
     ...layout,
@@ -109,7 +161,8 @@ export function reorderDashboardCards(
   if (oldIndex < 0 || newIndex < 0) return layout;
 
   const nextGroupCards = [...groupCards];
-  const [moved] = nextGroupCards.splice(oldIndex, 1);
+  const moved = nextGroupCards.splice(oldIndex, 1)[0];
+  if (!moved) return layout;
   nextGroupCards.splice(newIndex, 0, moved);
   const orderMap = new Map(nextGroupCards.map((card, index) => [card.id, index]));
 
@@ -126,21 +179,25 @@ export function normalizeDashboardLayout(
   viewport: DashboardViewport,
 ): DashboardLayout {
   const defaults = createDefaultDashboardLayout(viewport);
-  if (!isRecord(value) || !Array.isArray(value.cards)) return defaults;
+  if (!isRecord(value) || !Array.isArray(value["cards"])) return defaults;
 
   const incoming = new Map<DashboardCardId, DashboardCardLayout>();
-  for (const item of value.cards) {
+  for (const item of value["cards"]) {
     if (!isRecord(item)) continue;
-    const id = item.id;
-    const group = item.group;
+    const id = item["id"];
+    const group = item["group"];
     if (!isCardId(id) || !isGroup(group) || incoming.has(id)) continue;
 
+    const defaultCard = defaults.cards.find((card) => card.id === id) ?? defaults.cards[0];
+    if (!defaultCard) continue;
     incoming.set(id, {
       id,
       group,
-      order: finiteInt(item.order, 0),
-      width: Math.max(1, finiteInt(item.width, 1)),
-      height: Math.max(1, finiteInt(item.height, 1)),
+      order: finiteInt(item["order"], defaultCard.order),
+      width: Math.max(1, finiteNumber(item["width"], defaultCard.width)),
+      height: Math.max(1, finiteNumber(item["height"], defaultCard.height)),
+      x: clampPercentage(finiteNumber(item["x"], defaultCard.x), 100),
+      y: clampPercentage(finiteNumber(item["y"], defaultCard.y), 100),
     });
   }
 
@@ -204,4 +261,12 @@ function isGroup(value: unknown): value is DashboardCardGroup {
 
 function finiteInt(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? Math.round(value) : fallback;
+}
+
+function finiteNumber(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function clampPercentage(value: number, max: number): number {
+  return Math.min(Math.max(value, 0), max);
 }

@@ -8,14 +8,22 @@ describe("SaveCoordinator", () => {
       {
         scope: "theme",
         dirty: true,
-        validate: () => events.push("validate-theme"),
-        save: () => events.push("save-theme"),
+        validate: () => {
+          events.push("validate-theme");
+        },
+        save: () => {
+          events.push("save-theme");
+        },
       },
       {
         scope: "rates",
         dirty: true,
-        validate: () => events.push("validate-rates"),
-        save: () => events.push("save-rates"),
+        validate: () => {
+          events.push("validate-rates");
+        },
+        save: () => {
+          events.push("save-rates");
+        },
       },
     ]);
 
