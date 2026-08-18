@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useEditorHistory } from "@/hooks/use-editor-history";
-import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
+import type { DashboardLayoutState } from "@/hooks/use-dashboard-layout";
 import {
   createDefaultDashboardLayout,
   updateDashboardCard,
@@ -26,6 +26,8 @@ import type { MonthlySummary } from "@/lib/work-log";
 type Props = {
   userId: string;
   isGuest: boolean;
+  mobileLayout: DashboardLayoutState;
+  desktopLayout: DashboardLayoutState;
   disabled: boolean;
   summary: MonthlySummary;
   chartColors?: string[];
@@ -66,13 +68,13 @@ const CARD_LABELS: Record<DashboardCardLayout["id"], string> = {
 
 export const DashboardLayoutEditor = forwardRef<DashboardLayoutEditorHandle, Props>(
   function DashboardLayoutEditor(
-    { userId, isGuest, disabled, summary, chartColors, onDirtyChange },
+    { userId, isGuest, mobileLayout, desktopLayout, disabled, summary, chartColors, onDirtyChange },
     ref,
   ) {
     const [selectedViewport, setSelectedViewport] = useState<DashboardViewport>("mobile");
     const [selectedCardId, setSelectedCardId] = useState<DashboardCardLayout["id"] | null>(null);
-    const mobile = useDashboardLayout(userId, isGuest, "mobile");
-    const desktop = useDashboardLayout(userId, isGuest, "desktop");
+    const mobile = mobileLayout;
+    const desktop = desktopLayout;
     const mobileHistory = useEditorHistory();
     const desktopHistory = useEditorHistory();
     const {

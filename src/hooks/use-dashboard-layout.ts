@@ -9,7 +9,7 @@ import {
 
 const MOBILE_MEDIA_QUERY = "(max-width: 639px)";
 
-type DashboardLayoutState = {
+export type DashboardLayoutState = {
   layout: DashboardLayout;
   viewport: DashboardViewport;
   loading: boolean;

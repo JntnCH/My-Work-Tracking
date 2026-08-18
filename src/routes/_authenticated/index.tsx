@@ -9,6 +9,8 @@ import { HistoryPanel } from "@/components/work/HistoryPanel";
 import { SettingsPanel } from "@/components/work/SettingsPanel";
 import { FaceLockScreen, useFaceLock } from "@/components/work/FaceLock";
 import { useWorkTracker } from "@/hooks/use-work-tracker";
+import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
+import type { DashboardViewport } from "@/lib/dashboard-layout";
 import { clearGuestUser, displayName, useSession } from "@/hooks/use-session";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -46,6 +48,11 @@ function Index() {
   const { user, loading, isGuest } = useSession();
   const userId = user?.id ?? null;
   const tracker = useWorkTracker(userId, isGuest);
+  const mobileLayout = useDashboardLayout(userId, isGuest, "mobile");
+  const desktopLayout = useDashboardLayout(userId, isGuest, "desktop");
+  const [dashboardViewport, setDashboardViewport] = useState<DashboardViewport>(() =>
+    getViewport(),
+  );
   const lock = useFaceLock(userId);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -59,6 +66,14 @@ function Index() {
   );
   const pulledRef = useRef(false);
   const settingsDirtyRef = useRef(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 639px)");
+    const updateViewport = () => setDashboardViewport(mediaQuery.matches ? "mobile" : "desktop");
+    updateViewport();
+    mediaQuery.addEventListener("change", updateViewport);
+    return () => mediaQuery.removeEventListener("change", updateViewport);
+  }, []);
 
   const requestTabChange = (nextTab: TabId) => {
     if (nextTab === tab) return;
@@ -230,8 +245,7 @@ function Index() {
         ) : tab === "dashboard" ? (
           <DashboardPanel
             logs={tracker.logs}
-            userId={userId}
-            isGuest={isGuest}
+            layoutState={dashboardViewport === "mobile" ? mobileLayout : desktopLayout}
             chartColors={tracker.themeSettings.chartColors}
             month={month}
             onMonthChange={setMonth}
@@ -262,6 +276,8 @@ function Index() {
             spreadsheetId={tracker.spreadsheetId}
             logs={tracker.logs}
             previewMonth={month}
+            mobileLayout={mobileLayout}
+            desktopLayout={desktopLayout}
             onAddWorkType={tracker.addWorkType}
             onEditWorkType={tracker.editWorkType}
             onToggleWorkType={tracker.toggleWorkType}
@@ -288,4 +304,10 @@ function Index() {
       </main>
     </div>
   );
+}
+
+function getViewport(): DashboardViewport {
+  return typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches
+    ? "mobile"
+    : "desktop";
 }

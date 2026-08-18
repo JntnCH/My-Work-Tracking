@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { User } from "@supabase/supabase-js";
+import type { DashboardLayoutState } from "@/hooks/use-dashboard-layout";
 import type { BranchSettings, DBBranch, DBOtType, DBWorkType } from "@/lib/supabase-db";
 import {
   DEFAULT_COLORS_DARK,
@@ -64,6 +65,8 @@ type Props = {
   spreadsheetId: string;
   logs: WorkLog[];
   previewMonth: string;
+  mobileLayout: DashboardLayoutState;
+  desktopLayout: DashboardLayoutState;
   onAddWorkType: (name: string) => Promise<void>;
   onEditWorkType: (id: string, name: string) => Promise<void>;
   onToggleWorkType: (id: string) => Promise<void>;
@@ -109,6 +112,8 @@ export function SettingsPanel({
   spreadsheetId,
   logs,
   previewMonth,
+  mobileLayout,
+  desktopLayout,
   onAddWorkType,
   onEditWorkType,
   onToggleWorkType,
@@ -1370,6 +1375,8 @@ export function SettingsPanel({
           ref={layoutEditorRef}
           userId={_userId}
           isGuest={isGuest}
+          mobileLayout={mobileLayout}
+          desktopLayout={desktopLayout}
           disabled={isLocked}
           summary={summarizeMonth(logs, previewMonth)}
           chartColors={draftColors.chartColors}

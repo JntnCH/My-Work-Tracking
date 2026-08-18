@@ -241,9 +241,9 @@ export function renderDashboardCardContent(
 
 function ChartCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="surface-card h-full p-5">
-      <h3 className="mb-3 text-sm font-bold">{title}</h3>
-      <div className="h-56">{children}</div>
+    <div className="surface-card flex h-full min-h-0 min-w-0 flex-col overflow-visible p-5">
+      <h3 className="mb-3 shrink-0 text-sm font-bold">{title}</h3>
+      <div className="min-h-0 min-w-0 flex-1 overflow-visible">{children}</div>
     </div>
   );
 }

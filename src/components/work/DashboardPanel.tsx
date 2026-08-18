@@ -1,18 +1,13 @@
-import { useEffect, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { RefreshCw } from "lucide-react";
-import {
-  type DashboardCardGroup,
-  type DashboardCardId,
-  type DashboardCardLayout,
-} from "@/lib/dashboard-layout";
-import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
+import type { ReactNode } from "react";
+import type { DashboardLayoutState } from "@/hooks/use-dashboard-layout";
+import type { DashboardCardGroup, DashboardCardLayout } from "@/lib/dashboard-layout";
 import { type WorkLog, summarizeMonth } from "@/lib/work-log";
 import { DEFAULT_CHART_COLORS, renderDashboardCardContent } from "@/lib/dashboard-card-content";
 
 type Props = {
   logs: WorkLog[];
-  userId: string | null;
-  isGuest: boolean;
+  layoutState: DashboardLayoutState;
   chartColors: string[] | undefined;
   month: string;
   onMonthChange: (m: string) => void;
@@ -23,8 +18,7 @@ type Props = {
 
 export function DashboardPanel({
   logs,
-  userId,
-  isGuest,
+  layoutState,
   chartColors,
   month,
   onMonthChange,
@@ -32,28 +26,18 @@ export function DashboardPanel({
   syncing,
   onRefresh,
 }: Props) {
-  const s = summarizeMonth(logs, month);
+  const summary = summarizeMonth(logs, month);
   const colors = chartColors?.length ? chartColors : DEFAULT_CHART_COLORS;
-  const { layout, viewport, loading: layoutLoading } = useDashboardLayout(userId, isGuest);
-
-  const cardMap = new Map(layout.cards.map((card) => [card.id, card]));
-  const renderCard = (id: DashboardCardId, content: ReactNode) => {
-    const card = cardMap.get(id);
-    if (!card) return null;
-    return (
-      <DashboardCard key={id} card={card} viewport={viewport}>
-        {content}
-      </DashboardCard>
-    );
-  };
+  const { layout, viewport, loading: layoutLoading } = layoutState;
 
   return (
     <div
       className="space-y-5"
       data-dashboard-viewport={viewport}
       data-dashboard-layout-loading={layoutLoading ? "true" : "false"}
+      aria-busy={layoutLoading}
     >
-      <section className="surface-card mx-auto max-w-3xl p-4 sm:p-5">
+      <section className="surface-card mx-auto w-full p-4 sm:p-5">
         <header className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <h2 className="font-bold">สรุปรายเดือน</h2>
@@ -74,46 +58,17 @@ export function DashboardPanel({
           />
         </header>
 
-        <div className="mt-5 grid grid-cols-1 gap-3">
-          {renderCard("net-income", renderDashboardCardContent("net-income", s, colors))}
+        <div
+          className="mt-5 grid grid-cols-2 items-stretch gap-2 sm:gap-3 md:grid-cols-6"
+          data-dashboard-reflow="true"
+        >
+          {[...layout.cards].sort(compareReflowPosition).map((card) => (
+            <DashboardCard key={card.id} card={card} viewport={viewport}>
+              {renderDashboardCardContent(card.id, summary, colors)}
+            </DashboardCard>
+          ))}
         </div>
-
-        <SummarySection title="บันทึกการทำงาน">
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
-              {renderCard("work-days", renderDashboardCardContent("work-days", s, colors))}
-              {renderCard("days-with-ot", renderDashboardCardContent("days-with-ot", s, colors))}
-              {renderCard(
-                "days-without-ot",
-                renderDashboardCardContent("days-without-ot", s, colors),
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
-              {renderCard("tasks", renderDashboardCardContent("tasks", s, colors))}
-              {renderCard("tasks-average", renderDashboardCardContent("tasks-average", s, colors))}
-              {renderCard("hours", renderDashboardCardContent("hours", s, colors))}
-            </div>
-          </div>
-        </SummarySection>
-
-        <SummarySection title="รายรับเสริมและรายการหัก">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
-            {renderCard("ot-income", renderDashboardCardContent("ot-income", s, colors))}
-            {renderCard("allowance", renderDashboardCardContent("allowance", s, colors))}
-            {renderCard("deductions", renderDashboardCardContent("deductions", s, colors))}
-          </div>
-        </SummarySection>
       </section>
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {renderCard("daily-income", renderDashboardCardContent("daily-income", s, colors))}
-        {renderCard("daily-tasks", renderDashboardCardContent("daily-tasks", s, colors))}
-        {renderCard("work-type-income", renderDashboardCardContent("work-type-income", s, colors))}
-        {renderCard(
-          "frequent-location",
-          renderDashboardCardContent("frequent-location", s, colors),
-        )}
-      </div>
     </div>
   );
 }
@@ -127,20 +82,19 @@ function DashboardCard({
   viewport: "mobile" | "desktop";
   children: ReactNode;
 }) {
-  const columns = getGridColumns(card.group, viewport);
-  const width = clamp(card.width, 1, columns);
-  const minHeight = card.group === "charts" ? card.height * 96 : card.height * 80;
+  const columns = viewport === "mobile" ? 2 : 6;
+  const width = getGridSpan(card, viewport);
+  const height = getCardHeight(card);
 
   return (
     <article
-      className="relative min-w-0"
+      className="relative min-h-0 min-w-0"
       data-dashboard-card-id={card.id}
       data-dashboard-card-group={card.group}
       data-testid={`dashboard-card-${card.id}`}
       style={{
-        order: card.order,
-        gridColumn: `span ${width} / span ${width}`,
-        minHeight: `${minHeight}px`,
+        height: `${height}px`,
+        gridColumn: `span ${Math.min(width, columns)} / span ${Math.min(width, columns)}`,
       }}
     >
       {children}
@@ -148,9 +102,33 @@ function DashboardCard({
   );
 }
 
-function getGridColumns(group: DashboardCardGroup, viewport: "mobile" | "desktop"): number {
-  if (group === "charts") return viewport === "mobile" ? 1 : 2;
-  return viewport === "mobile" ? 2 : 3;
+function getGridSpan(card: DashboardCardLayout, viewport: "mobile" | "desktop"): number {
+  if (card.group === "net") return viewport === "mobile" ? 2 : 6;
+  if (card.group === "charts") {
+    const chartColumns = viewport === "mobile" ? 2 : 3;
+    return chartColumns * clamp(card.width, 1, viewport === "mobile" ? 1 : 2);
+  }
+  const statColumns = viewport === "mobile" ? 1 : 2;
+  return statColumns * clamp(card.width, 1, viewport === "mobile" ? 2 : 3);
+}
+
+function getCardHeight(card: DashboardCardLayout): number {
+  const baseHeight = card.group === "charts" ? 260 : card.group === "net" ? 104 : 92;
+  const maximum = card.group === "charts" ? 6 : 4;
+  return baseHeight * clamp(card.height, 1, maximum);
+}
+
+function compareReflowPosition(a: DashboardCardLayout, b: DashboardCardLayout): number {
+  const y = a.y - b.y;
+  if (Math.abs(y) > 0.01) return y;
+  const x = a.x - b.x;
+  if (Math.abs(x) > 0.01) return x;
+  if (a.group !== b.group) return groupRank(a.group) - groupRank(b.group);
+  return a.order - b.order;
+}
+
+function groupRank(group: DashboardCardGroup): number {
+  return group === "net" ? 0 : group === "work" ? 1 : group === "income" ? 2 : 3;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -192,14 +170,5 @@ function DashboardControls({
         className="min-w-0 rounded-lg border border-input bg-secondary p-2 text-sm font-medium sm:w-auto"
       />
     </div>
-  );
-}
-
-function SummarySection({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="mt-5 border-t border-border pt-4">
-      <h3 className="mb-3 text-xs font-bold text-muted-foreground">{title}</h3>
-      {children}
-    </section>
   );
 }
