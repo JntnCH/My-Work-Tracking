@@ -64,92 +64,118 @@ export function DashboardPanel({
 
   return (
     <div className="space-y-5">
-      <div className="surface-card flex flex-col gap-4 p-4 sm:p-5 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h2 className="font-bold">สรุปรายเดือน</h2>
-          <p className="text-xs text-muted-foreground">
-            {spreadsheetId
-              ? syncing
-                ? "กำลังดึงข้อมูลจาก Google Sheets…"
-                : "ข้อมูลดึงจาก Google Sheets"
-              : "ยังไม่ได้เชื่อมต่อ Google Sheets — แสดงข้อมูลในเครื่อง"}
-          </p>
-        </div>
-        <div className="flex w-full flex-wrap items-center gap-2 md:w-auto md:flex-nowrap">
-          {spreadsheetId ? (
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={syncing}
-              data-testid="dashboard-refresh"
-              className="flex items-center gap-1.5 rounded-lg border border-input bg-secondary px-3 py-2 text-xs font-medium transition hover:bg-accent disabled:opacity-60"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
-              รีเฟรชจากชีต
-            </button>
-          ) : null}
-          <input
-            type="month"
-            aria-label="เลือกเดือน"
-            value={month}
-            onChange={(e) => onMonthChange(e.target.value)}
-            className="min-w-0 flex-1 rounded-lg border border-input bg-secondary p-2 text-sm font-medium md:flex-none"
+      <section className="surface-card mx-auto max-w-3xl p-4 sm:p-5">
+        <header className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <h2 className="font-bold">สรุปรายเดือน</h2>
+            <p className="text-xs text-muted-foreground">
+              {spreadsheetId
+                ? syncing
+                  ? "กำลังดึงข้อมูลจาก Google Sheets…"
+                  : "ข้อมูลดึงจาก Google Sheets"
+                : "ยังไม่ได้เชื่อมต่อ Google Sheets — แสดงข้อมูลในเครื่อง"}
+            </p>
+          </div>
+          <DashboardControls
+            spreadsheetId={spreadsheetId}
+            syncing={syncing}
+            onRefresh={onRefresh}
+            month={month}
+            onMonthChange={onMonthChange}
           />
-        </div>
-      </div>
+        </header>
 
-      <div className="grid grid-cols-2 gap-3 [&>*:nth-child(-n+2)]:col-span-2 md:grid-cols-4 md:[&>*:nth-child(-n+2)]:col-span-1">
-        <Stat
-          icon={<Coins className="h-4 w-4" />}
-          label="รายได้สุทธิรวม"
-          value={formatTHB(s.totalNet)}
-          testId="stat-net"
-          tone="success"
-        />
-        <Stat
-          icon={<CalendarCheck className="h-4 w-4" />}
-          label="วันทำงานทั้งหมด"
-          value={`${s.workDays} วัน ${s.daysWithOt} วัน มี OT / ${s.daysWithoutOt} วัน ไม่มี OT`}
-          testId="stat-days"
-        />
-        <Stat
-          icon={<ListChecks className="h-4 w-4" />}
-          label="งานที่ทำเสร็จ"
-          value={`${s.totalTasks} งาน`}
-          testId="stat-tasks"
-        />
-        <Stat
-          icon={<ListChecks className="h-4 w-4" />}
-          label="เฉลี่ยต่อวัน"
-          value={`${s.avgTasksPerDay} งาน/วัน`}
-          testId="stat-tasks-avg"
-        />
-        <Stat
-          icon={<Clock className="h-4 w-4" />}
-          label="ชั่วโมงรวม"
-          value={`${s.totalHours.toFixed(1)} ชม.`}
-          testId="stat-hours"
-        />
-        <Stat
-          icon={<TrendingUp className="h-4 w-4" />}
-          label={`OT ${s.totalOtHours.toFixed(1)} ชม.`}
-          value={formatTHB(s.totalOtIncome)}
-          testId="stat-ot"
-        />
-        <Stat
-          icon={<Coins className="h-4 w-4" />}
-          label="เบี้ยเลี้ยง/รายรับอื่น"
-          value={formatTHB(s.totalAllowances)}
-          testId="stat-allowance"
-        />
-        <Stat
-          icon={<MinusCircle className="h-4 w-4" />}
-          label="รายการหักรวม"
-          value={formatTHB(s.totalDeductions)}
-          testId="stat-deduction"
-          tone="destructive"
-        />
-      </div>
+        <div className="mt-5 flex flex-col items-center rounded-xl bg-secondary/60 p-4 text-center sm:p-5">
+          <div className="flex items-center justify-center gap-1.5 text-xs leading-5 text-muted-foreground">
+            <Coins className="h-4 w-4" />
+            รายได้สุทธิรวม
+          </div>
+          <div
+            className="mt-1 break-words text-3xl leading-tight font-bold text-success sm:text-4xl"
+            data-testid="stat-net"
+          >
+            {formatTHB(s.totalNet)}
+          </div>
+        </div>
+
+        <SummarySection title="บันทึกการทำงาน">
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <Stat
+                compact
+                icon={<CalendarCheck className="h-4 w-4" />}
+                label="วันทำงานทั้งหมด"
+                value={`${s.workDays} วัน`}
+                testId="stat-days"
+              />
+              <Stat
+                compact
+                icon={<TrendingUp className="h-4 w-4" />}
+                label="วันที่มี OT"
+                value={`${s.daysWithOt} วัน`}
+                testId="stat-days-with-ot"
+              />
+              <Stat
+                compact
+                icon={<CalendarCheck className="h-4 w-4" />}
+                label="วันที่ไม่มี OT"
+                value={`${s.daysWithoutOt} วัน`}
+                testId="stat-days-without-ot"
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <Stat
+                compact
+                icon={<ListChecks className="h-4 w-4" />}
+                label="งานที่ทำเสร็จ"
+                value={`${s.totalTasks} งาน`}
+                testId="stat-tasks"
+              />
+              <Stat
+                compact
+                icon={<ListChecks className="h-4 w-4" />}
+                label="เฉลี่ยต่อวัน"
+                value={`${s.avgTasksPerDay} งาน/วัน`}
+                testId="stat-tasks-avg"
+              />
+              <Stat
+                compact
+                icon={<Clock className="h-4 w-4" />}
+                label="ชั่วโมงรวม"
+                value={`${s.totalHours.toFixed(1)} ชม.`}
+                testId="stat-hours"
+              />
+            </div>
+          </div>
+        </SummarySection>
+
+        <SummarySection title="รายรับเสริมและรายการหัก">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <Stat
+              compact
+              icon={<TrendingUp className="h-4 w-4" />}
+              label={`OT ${s.totalOtHours.toFixed(1)} ชม.`}
+              value={formatTHB(s.totalOtIncome)}
+              testId="stat-ot"
+            />
+            <Stat
+              compact
+              icon={<Coins className="h-4 w-4" />}
+              label="เบี้ยเลี้ยง/รายรับอื่น"
+              value={formatTHB(s.totalAllowances)}
+              testId="stat-allowance"
+            />
+            <Stat
+              compact
+              icon={<MinusCircle className="h-4 w-4" />}
+              label="รายการหักรวม"
+              value={formatTHB(s.totalDeductions)}
+              testId="stat-deduction"
+              tone="destructive"
+            />
+          </div>
+        </SummarySection>
+      </section>
 
       <div className="surface-card p-5">
         <h3 className="mb-3 text-sm font-bold">รายได้รายวัน</h3>
@@ -261,18 +287,67 @@ function Empty() {
   );
 }
 
+function DashboardControls({
+  spreadsheetId,
+  syncing,
+  onRefresh,
+  month,
+  onMonthChange,
+}: {
+  spreadsheetId?: string;
+  syncing?: boolean;
+  onRefresh?: () => void;
+  month: string;
+  onMonthChange: (month: string) => void;
+}) {
+  return (
+    <div className="flex w-full flex-wrap items-center justify-start gap-2 sm:w-auto sm:justify-end">
+      {spreadsheetId ? (
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={syncing}
+          data-testid="dashboard-refresh"
+          className="flex items-center justify-center gap-1.5 rounded-lg border border-input bg-secondary px-3 py-2 text-xs font-medium transition hover:bg-accent disabled:opacity-60"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
+          รีเฟรชจากชีต
+        </button>
+      ) : null}
+      <input
+        type="month"
+        aria-label="เลือกเดือน"
+        value={month}
+        onChange={(e) => onMonthChange(e.target.value)}
+        className="min-w-0 rounded-lg border border-input bg-secondary p-2 text-sm font-medium sm:w-auto"
+      />
+    </div>
+  );
+}
+
+function SummarySection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="mt-5 border-t border-border pt-4">
+      <h3 className="mb-3 text-xs font-bold text-muted-foreground">{title}</h3>
+      {children}
+    </section>
+  );
+}
+
 function Stat({
   icon,
   label,
   value,
   testId,
   tone,
+  compact = false,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   testId: string;
   tone?: "success" | "destructive";
+  compact?: boolean;
 }) {
   const toneCls =
     tone === "success"
@@ -281,10 +356,10 @@ function Stat({
         ? "text-destructive"
         : "text-foreground";
   return (
-    <div className="surface-card min-w-0 p-4">
+    <div className={`surface-card min-w-0 ${compact ? "p-3" : "p-4"}`}>
       <div className="flex min-w-0 items-start gap-1.5 text-xs leading-5 text-muted-foreground">
         {icon}
-        {label}
+        <span className="min-w-0 break-words">{label}</span>
       </div>
       <div
         className={`mt-1 break-words text-xl leading-tight font-bold ${toneCls}`}
