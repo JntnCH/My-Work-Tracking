@@ -3,11 +3,9 @@ import {
   CalendarCheck,
   Clock,
   Coins,
-  GripVertical,
   ListChecks,
   MinusCircle,
   RefreshCw,
-  Scaling,
   TrendingUp,
 } from "lucide-react";
 import {
@@ -22,8 +20,6 @@ import {
   YAxis,
 } from "recharts";
 import {
-  reorderDashboardCards,
-  updateDashboardCard,
   type DashboardCardGroup,
   type DashboardCardId,
   type DashboardCardLayout,
@@ -48,16 +44,6 @@ const PIE_COLORS = [
   "var(--chart-4)",
   "var(--chart-5)",
 ];
-
-type DashboardInteraction = {
-  type: "drag" | "resize";
-  cardId: DashboardCardId;
-  group: DashboardCardGroup;
-  startX: number;
-  startY: number;
-  startWidth: number;
-  startHeight: number;
-};
 
 type Props = {
   logs: WorkLog[];
@@ -86,90 +72,16 @@ export function DashboardPanel({
   const colors = chartColors?.length
     ? chartColors
     : ["#60a5fa", "#34d399", "#fbbf24", "#f87171", "#a78bfa"];
-  const {
-    layout,
-    viewport,
-    loading: layoutLoading,
-    saving: layoutSaving,
-    updateLayout,
-  } = useDashboardLayout(userId, isGuest);
-  const [activeInteraction, setActiveInteraction] = useState<DashboardInteraction | null>(null);
-  useEffect(() => {
-    if (!activeInteraction) return;
-
-    const handlePointerMove = (event: PointerEvent) => {
-      if (activeInteraction.type === "drag") {
-        const target = document
-          .elementFromPoint(event.clientX, event.clientY)
-          ?.closest<HTMLElement>("[data-dashboard-card-id]");
-        const overId = target?.dataset.dashboardCardId as DashboardCardId | undefined;
-        const group = target?.dataset.dashboardCardGroup as DashboardCardGroup | undefined;
-        if (overId && group === activeInteraction.group && overId !== activeInteraction.cardId) {
-          updateLayout((current) =>
-            reorderDashboardCards(
-              current,
-              activeInteraction.group,
-              activeInteraction.cardId,
-              overId,
-            ),
-          );
-        }
-        return;
-      }
-
-      const columns = getGridColumns(activeInteraction.group, viewport);
-      const widthDelta = Math.round((event.clientX - activeInteraction.startX) / 120);
-      const heightDelta = Math.round((event.clientY - activeInteraction.startY) / 96);
-      updateLayout((current) =>
-        updateDashboardCard(current, activeInteraction.cardId, {
-          width: clamp(activeInteraction.startWidth + widthDelta, 1, columns),
-          height: clamp(activeInteraction.startHeight + heightDelta, 1, 8),
-        }),
-      );
-    };
-
-    const handlePointerUp = () => setActiveInteraction(null);
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", handlePointerUp, { once: true });
-    return () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", handlePointerUp);
-    };
-  }, [activeInteraction, updateLayout, viewport]);
-
-  const beginInteraction = (
-    type: DashboardInteraction["type"],
-    card: DashboardCardLayout,
-    event: ReactPointerEvent,
-  ) => {
-    event.preventDefault();
-    event.stopPropagation();
-    event.currentTarget.setPointerCapture?.(event.pointerId);
-    setActiveInteraction({
-      type,
-      cardId: card.id,
-      group: card.group,
-      startX: event.clientX,
-      startY: event.clientY,
-      startWidth: card.width,
-      startHeight: card.height,
-    });
-  };
+  const { layout, viewport, loading: layoutLoading } = useDashboardLayout(userId, isGuest);
 
   const cardMap = new Map(layout.cards.map((card) => [card.id, card]));
   const renderCard = (id: DashboardCardId, content: ReactNode) => {
     const card = cardMap.get(id);
     if (!card) return null;
     return (
-      <EditableDashboardCard
-        key={id}
-        card={card}
-        viewport={viewport}
-        active={activeInteraction?.cardId === id}
-        onPointerDown={beginInteraction}
-      >
+      <DashboardCard key={id} card={card} viewport={viewport}>
         {content}
-      </EditableDashboardCard>
+      </DashboardCard>
     );
   };
 
@@ -178,7 +90,6 @@ export function DashboardPanel({
       className="space-y-5"
       data-dashboard-viewport={viewport}
       data-dashboard-layout-loading={layoutLoading ? "true" : "false"}
-      data-dashboard-layout-saving={layoutSaving ? "true" : "false"}
     >
       <section className="surface-card mx-auto max-w-3xl p-4 sm:p-5">
         <header className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-start sm:justify-between">
@@ -438,21 +349,13 @@ export function DashboardPanel({
   );
 }
 
-function EditableDashboardCard({
+function DashboardCard({
   card,
   viewport,
-  active,
-  onPointerDown,
   children,
 }: {
   card: DashboardCardLayout;
   viewport: "mobile" | "desktop";
-  active: boolean;
-  onPointerDown: (
-    type: DashboardInteraction["type"],
-    card: DashboardCardLayout,
-    event: ReactPointerEvent,
-  ) => void;
   children: ReactNode;
 }) {
   const columns = getGridColumns(card.group, viewport);
@@ -461,7 +364,7 @@ function EditableDashboardCard({
 
   return (
     <article
-      className={`relative min-w-0 ${active ? "z-20" : ""}`}
+      className="relative min-w-0"
       data-dashboard-card-id={card.id}
       data-dashboard-card-group={card.group}
       data-testid={`dashboard-card-${card.id}`}
@@ -471,27 +374,7 @@ function EditableDashboardCard({
         minHeight: `${minHeight}px`,
       }}
     >
-      <div className="relative h-full">
-        {children}
-        <div className="absolute right-2 top-2 z-30 flex items-center gap-1 rounded-lg border border-border/70 bg-card/90 p-1 shadow-sm backdrop-blur">
-          <button
-            type="button"
-            aria-label={`ลากการ์ด ${card.id}`}
-            className="touch-none cursor-grab rounded-md p-1 text-muted-foreground transition hover:bg-accent hover:text-foreground active:cursor-grabbing"
-            onPointerDown={(event) => onPointerDown("drag", card, event)}
-          >
-            <GripVertical className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            aria-label={`ปรับขนาดการ์ด ${card.id}`}
-            className="touch-none cursor-se-resize rounded-md p-1 text-muted-foreground transition hover:bg-accent hover:text-foreground"
-            onPointerDown={(event) => onPointerDown("resize", card, event)}
-          >
-            <Scaling className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      </div>
+      {children}
     </article>
   );
 }

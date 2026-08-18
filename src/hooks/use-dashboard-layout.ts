@@ -8,44 +8,56 @@ import {
 } from "@/lib/dashboard-layout";
 
 const MOBILE_MEDIA_QUERY = "(max-width: 639px)";
-const SAVE_DEBOUNCE_MS = 650;
 
 type DashboardLayoutState = {
   layout: DashboardLayout;
   viewport: DashboardViewport;
   loading: boolean;
+  loaded: boolean;
   saving: boolean;
   updateLayout: (updater: (current: DashboardLayout) => DashboardLayout) => void;
+  saveLayout: () => Promise<void>;
+  resetLayout: () => void;
 };
 
-export function useDashboardLayout(userId: string | null, isGuest: boolean): DashboardLayoutState {
-  const [viewport, setViewport] = useState<DashboardViewport>(() => getViewport());
+export function useDashboardLayout(
+  userId: string | null,
+  isGuest: boolean,
+  viewportOverride?: DashboardViewport,
+): DashboardLayoutState {
+  const [detectedViewport, setDetectedViewport] = useState<DashboardViewport>(() => getViewport());
+  const viewport = viewportOverride ?? detectedViewport;
   const [layout, setLayout] = useState<DashboardLayout>(() =>
-    createDefaultDashboardLayout(getViewport()),
+    createDefaultDashboardLayout(viewport),
   );
   const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [revision, setRevision] = useState(0);
   const loadedKeyRef = useRef<string | null>(null);
-  const savedRevisionRef = useRef(0);
+  const layoutRef = useRef(layout);
 
   useEffect(() => {
+    layoutRef.current = layout;
+  }, [layout]);
+
+  useEffect(() => {
+    if (viewportOverride) return;
     const mediaQuery = window.matchMedia(MOBILE_MEDIA_QUERY);
-    const updateViewport = () => setViewport(mediaQuery.matches ? "mobile" : "desktop");
+    const updateViewport = () => setDetectedViewport(mediaQuery.matches ? "mobile" : "desktop");
     updateViewport();
     mediaQuery.addEventListener("change", updateViewport);
     return () => mediaQuery.removeEventListener("change", updateViewport);
-  }, []);
+  }, [viewportOverride]);
 
   useEffect(() => {
     const key = `${userId ?? "guest"}:${viewport}`;
     loadedKeyRef.current = null;
-    savedRevisionRef.current = 0;
+    setLoaded(false);
     setLayout(createDefaultDashboardLayout(viewport));
-    setRevision(0);
 
     if (!userId || isGuest) {
       setLoading(false);
+      setLoaded(true);
       return;
     }
 
@@ -56,11 +68,14 @@ export function useDashboardLayout(userId: string | null, isGuest: boolean): Das
         if (!active) return;
         setLayout(nextLayout);
         loadedKeyRef.current = key;
-        savedRevisionRef.current = 0;
+        setLoaded(true);
       })
       .catch((error: unknown) => {
         console.warn("[dashboard-layout] load failed:", error);
-        if (active) loadedKeyRef.current = key;
+        if (active) {
+          loadedKeyRef.current = key;
+          setLoaded(true);
+        }
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -71,41 +86,27 @@ export function useDashboardLayout(userId: string | null, isGuest: boolean): Das
     };
   }, [isGuest, userId, viewport]);
 
-  useEffect(() => {
-    if (
-      !userId ||
-      isGuest ||
-      loading ||
-      loadedKeyRef.current === null ||
-      revision === savedRevisionRef.current
-    ) {
-      return;
-    }
-
-    const currentRevision = revision;
-    setSaving(true);
-    const timeout = window.setTimeout(() => {
-      void saveDashboardLayout(userId, viewport, layout)
-        .catch((error: unknown) => {
-          console.warn("[dashboard-layout] save failed:", error);
-        })
-        .finally(() => {
-          savedRevisionRef.current = currentRevision;
-          setSaving(false);
-        });
-    }, SAVE_DEBOUNCE_MS);
-
-    return () => window.clearTimeout(timeout);
-  }, [isGuest, layout, loading, revision, userId, viewport]);
-
   const updateLayout = useCallback((updater: (current: DashboardLayout) => DashboardLayout) => {
     setLayout((current) => updater(current));
-    setRevision((current) => current + 1);
   }, []);
 
+  const resetLayout = useCallback(() => {
+    setLayout(createDefaultDashboardLayout(viewport));
+  }, [viewport]);
+
+  const saveLayout = useCallback(async () => {
+    if (!userId || isGuest || loadedKeyRef.current === null) return;
+    setSaving(true);
+    try {
+      await saveDashboardLayout(userId, viewport, layoutRef.current);
+    } finally {
+      setSaving(false);
+    }
+  }, [isGuest, userId, viewport]);
+
   return useMemo(
-    () => ({ layout, viewport, loading, saving, updateLayout }),
-    [layout, loading, saving, updateLayout, viewport],
+    () => ({ layout, viewport, loading, loaded, saving, updateLayout, saveLayout, resetLayout }),
+    [layout, loaded, loading, resetLayout, saveLayout, saving, updateLayout, viewport],
   );
 }
 

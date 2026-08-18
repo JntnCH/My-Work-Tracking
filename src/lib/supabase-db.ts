@@ -62,6 +62,10 @@ export type DBUserSettings = {
   warning_color: string;
   destructive_color: string;
   chart_colors: string[];
+  preset_name: string | null;
+  border_radius: string;
+  button_style: string;
+  density: string;
   daily_rate: number;
   default_ot_type: number;
   travel_cost: number;

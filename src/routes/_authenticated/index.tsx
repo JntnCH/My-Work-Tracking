@@ -58,6 +58,19 @@ function Index() {
     }).format(new Date()),
   );
   const pulledRef = useRef(false);
+  const settingsDirtyRef = useRef(false);
+
+  const requestTabChange = (nextTab: TabId) => {
+    if (nextTab === tab) return;
+    if (tab === "settings" && settingsDirtyRef.current) {
+      const confirmed = window.confirm(
+        "หน้านี้มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก ต้องการออกจาก Settings หรือไม่?",
+      );
+      if (!confirmed) return;
+      settingsDirtyRef.current = false;
+    }
+    setTab(nextTab);
+  };
 
   // --- 💡 Logic ตรวจจับการ Scroll หน้าจอเพื่อ ซ่อน/แสดง Header ---
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
@@ -104,6 +117,13 @@ function Index() {
   }, [loading, userId, navigate]);
 
   async function signOut(scope: "local" | "global" = "local") {
+    if (settingsDirtyRef.current) {
+      const confirmed = window.confirm(
+        "หน้านี้มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก ต้องการออกจากระบบหรือไม่?",
+      );
+      if (!confirmed) return;
+      settingsDirtyRef.current = false;
+    }
     await queryClient.cancelQueries();
     queryClient.clear();
     clearGuestUser();
@@ -161,12 +181,7 @@ function Index() {
           onFaceChanged={lock.refresh}
           onSignOut={() => void signOut()}
           themeMode={tracker.themeSettings.themeMode === "dark" ? "dark" : "light"}
-          onToggleTheme={() =>
-            void tracker.saveThemeSettings({
-              ...tracker.themeSettings,
-              themeMode: tracker.themeSettings.themeMode === "dark" ? "light" : "dark",
-            })
-          }
+          onToggleTheme={() => requestTabChange("settings")}
         />
 
         {/* Navigation Tabs Bar อยู่ในส่วน Auto-Hide Sticky เดียวกัน */}
@@ -176,7 +191,7 @@ function Index() {
               {TABS.map(({ id, label, icon: Icon }) => (
                 <button
                   key={id}
-                  onClick={() => setTab(id)}
+                  onClick={() => requestTabChange(id)}
                   aria-current={tab === id}
                   className={`flex min-w-[7.25rem] items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-medium transition md:min-w-0 md:flex-1 md:text-sm ${
                     tab === id
@@ -260,8 +275,10 @@ function Index() {
             onSelectBranch={tracker.selectBranch}
             onSaveBranchSettings={tracker.saveBranchSettings}
             onSaveThemeSettings={tracker.saveThemeSettings}
-            onResetThemeSettings={tracker.resetThemeSettings}
             onSetSpreadsheetId={tracker.setSpreadsheetId}
+            onDirtyChange={(isDirty) => {
+              settingsDirtyRef.current = isDirty;
+            }}
             onSyncAirtableAll={tracker.syncAirtableAll}
             airtableSyncing={tracker.airtableSyncing}
             onSignOut={signOut}

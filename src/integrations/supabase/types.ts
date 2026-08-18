@@ -21,6 +21,10 @@ type UserSettingsRow = {
   warning_color: string | null;
   destructive_color: string | null;
   chart_colors: Json;
+  preset_name: string | null;
+  border_radius: string;
+  button_style: string;
+  density: string;
   daily_rate: number;
   default_ot_type: number;
   travel_cost: number;

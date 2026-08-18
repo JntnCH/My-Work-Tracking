@@ -160,6 +160,10 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
             chartColors: dbSettings.chart_colors?.length
               ? dbSettings.chart_colors
               : DEFAULT_COLORS_LIGHT.chartColors,
+            presetName: dbSettings.preset_name || "google-blue",
+            borderRadius: (dbSettings.border_radius as CustomColors["borderRadius"]) || "normal",
+            buttonStyle: (dbSettings.button_style as CustomColors["buttonStyle"]) || "filled",
+            density: (dbSettings.density as CustomColors["density"]) || "normal",
           };
 
           setThemeSettings(colors);
@@ -372,6 +376,10 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
           warning_color: colors.warningColor,
           destructive_color: colors.destructiveColor,
           chart_colors: colors.chartColors,
+          preset_name: colors.presetName ?? null,
+          border_radius: colors.borderRadius ?? "normal",
+          button_style: colors.buttonStyle ?? "filled",
+          density: colors.density ?? "normal",
         });
       }
     },
@@ -396,6 +404,10 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
         warning_color: DEFAULT_COLORS_LIGHT.warningColor,
         destructive_color: DEFAULT_COLORS_LIGHT.destructiveColor,
         chart_colors: DEFAULT_COLORS_LIGHT.chartColors,
+        preset_name: "google-blue",
+        border_radius: "normal",
+        button_style: "filled",
+        density: "normal",
       });
     }
   }, [useSupabase, userId]);
