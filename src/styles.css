@@ -1,0 +1,632 @@
+@import "tailwindcss";
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Design system definition.
+ *
+ * The @theme inline block maps CSS custom properties to Tailwind utility
+ * classes (e.g. --color-primary -> bg-primary, text-primary).
+ *
+ * The :root and .dark blocks define the actual color values using oklch.
+ * All colors MUST use oklch format.
+ *
+ * To add a new semantic color:
+ * 1. Add the variable to :root (light value) and .dark (dark value)
+ * 2. Register it in @theme inline as --color-<name>: var(--<name>)
+ */
+
+@theme inline {
+  --font-sans: "Prompt", ui-sans-serif, system-ui, sans-serif;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-soft: var(--warning-soft);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-info-soft: var(--info-soft);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --radius: 0.75rem;
+  --background: oklch(0.984 0.005 258.3);
+  --foreground: oklch(0.248 0.006 271.2);
+  --card: oklch(1 0 89.9);
+  --card-foreground: oklch(0.248 0.006 271.2);
+  --popover: oklch(1 0 89.9);
+  --popover-foreground: oklch(0.248 0.006 271.2);
+  --primary: oklch(0.574 0.195 257.9);
+  --primary-foreground: oklch(1 0 89.9);
+  --secondary: oklch(0.953 0.021 261.8);
+  --secondary-foreground: oklch(0.443 0.153 259.9);
+  --muted: oklch(0.963 0.003 228.8);
+  --muted-foreground: oklch(0.498 0.009 253.9);
+  --accent: oklch(0.932 0.037 261.5);
+  --accent-foreground: oklch(0.443 0.153 259.9);
+  --destructive: oklch(0.578 0.206 29);
+  --destructive-foreground: oklch(1 0 89.9);
+  --destructive-soft: oklch(0.958 0.022 26);
+  --success: oklch(0.527 0.141 148.4);
+  --success-foreground: oklch(1 0 89.9);
+  --success-soft: oklch(0.954 0.02 154.9);
+  --warning: oklch(0.57 0.135 59.1);
+  --warning-foreground: oklch(0.248 0.006 271.2);
+  --warning-soft: oklch(0.976 0.031 92.9);
+  --info-soft: oklch(0.953 0.021 261.8);
+  --border: oklch(0.894 0.006 264.5);
+  --input: oklch(0.642 0.007 255.5);
+  --ring: oklch(0.574 0.195 257.9);
+  --chart-1: oklch(0.574 0.195 257.9);
+  --chart-2: oklch(0.527 0.141 148.4);
+  --chart-3: oklch(0.57 0.135 59.1);
+  --chart-4: oklch(0.578 0.206 29);
+  --chart-5: oklch(0.514 0.226 303.2);
+  --gradient-header: linear-gradient(115deg, oklch(0.49 0.18 257.9) 0%, oklch(0.43 0.17 278) 100%);
+  --shadow-card:
+    0 1px 2px oklch(0.248 0.006 271.2 / 0.08), 0 8px 24px oklch(0.248 0.006 271.2 / 0.07);
+
+  --sidebar: oklch(0.984 0.005 258.3);
+  --sidebar-foreground: oklch(0.248 0.006 271.2);
+  --sidebar-primary: oklch(0.574 0.195 257.9);
+  --sidebar-primary-foreground: oklch(1 0 89.9);
+  --sidebar-accent: oklch(0.932 0.037 261.5);
+  --sidebar-accent-foreground: oklch(0.443 0.153 259.9);
+  --sidebar-border: oklch(0.894 0.006 264.5);
+  --sidebar-ring: oklch(0.574 0.195 257.9);
+}
+
+.dark {
+  --background: oklch(0.248 0.006 271.2);
+  --foreground: oklch(0.982 0.002 247.8);
+  --card: oklch(0.285 0.006 271.2);
+  --card-foreground: oklch(0.982 0.002 247.8);
+  --popover: oklch(0.313 0.006 271.2);
+  --popover-foreground: oklch(0.982 0.002 247.8);
+  --primary: oklch(0.766 0.108 259.8);
+  --primary-foreground: oklch(0.248 0.006 271.2);
+  --secondary: oklch(0.313 0.006 271.2);
+  --secondary-foreground: oklch(0.936 0.005 258.3);
+  --muted: oklch(0.313 0.006 271.2);
+  --muted-foreground: oklch(0.809 0.008 253.9);
+  --accent: oklch(0.36 0.015 260);
+  --accent-foreground: oklch(0.982 0.002 247.8);
+  --destructive: oklch(0.745 0.127 25.8);
+  --destructive-foreground: oklch(0.248 0.006 271.2);
+  --destructive-soft: oklch(0.36 0.05 25);
+  --success: oklch(0.774 0.104 152.2);
+  --success-foreground: oklch(0.248 0.006 271.2);
+  --success-soft: oklch(0.354 0.078 144.7);
+  --warning: oklch(0.888 0.139 90.6);
+  --warning-foreground: oklch(0.248 0.006 271.2);
+  --warning-soft: oklch(0.359 0.062 89.2);
+  --info-soft: oklch(0.346 0.074 256);
+  --border: oklch(0.617 0.01 242.9);
+  --input: oklch(0.617 0.01 242.9);
+  --ring: oklch(0.766 0.108 259.8);
+  --chart-1: oklch(0.766 0.108 259.8);
+  --chart-2: oklch(0.774 0.104 152.2);
+  --chart-3: oklch(0.888 0.139 90.6);
+  --chart-4: oklch(0.745 0.127 25.8);
+  --chart-5: oklch(0.735 0.165 307.3);
+  --gradient-header: linear-gradient(115deg, oklch(0.35 0.12 257.9) 0%, oklch(0.3 0.1 278) 100%);
+  --shadow-card: 0 1px 2px oklch(0.15 0.01 271.2 / 0.42), 0 8px 24px oklch(0.15 0.01 271.2 / 0.28);
+
+  --sidebar: oklch(0.285 0.006 271.2);
+  --sidebar-foreground: oklch(0.982 0.002 247.8);
+  --sidebar-primary: oklch(0.766 0.108 259.8);
+  --sidebar-primary-foreground: oklch(0.248 0.006 271.2);
+  --sidebar-accent: oklch(0.36 0.015 260);
+  --sidebar-accent-foreground: oklch(0.982 0.002 247.8);
+  --sidebar-border: oklch(0.617 0.01 242.9);
+  --sidebar-ring: oklch(0.766 0.108 259.8);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+  }
+}
+
+@utility surface-card {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-card);
+}
+
+@utility gradient-header {
+  background-image: var(--gradient-header);
+}
+
+/* --- "กำลังทำงาน" (shift running) animations --- */
+@keyframes work-pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-primary) 45%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 18px color-mix(in oklab, var(--color-primary) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-success) 0%, transparent);
+  }
+}
+
+@keyframes work-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@keyframes work-bar {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes work-sheen {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+@utility work-pulse-ring {
+  animation: work-pulse-ring 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@utility work-blink {
+  animation: work-blink 1.4s ease-in-out infinite;
+}
+
+@utility work-bar {
+  transform-origin: bottom;
+  animation: work-bar 1s ease-in-out infinite;
+}
+
+@utility work-active-card {
+  border-color: color-mix(in oklab, var(--color-success) 40%, var(--color-border));
+  background-image: linear-gradient(
+    100deg,
+    transparent 20%,
+    color-mix(in oklab, var(--color-success) 9%, transparent) 40%,
+    transparent 60%
+  );
+  background-size: 200% 100%;
+  animation: work-sheen 3.5s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .work-pulse-ring,
+  .work-blink,
+  .work-bar,
+  .work-active-card {
+    animation: none;
+  }
+}
+
+@keyframes sleep-breathe {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: translateY(-4px) scale(1.14);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.85;
+  }
+}
+@utility sleep-breathe {
+  animation: sleep-breathe 2.6s ease-in-out infinite;
+}
+
+@keyframes sleep-z {
+  0% {
+    transform: translate(0, 2px) scale(0.6) rotate(-8deg);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(12px, -22px) scale(1.35) rotate(10deg);
+    opacity: 0;
+  }
+}
+@utility sleep-z {
+  animation: sleep-z 2.8s ease-out infinite;
+}
+
+@keyframes rest-halo {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--muted-foreground) 30%, transparent);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 12px transparent;
+    transform: scale(1.04);
+  }
+}
+@utility rest-halo {
+  animation: rest-halo 2.6s ease-in-out infinite;
+}
+
+@keyframes engine-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+@utility engine-spin {
+  animation: engine-spin 2.4s linear infinite;
+}
+
+@keyframes engine-piston {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+@utility engine-piston {
+  animation: engine-piston 0.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sleep-breathe,
+  .sleep-z,
+  .engine-spin,
+  .engine-piston,
+  .rest-halo {
+    animation: none;
+  }
+}
+
+/* --- Engine working animation --- */
+.engine-working {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  color: var(--color-primary);
+  vertical-align: middle;
+}
+
+.engine-working__visual {
+  position: relative;
+  display: inline-flex;
+  width: 4.5rem;
+  height: 3.25rem;
+  align-items: center;
+  justify-content: center;
+  isolation: isolate;
+}
+
+.engine-working__machine {
+  position: relative;
+  z-index: 2;
+  width: 3.2rem;
+  height: 1.9rem;
+  border: 2px solid currentColor;
+  border-radius: 0.45rem 0.55rem 0.4rem 0.4rem;
+  background: color-mix(in oklab, var(--color-primary) 12%, var(--color-card));
+  box-shadow: inset 0 -0.3rem 0 color-mix(in oklab, var(--color-primary) 14%, transparent);
+  animation: engine-vibrate 0.42s ease-in-out infinite;
+}
+
+.engine-working__machine::before {
+  position: absolute;
+  top: -0.38rem;
+  left: 0.35rem;
+  width: 2.35rem;
+  height: 0.38rem;
+  border: 2px solid currentColor;
+  border-bottom: 0;
+  border-radius: 0.2rem 0.2rem 0 0;
+  content: "";
+}
+
+.engine-working__machine::after {
+  position: absolute;
+  right: -0.48rem;
+  bottom: 0.28rem;
+  width: 0.48rem;
+  height: 0.52rem;
+  border: 2px solid currentColor;
+  border-left: 0;
+  border-radius: 0 0.2rem 0.2rem 0;
+  content: "";
+}
+
+.engine-working__cylinder {
+  position: absolute;
+  top: 0.25rem;
+  width: 0.36rem;
+  height: 0.55rem;
+  border: 1.5px solid currentColor;
+  border-radius: 0.12rem;
+  background: color-mix(in oklab, var(--color-primary) 22%, var(--color-card));
+}
+
+.engine-working__cylinder--one {
+  left: 0.34rem;
+}
+
+.engine-working__cylinder--two {
+  left: 0.92rem;
+}
+
+.engine-working__cylinder--three {
+  left: 1.5rem;
+}
+
+.engine-working__cylinder--four {
+  left: 2.08rem;
+}
+
+.engine-working__piston {
+  position: absolute;
+  top: 0.72rem;
+  left: 0.45rem;
+  width: 0.1rem;
+  height: 0.62rem;
+  border-radius: 0.2rem;
+  background: currentColor;
+  transform-origin: top center;
+  animation: engine-piston 0.84s ease-in-out infinite;
+}
+
+.engine-working__piston--two {
+  left: 1.03rem;
+  animation-delay: -0.21s;
+}
+
+.engine-working__piston--three {
+  left: 1.61rem;
+  animation-delay: -0.42s;
+}
+
+.engine-working__piston--four {
+  left: 2.19rem;
+  animation-delay: -0.63s;
+}
+
+.engine-working__port {
+  position: absolute;
+  right: 0.42rem;
+  bottom: 0.35rem;
+  width: 0.48rem;
+  height: 0.28rem;
+  border: 1.5px solid currentColor;
+  border-radius: 0.1rem;
+}
+
+.engine-working__gear {
+  position: absolute;
+  z-index: 1;
+  width: 1.55rem;
+  height: 1.55rem;
+  color: var(--color-warning);
+  animation: engine-gear 1.5s linear infinite;
+}
+
+.engine-working__gear--back {
+  right: 0.02rem;
+  bottom: 0.15rem;
+}
+
+.engine-working__gauge {
+  position: absolute;
+  top: 0.02rem;
+  left: 0.05rem;
+  z-index: 3;
+  width: 1rem;
+  height: 1rem;
+  color: var(--color-success);
+  animation: engine-gauge 0.84s ease-in-out infinite;
+}
+
+.engine-working__spark {
+  position: absolute;
+  top: 0.15rem;
+  right: 0.62rem;
+  z-index: 4;
+  width: 0.85rem;
+  height: 0.85rem;
+  color: var(--color-warning);
+  animation: engine-spark 0.84s ease-in-out infinite;
+}
+
+.engine-working__exhaust {
+  position: absolute;
+  right: -0.12rem;
+  bottom: 0.43rem;
+  z-index: 0;
+  display: flex;
+  gap: 0.12rem;
+  align-items: flex-end;
+  height: 0.8rem;
+}
+
+.engine-working__exhaust i {
+  display: block;
+  width: 0.18rem;
+  height: 0.34rem;
+  border-radius: 999px;
+  background: var(--color-muted-foreground);
+  opacity: 0.5;
+  transform-origin: bottom center;
+  animation: engine-exhaust 0.8s ease-in-out infinite;
+}
+
+.engine-working__exhaust i:nth-child(2) {
+  height: 0.52rem;
+  animation-delay: 0.16s;
+}
+
+.engine-working__exhaust i:nth-child(3) {
+  height: 0.68rem;
+  animation-delay: 0.32s;
+}
+
+.engine-working__label {
+  color: var(--color-foreground);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.engine-working--sm .engine-working__visual {
+  width: 1.5rem;
+  height: 1.25rem;
+  transform: scale(0.36);
+  transform-origin: center;
+  margin: -0.9rem;
+}
+
+.engine-working--sm .engine-working__label {
+  font-size: 0.75rem;
+}
+
+.engine-working--lg .engine-working__visual {
+  width: 6.25rem;
+  height: 4.5rem;
+  transform: scale(1.25);
+}
+
+@keyframes engine-vibrate {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(0.08rem) rotate(-1deg);
+  }
+}
+
+@keyframes engine-piston {
+  0%,
+  100% {
+    transform: translateY(0) scaleY(0.72);
+  }
+  50% {
+    transform: translateY(0.22rem) scaleY(1);
+  }
+}
+
+@keyframes engine-gear {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes engine-gauge {
+  0%,
+  100% {
+    transform: rotate(-18deg);
+  }
+  50% {
+    transform: rotate(18deg);
+  }
+}
+
+@keyframes engine-spark {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.8) rotate(-8deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15) rotate(8deg);
+  }
+}
+
+@keyframes engine-exhaust {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scaleY(0.65) translateY(0.08rem);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scaleY(1) translateY(-0.05rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .engine-working__machine,
+  .engine-working__piston,
+  .engine-working__gear,
+  .engine-working__gauge,
+  .engine-working__spark,
+  .engine-working__exhaust i {
+    animation: none;
+  }
+}

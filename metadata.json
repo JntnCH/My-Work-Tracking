@@ -1,0 +1,6 @@
+{
+  "name": "Google Sheet Organizer",
+  "description": "Work tracker and Google Sheet organizer application",
+  "requestFramePermissions": ["geolocation", "camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

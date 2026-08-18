@@ -1,0 +1,297 @@
+import {
+  CalendarCheck,
+  Clock,
+  Coins,
+  ListChecks,
+  MinusCircle,
+  RefreshCw,
+  TrendingUp,
+} from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { type WorkLog, formatTHB, summarizeMonth } from "@/lib/work-log";
+
+const axisTick = { fill: "var(--muted-foreground)", fontSize: 11 };
+const tooltipStyle = {
+  backgroundColor: "var(--popover)",
+  border: "1px solid var(--border)",
+  borderRadius: "0.75rem",
+  color: "var(--popover-foreground)",
+  fontSize: "12px",
+};
+const tooltipCursor = { fill: "color-mix(in oklab, var(--muted-foreground) 12%, transparent)" };
+
+const PIE_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+];
+
+type Props = {
+  logs: WorkLog[];
+  chartColors?: string[];
+  month: string;
+  onMonthChange: (m: string) => void;
+  spreadsheetId?: string;
+  syncing?: boolean;
+  onRefresh?: () => void;
+};
+
+export function DashboardPanel({
+  logs,
+  chartColors,
+  month,
+  onMonthChange,
+  spreadsheetId,
+  syncing,
+  onRefresh,
+}: Props) {
+  const s = summarizeMonth(logs, month);
+  const colors = chartColors?.length
+    ? chartColors
+    : ["#60a5fa", "#34d399", "#fbbf24", "#f87171", "#a78bfa"];
+
+  return (
+    <div className="space-y-5">
+      <div className="surface-card flex flex-col gap-4 p-4 sm:p-5 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="font-bold">สรุปรายเดือน</h2>
+          <p className="text-xs text-muted-foreground">
+            {spreadsheetId
+              ? syncing
+                ? "กำลังดึงข้อมูลจาก Google Sheets…"
+                : "ข้อมูลดึงจาก Google Sheets"
+              : "ยังไม่ได้เชื่อมต่อ Google Sheets — แสดงข้อมูลในเครื่อง"}
+          </p>
+        </div>
+        <div className="flex w-full flex-wrap items-center gap-2 md:w-auto md:flex-nowrap">
+          {spreadsheetId ? (
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={syncing}
+              data-testid="dashboard-refresh"
+              className="flex items-center gap-1.5 rounded-lg border border-input bg-secondary px-3 py-2 text-xs font-medium transition hover:bg-accent disabled:opacity-60"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
+              รีเฟรชจากชีต
+            </button>
+          ) : null}
+          <input
+            type="month"
+            aria-label="เลือกเดือน"
+            value={month}
+            onChange={(e) => onMonthChange(e.target.value)}
+            className="min-w-0 flex-1 rounded-lg border border-input bg-secondary p-2 text-sm font-medium md:flex-none"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 [&>*:nth-child(-n+2)]:col-span-2 md:grid-cols-4 md:[&>*:nth-child(-n+2)]:col-span-1">
+        <Stat
+          icon={<Coins className="h-4 w-4" />}
+          label="รายได้สุทธิรวม"
+          value={formatTHB(s.totalNet)}
+          testId="stat-net"
+          tone="success"
+        />
+        <Stat
+          icon={<CalendarCheck className="h-4 w-4" />}
+          label="วันทำงานทั้งหมด"
+          value={`${s.workDays} วัน ${s.daysWithOt} วัน มี OT / ${s.daysWithoutOt} วัน ไม่มี OT`}
+          testId="stat-days"
+        />
+        <Stat
+          icon={<ListChecks className="h-4 w-4" />}
+          label="งานที่ทำเสร็จ"
+          value={`${s.totalTasks} งาน`}
+          testId="stat-tasks"
+        />
+        <Stat
+          icon={<ListChecks className="h-4 w-4" />}
+          label="เฉลี่ยต่อวัน"
+          value={`${s.avgTasksPerDay} งาน/วัน`}
+          testId="stat-tasks-avg"
+        />
+        <Stat
+          icon={<Clock className="h-4 w-4" />}
+          label="ชั่วโมงรวม"
+          value={`${s.totalHours.toFixed(1)} ชม.`}
+          testId="stat-hours"
+        />
+        <Stat
+          icon={<TrendingUp className="h-4 w-4" />}
+          label={`OT ${s.totalOtHours.toFixed(1)} ชม.`}
+          value={formatTHB(s.totalOtIncome)}
+          testId="stat-ot"
+        />
+        <Stat
+          icon={<Coins className="h-4 w-4" />}
+          label="เบี้ยเลี้ยง/รายรับอื่น"
+          value={formatTHB(s.totalAllowances)}
+          testId="stat-allowance"
+        />
+        <Stat
+          icon={<MinusCircle className="h-4 w-4" />}
+          label="รายการหักรวม"
+          value={formatTHB(s.totalDeductions)}
+          testId="stat-deduction"
+          tone="destructive"
+        />
+      </div>
+
+      <div className="surface-card p-5">
+        <h3 className="mb-3 text-sm font-bold">รายได้รายวัน</h3>
+        {s.dailyIncome.length === 0 ? (
+          <Empty />
+        ) : (
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={s.dailyIncome}>
+                <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={false} />
+                <YAxis tick={axisTick} tickLine={false} axisLine={false} width={44} />
+                <Tooltip
+                  contentStyle={tooltipStyle}
+                  cursor={tooltipCursor}
+                  formatter={(v: number) => formatTHB(v)}
+                />
+                <Bar dataKey="value" fill={colors[0]} radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+
+      <div className="surface-card p-5">
+        <h3 className="mb-3 text-sm font-bold">จำนวนงานที่ทำเสร็จรายวัน</h3>
+        {s.dailyTasks.length === 0 ? (
+          <Empty />
+        ) : (
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={s.dailyTasks}>
+                <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={false} />
+                <YAxis
+                  tick={axisTick}
+                  tickLine={false}
+                  axisLine={false}
+                  width={30}
+                  allowDecimals={false}
+                />
+                <Tooltip
+                  contentStyle={tooltipStyle}
+                  cursor={tooltipCursor}
+                  formatter={(v: number) => `${v} งาน`}
+                />
+                <Bar dataKey="value" fill={colors[2]} radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="surface-card p-5">
+          <h3 className="mb-3 text-sm font-bold">สัดส่วนรายได้ตามประเภทงาน</h3>
+          {s.byWorkType.length === 0 ? (
+            <Empty />
+          ) : (
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={s.byWorkType}
+                    dataKey="value"
+                    nameKey="name"
+                    outerRadius={80}
+                    stroke="var(--card)"
+                    label={{ fill: "var(--foreground)", fontSize: 11 }}
+                  >
+                    {s.byWorkType.map((_, i) => (
+                      <Cell key={i} fill={colors[i % colors.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={tooltipStyle}
+                    cursor={tooltipCursor}
+                    formatter={(v: number) => formatTHB(v)}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+
+        <div className="surface-card p-5">
+          <h3 className="mb-3 text-sm font-bold">สถานที่ทำงานบ่อยที่สุด (ครั้ง)</h3>
+          {s.byLocation.length === 0 ? (
+            <Empty />
+          ) : (
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={s.byLocation} layout="vertical">
+                  <XAxis type="number" tick={axisTick} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" width={90} tick={axisTick} />
+                  <Tooltip contentStyle={tooltipStyle} cursor={tooltipCursor} />
+                  <Bar dataKey="value" fill={colors[1]} radius={[0, 6, 6, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Empty() {
+  return (
+    <p className="py-10 text-center text-xs text-muted-foreground">ไม่มีข้อมูลในเดือนที่เลือก</p>
+  );
+}
+
+function Stat({
+  icon,
+  label,
+  value,
+  testId,
+  tone,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  testId: string;
+  tone?: "success" | "destructive";
+}) {
+  const toneCls =
+    tone === "success"
+      ? "text-success"
+      : tone === "destructive"
+        ? "text-destructive"
+        : "text-foreground";
+  return (
+    <div className="surface-card min-w-0 p-4">
+      <div className="flex min-w-0 items-start gap-1.5 text-xs leading-5 text-muted-foreground">
+        {icon}
+        {label}
+      </div>
+      <div
+        className={`mt-1 break-words text-xl leading-tight font-bold ${toneCls}`}
+        data-testid={testId}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
