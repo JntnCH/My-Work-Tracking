@@ -8,6 +8,7 @@ import {
   ExternalLink,
   Github,
   HelpCircle,
+  MessageCircle,
   LogIn,
   Mail,
   Phone,
@@ -19,6 +20,7 @@ import {
 import { toast } from "sonner";
 import { setGuestUser, useSession } from "@/hooks/use-session";
 import { supabase } from "@/integrations/supabase/client";
+import { completeLineLiffLoginIfNeeded, isLineLiffCallback, startLineLogin } from "@/lib/line-auth";
 import { EngineWorkingAnimation } from "@/components/ui/engine-working-animation";
 
 export const Route = createFileRoute("/auth")({
@@ -96,7 +98,31 @@ function AuthPage() {
   }, [loading, user, navigate]);
 
   useEffect(() => {
-    // Handle OAuth callback parameters or error codes
+    let cancelled = false;
+
+    async function completeLiffCallback() {
+      if (!isLineLiffCallback()) return;
+      setBusy(true);
+      try {
+        await completeLineLiffLoginIfNeeded();
+        if (!cancelled) {
+          toast.success("เข้าสู่ระบบด้วย LINE สำเร็จ");
+          void navigate({ to: "/", replace: true });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          toast.error("เข้าสู่ระบบด้วย LINE ไม่สำเร็จ", {
+            description: error instanceof Error ? error.message : String(error),
+          });
+        }
+      } finally {
+        if (!cancelled) setBusy(false);
+      }
+    }
+
+    void completeLiffCallback();
+
+    // Handle OAuth callback parameters or error codes.
     const searchParams = new URLSearchParams(window.location.search);
     const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
     const oauthError =
@@ -111,7 +137,11 @@ function AuthPage() {
       });
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, []);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate]);
 
   async function signInGoogle() {
     if (busy) return;
@@ -159,6 +189,24 @@ function AuthPage() {
       }
     } catch (err) {
       toast.error("เข้าสู่ระบบ GitHub ไม่สำเร็จ", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function signInLine() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const result = await startLineLogin();
+      if (!result.redirected) {
+        toast.success("เข้าสู่ระบบด้วย LINE สำเร็จ");
+        void navigate({ to: "/", replace: true });
+      }
+    } catch (err) {
+      toast.error("เข้าสู่ระบบด้วย LINE ไม่สำเร็จ", {
         description: err instanceof Error ? err.message : String(err),
       });
     } finally {
@@ -446,6 +494,16 @@ function AuthPage() {
               <span>Continue with GitHub</span>
             </button>
 
+            <button
+              type="button"
+              onClick={() => void signInLine()}
+              disabled={busy}
+              className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-[#06C755]/40 bg-[#06C755]/10 py-2.5 px-4 text-xs font-bold text-foreground transition hover:bg-[#06C755]/20 active:scale-[0.99] disabled:opacity-60 cursor-pointer"
+            >
+              <MessageCircle className="h-4 w-4 text-[#06C755]" />
+              <span>เข้าสู่ระบบด้วย LINE</span>
+            </button>
+
             <div className="text-left">
               <button
                 type="button"
@@ -459,13 +517,18 @@ function AuthPage() {
               {showConfigHelp && (
                 <div className="mt-2.5 space-y-2 rounded-xl border border-primary/20 bg-info-soft/40 p-3 text-[11px] text-muted-foreground animate-in fade-in-50 duration-200">
                   <p className="font-semibold text-foreground">
-                    ขั้นตอนเปิดใช้งาน Google/GitHub Login ใน Supabase Dashboard:
+                    ขั้นตอนเปิดใช้งาน Google/GitHub/LINE Login ใน Supabase Dashboard:
                   </p>
                   <ol className="list-decimal pl-4 space-y-1 leading-relaxed">
                     <li>
-                      ไปที่ Supabase &gt; Authentication &gt; Providers แล้วเลือก Google หรือ GitHub
+                      ไปที่ Supabase &gt; Authentication &gt; Providers แล้วเปิด Google, GitHub หรือ
+                      Custom OIDC (LINE)
                     </li>
                     <li>เปิดใช้งาน Provider และใส่ Client ID/Client Secret ใน Supabase เท่านั้น</li>
+                    <li>
+                      สำหรับ LINE ให้ใช้ provider name `line`, เปิด OIDC และไม่ใส่ Channel Secret ใน
+                      frontend
+                    </li>
                     <li>
                       เพิ่ม URL ของเว็บไซต์และ <code>/auth/callback</code> ใน Supabase Redirect URLs
                     </li>
