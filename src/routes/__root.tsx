@@ -7,9 +7,14 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  initializeLineLiffOnPrimaryRedirect,
+  isLineLiffPrimaryRedirect,
+} from "@/lib/line-auth";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -151,6 +156,30 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const router = useRouter();
+  const [isLiffPrimaryRedirectPending, setIsLiffPrimaryRedirectPending] = useState(() =>
+    isLineLiffPrimaryRedirect(),
+  );
+
+  useEffect(() => {
+    if (!isLiffPrimaryRedirectPending) return;
+
+    let cancelled = false;
+    void initializeLineLiffOnPrimaryRedirect()
+      .catch((error) => {
+        if (cancelled) return;
+
+        const message = error instanceof Error ? error.message : String(error);
+        toast.error("เชื่อมต่อ LINE ไม่สำเร็จ", { description: message });
+        window.history.replaceState({}, document.title, window.location.pathname);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLiffPrimaryRedirectPending(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isLiffPrimaryRedirectPending]);
 
   useEffect(() => {
     const { data } = supabase.auth.onAuthStateChange((event) => {
@@ -160,6 +189,20 @@ function RootComponent() {
     });
     return () => data.subscription.unsubscribe();
   }, [queryClient, router]);
+
+  if (isLiffPrimaryRedirectPending) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <div className="flex min-h-screen items-center justify-center bg-background px-4 text-center">
+          <div className="space-y-2">
+            <p className="text-lg font-semibold text-foreground">กำลังเชื่อมต่อ LINE...</p>
+            <p className="text-sm text-muted-foreground">กรุณารอสักครู่</p>
+          </div>
+        </div>
+        <Toaster position="top-center" richColors />
+      </QueryClientProvider>
+    );
+  }
 
   return (
     <QueryClientProvider client={queryClient}>

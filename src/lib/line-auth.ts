@@ -28,11 +28,21 @@ export function isLineLiffCallback() {
   return new URLSearchParams(window.location.search).get(LINE_RETURN_PARAM) === "1";
 }
 
+export function isLineLiffPrimaryRedirect() {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).has("liff.state");
+}
+
 async function initializeLiff() {
   if (!LIFF_ID) {
     throw new Error("ยังไม่ได้ตั้งค่า VITE_LINE_LIFF_ID สำหรับ LINE LIFF");
   }
   await liff.init({ liffId: LIFF_ID });
+}
+
+export async function initializeLineLiffOnPrimaryRedirect() {
+  if (!LIFF_ID || !isLineLiffPrimaryRedirect()) return;
+  await initializeLiff();
 }
 
 export async function startLineLogin(): Promise<LineAuthResult> {
