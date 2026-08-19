@@ -38,12 +38,12 @@ export function renderDashboardCardContent(
     case "net-income":
       return (
         <div className="flex h-full min-h-24 flex-col items-center justify-center rounded-xl bg-secondary/60 p-4 text-center sm:p-5">
-          <div className="flex items-center justify-center gap-1.5 text-xs leading-5 text-muted-foreground">
+          <div className="flex w-full items-center justify-center gap-1.5 whitespace-nowrap text-center text-xs leading-5 text-muted-foreground">
             <Coins className="h-4 w-4" />
             รายได้สุทธิรวม
           </div>
           <div
-            className="mt-1 break-words text-3xl leading-tight font-bold text-success sm:text-4xl"
+            className="mt-2 w-full text-center text-3xl leading-tight font-bold text-success sm:text-4xl"
             data-testid="stat-net"
           >
             {formatTHB(summary.totalNet)}
@@ -241,9 +241,11 @@ export function renderDashboardCardContent(
 
 function ChartCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="surface-card flex h-full min-h-0 min-w-0 flex-col overflow-visible p-5">
-      <h3 className="mb-3 shrink-0 text-sm font-bold">{title}</h3>
-      <div className="min-h-0 min-w-0 flex-1 overflow-visible">{children}</div>
+    <div className="surface-card flex h-full min-h-0 min-w-0 flex-col items-center justify-center overflow-visible p-5 text-center">
+      <h3 className="mb-3 w-full shrink-0 whitespace-nowrap text-center text-sm font-bold">
+        {title}
+      </h3>
+      <div className="min-h-0 w-full min-w-0 flex-1 overflow-visible">{children}</div>
     </div>
   );
 }
@@ -270,13 +272,15 @@ function Stat({
         ? "text-destructive"
         : "text-foreground";
   return (
-    <div className={`surface-card h-full min-w-0 ${compact ? "p-3" : "p-4"}`}>
-      <div className="flex min-w-0 items-start gap-1.5 text-xs leading-5 text-muted-foreground">
+    <div
+      className={`surface-card flex h-full min-w-0 flex-col items-center justify-center text-center ${compact ? "p-3" : "p-4"}`}
+    >
+      <div className="flex w-full min-w-0 items-center justify-center gap-1.5 text-center text-xs leading-5 text-muted-foreground">
         {icon}
-        <span className="min-w-0 break-words">{label}</span>
+        <span className="max-w-full whitespace-nowrap">{label}</span>
       </div>
       <div
-        className={`mt-1 break-words text-xl leading-tight font-bold ${toneCls}`}
+        className={`mt-2 w-full text-center text-xl leading-tight font-bold ${toneCls}`}
         data-testid={testId}
       >
         {value}
@@ -287,6 +291,8 @@ function Stat({
 
 function Empty() {
   return (
-    <p className="py-10 text-center text-xs text-muted-foreground">ไม่มีข้อมูลในเดือนที่เลือก</p>
+    <p className="w-full py-10 text-center text-xs text-muted-foreground">
+      ไม่มีข้อมูลในเดือนที่เลือก
+    </p>
   );
 }
