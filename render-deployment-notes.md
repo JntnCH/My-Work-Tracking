@@ -15,4 +15,5 @@
 - `npm run build` succeeded with the existing default Nitro target.
 - `npm run build:render` succeeded with `NITRO_PRESET=node-server`.
 - The production start command was tested with `PORT=10000 NODE_ENV=production npm run start:render`.
-- The Node server started, but requesting `/` returned an SSR error: `TypeError: (0, import_jsx_dev_runtime.jsxDEV) is not a function` from `RootShell` in the generated server bundle. This means Render configuration is not yet ready for delivery; the SSR dev-runtime mismatch must be fixed or the deployment must be changed to a compatible production target before asking the user to deploy.
+- The current production artifact was rebuilt with `npm run build:render`, verified by `scripts/verify-render-build.mjs`, and started successfully with `NODE_ENV=production PORT=10001 npm run start:render`. Local smoke tests returned the Login page at `/auth`, the controlled OAuth callback page at `/auth/callback`, and the Guest work tracker at `/` without an SSR 500.
+- OAuth deployment requirement: add the deployed site URL plus `/auth/callback` to Supabase Authentication → URL Configuration → Redirect URLs. The GitHub OAuth App callback remains the Supabase Provider callback URL (`https://<project-ref>.supabase.co/auth/v1/callback`), not the website route.

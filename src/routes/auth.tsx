@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import {
   AlertCircle,
   Check,
@@ -39,7 +39,7 @@ export const Route = createFileRoute("/auth")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: AuthPage,
+  component: AuthRoute,
 });
 
 function GoogleIcon({ className = "h-5 w-5" }: { className?: string }) {
@@ -62,6 +62,17 @@ function GoogleIcon({ className = "h-5 w-5" }: { className?: string }) {
         d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.35 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
       />
     </svg>
+  );
+}
+
+function AuthRoute() {
+  const location = useLocation();
+
+  return (
+    <>
+      {location.pathname === "/auth" ? <AuthPage /> : null}
+      <Outlet />
+    </>
   );
 }
 
@@ -110,7 +121,7 @@ function AuthPage() {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${redirectOrigin}/`,
+          redirectTo: `${redirectOrigin}/auth/callback`,
           queryParams: {
             access_type: "offline",
             prompt: "consent",
@@ -140,7 +151,7 @@ function AuthPage() {
       const redirectOrigin = typeof window !== "undefined" ? window.location.origin : "";
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "github",
-        options: { redirectTo: `${redirectOrigin}/` },
+        options: { redirectTo: `${redirectOrigin}/auth/callback` },
       });
       if (error) throw error;
       if (data?.url) {
@@ -273,7 +284,11 @@ function AuthPage() {
         });
         if (error) {
           // If Supabase is offline / misconfigured, establish local session
-          if (error.message.includes("fetch") || error.message.includes("placeholder") || error.message.includes("API key")) {
+          if (
+            error.message.includes("fetch") ||
+            error.message.includes("placeholder") ||
+            error.message.includes("API key")
+          ) {
             setGuestUser(name || email.split("@")[0], email, "email");
             toast.success("สมัครสมาชิกและเข้าสู่ระบบเรียบร้อยแล้ว");
             void navigate({ to: "/", replace: true });
@@ -289,7 +304,11 @@ function AuthPage() {
           password,
         });
         if (error) {
-          if (error.message.includes("fetch") || error.message.includes("placeholder") || error.message.includes("API key")) {
+          if (
+            error.message.includes("fetch") ||
+            error.message.includes("placeholder") ||
+            error.message.includes("API key")
+          ) {
             setGuestUser(email.split("@")[0], email, "email");
             toast.success(`เข้าสู่ระบบในชื่อ ${email} เรียบร้อยแล้ว`);
             void navigate({ to: "/", replace: true });
@@ -324,7 +343,7 @@ function AuthPage() {
 
   function copyRedirectUrl() {
     if (typeof window === "undefined") return;
-    navigator.clipboard.writeText(`${window.location.origin}/`);
+    navigator.clipboard.writeText(`${window.location.origin}/auth/callback`);
     setCopiedUrl(true);
     toast.success("คัดลอก Redirect URL แล้ว");
     setTimeout(() => setCopiedUrl(false), 2500);
@@ -352,7 +371,9 @@ function AuthPage() {
             type="button"
             onClick={() => selectMode("google")}
             className={`rounded-lg py-1.5 transition ${
-              mode === "google" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              mode === "google"
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
             Google
@@ -361,7 +382,9 @@ function AuthPage() {
             type="button"
             onClick={() => selectMode("phone")}
             className={`rounded-lg py-1.5 transition ${
-              mode === "phone" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              mode === "phone"
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
             โทรศัพท์
@@ -370,7 +393,9 @@ function AuthPage() {
             type="button"
             onClick={() => selectMode("email")}
             className={`rounded-lg py-1.5 transition ${
-              mode === "email" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              mode === "email"
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
             อีเมล
@@ -379,7 +404,9 @@ function AuthPage() {
             type="button"
             onClick={() => selectMode("signup")}
             className={`rounded-lg py-1.5 transition ${
-              mode === "signup" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              mode === "signup"
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
             สมัคร
@@ -416,7 +443,7 @@ function AuthPage() {
               className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-border bg-secondary/50 py-2.5 px-4 text-xs font-semibold text-foreground transition hover:bg-secondary active:scale-[0.99] disabled:opacity-60 cursor-pointer"
             >
               <Github className="h-4 w-4" />
-              <span>เข้าสู่ระบบด้วย GitHub</span>
+              <span>Continue with GitHub</span>
             </button>
 
             <div className="text-left">
@@ -426,25 +453,32 @@ function AuthPage() {
                 className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-primary transition cursor-pointer"
               >
                 <HelpCircle className="h-3.5 w-3.5" />
-                <span>คำแนะนำการตั้งค่า Google OAuth ใน Supabase</span>
+                <span>คำแนะนำการตั้งค่า OAuth ใน Supabase</span>
               </button>
 
               {showConfigHelp && (
                 <div className="mt-2.5 space-y-2 rounded-xl border border-primary/20 bg-info-soft/40 p-3 text-[11px] text-muted-foreground animate-in fade-in-50 duration-200">
                   <p className="font-semibold text-foreground">
-                    ขั้นตอนเปิดใช้งาน Google Login ใน Supabase Dashboard:
+                    ขั้นตอนเปิดใช้งาน Google/GitHub Login ใน Supabase Dashboard:
                   </p>
                   <ol className="list-decimal pl-4 space-y-1 leading-relaxed">
-                    <li>ไปที่ Supabase &gt; Authentication &gt; Providers &gt; Google</li>
-                    <li>เปิดใช้งาน Enable Sign in with Google</li>
-                    <li>ใส่ Client ID และ Client Secret จาก Google Cloud Console</li>
                     <li>
-                      เพิ่ม Authorized Redirect URI ลงใน Google Cloud Console
+                      ไปที่ Supabase &gt; Authentication &gt; Providers แล้วเลือก Google หรือ GitHub
+                    </li>
+                    <li>เปิดใช้งาน Provider และใส่ Client ID/Client Secret ใน Supabase เท่านั้น</li>
+                    <li>
+                      เพิ่ม URL ของเว็บไซต์และ <code>/auth/callback</code> ใน Supabase Redirect URLs
+                    </li>
+                    <li>
+                      สำหรับ GitHub ให้ใช้ Supabase Callback URL ที่หน้า Provider แสดงใน GitHub
+                      OAuth App
                     </li>
                   </ol>
                   <div className="pt-1.5 flex items-center justify-between gap-2">
                     <span className="truncate font-mono text-[10px] bg-card px-2 py-1 rounded border border-border">
-                      {typeof window !== "undefined" ? window.location.origin : ""}/
+                      {typeof window !== "undefined"
+                        ? `${window.location.origin}/auth/callback`
+                        : ""}
                     </span>
                     <button
                       type="button"
@@ -689,10 +723,10 @@ function AuthPage() {
         </div>
 
         <p className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
-          <ScanFace className="h-3.5 w-3.5" /> รองรับปลดล็อกด้วย Face ID / Touch ID บนอุปกรณ์ที่รองรับ
+          <ScanFace className="h-3.5 w-3.5" /> รองรับปลดล็อกด้วย Face ID / Touch ID
+          บนอุปกรณ์ที่รองรับ
         </p>
       </div>
     </div>
   );
 }
-

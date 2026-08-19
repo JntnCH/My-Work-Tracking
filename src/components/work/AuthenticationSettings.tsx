@@ -108,7 +108,7 @@ export function AuthenticationSettings({ user, isGuest = false, onSignOut }: Pro
     try {
       const { data, error } = await supabase.auth.linkIdentity({
         provider,
-        options: { redirectTo: `${window.location.origin}/` },
+        options: { redirectTo: `${window.location.origin}/auth/callback` },
       });
       if (error) throw error;
       if (data?.url) {
