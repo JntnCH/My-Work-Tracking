@@ -195,8 +195,13 @@ function Index() {
           userId={userId}
           onFaceChanged={lock.refresh}
           onSignOut={() => void signOut()}
-          themeMode={tracker.themeSettings.themeMode === "dark" ? "dark" : "light"}
-          onToggleTheme={() => requestTabChange("settings")}
+          themeMode={tracker.themeSettings.themeMode}
+          onToggleTheme={() =>
+            tracker.previewThemeSettings({
+              ...tracker.themeSettings,
+              themeMode: tracker.themeSettings.themeMode === "dark" ? "light" : "dark",
+            })
+          }
         />
 
         {/* Navigation Tabs Bar อยู่ในส่วน Auto-Hide Sticky เดียวกัน */}
@@ -273,6 +278,7 @@ function Index() {
             otTypes={tracker.otTypes}
             rates={tracker.rates}
             themeSettings={tracker.themeSettings}
+            savedThemeSettings={tracker.savedThemeSettings}
             spreadsheetId={tracker.spreadsheetId}
             logs={tracker.logs}
             previewMonth={month}
@@ -291,6 +297,7 @@ function Index() {
             onUpdateBranch={tracker.updateBranch}
             onSelectBranch={tracker.selectBranch}
             onSaveBranchSettings={tracker.saveBranchSettings}
+            onPreviewThemeSettings={tracker.previewThemeSettings}
             onSaveThemeSettings={tracker.saveThemeSettings}
             onSetSpreadsheetId={tracker.setSpreadsheetId}
             onDirtyChange={(isDirty) => {

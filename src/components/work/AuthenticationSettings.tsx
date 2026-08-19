@@ -9,6 +9,7 @@ import {
   Loader2,
   LogOut,
   Mail,
+  MessageCircle,
   RefreshCw,
   ShieldCheck,
   Unlink2,
@@ -23,7 +24,7 @@ type Props = {
   onSignOut: (scope?: "local" | "global") => Promise<void>;
 };
 
-type Provider = "google" | "github";
+type Provider = "google" | "github" | "custom:line";
 
 const PROVIDERS: Array<{
   id: Provider;
@@ -46,11 +47,19 @@ const PROVIDERS: Array<{
     icon: Github,
     className: "text-foreground",
   },
+  {
+    id: "custom:line",
+    label: "LINE",
+    description: "เข้าสู่ระบบด้วยบัญชี LINE ผ่าน Custom OIDC",
+    icon: MessageCircle,
+    className: "text-[#06C755]",
+  },
 ];
 
 function providerLabel(provider: string) {
   if (provider === "google") return "Google";
   if (provider === "github") return "GitHub";
+  if (provider === "custom:line" || provider === "line") return "LINE";
   if (provider === "email") return "อีเมลและรหัสผ่าน";
   return provider;
 }
@@ -280,7 +289,11 @@ export function AuthenticationSettings({ user, isGuest = false, onSignOut }: Pro
         ) : (
           <div className="mt-4 space-y-2">
             {PROVIDERS.map(({ id, label, description, icon: Icon, className }) => {
-              const identity = identities.find((item) => item.provider === id);
+              const identity = identities.find((item) =>
+                id === "custom:line"
+                  ? item.provider === "custom:line" || item.provider === "line"
+                  : item.provider === id,
+              );
               const isConnected = Boolean(identity);
               return (
                 <div

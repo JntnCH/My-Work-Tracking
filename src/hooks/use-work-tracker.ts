@@ -89,6 +89,7 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
   const [airtableSyncing, setAirtableSyncing] = useState(false);
 
   const [themeSettings, setThemeSettings] = useState<CustomColors>(DEFAULT_COLORS_LIGHT);
+  const [savedThemeSettings, setSavedThemeSettings] = useState<CustomColors>(DEFAULT_COLORS_LIGHT);
   const useSupabase = Boolean(userId && !isGuest);
 
   // Load local state first; only authenticated sessions hydrate from Supabase.
@@ -115,6 +116,7 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
       setGlobalRates(localRates);
       setSpreadsheetIdState(localSheetId);
       setThemeSettings(localTheme);
+      setSavedThemeSettings(localTheme);
       applyTheme(localTheme);
       setDbWorkTypes(
         localCategories.map((name, index) => ({
@@ -167,6 +169,7 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
           };
 
           setThemeSettings(colors);
+          setSavedThemeSettings(colors);
           applyTheme(colors);
 
           if (dbSettings.daily_rate) {
@@ -357,9 +360,15 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
     [activeBranchId, globalRates, useSupabase, userId],
   );
 
+  const previewThemeSettings = useCallback((colors: CustomColors) => {
+    setThemeSettings(colors);
+    applyTheme(colors);
+  }, []);
+
   const saveThemeSettings = useCallback(
     async (colors: CustomColors) => {
       setThemeSettings(colors);
+      setSavedThemeSettings(colors);
       storage.setTheme(colors);
       applyTheme(colors);
       if (useSupabase && userId) {
@@ -388,6 +397,7 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
 
   const resetThemeSettings = useCallback(async () => {
     setThemeSettings(DEFAULT_COLORS_LIGHT);
+    setSavedThemeSettings(DEFAULT_COLORS_LIGHT);
     storage.setTheme(DEFAULT_COLORS_LIGHT);
     applyTheme(DEFAULT_COLORS_LIGHT);
     if (useSupabase && userId) {
@@ -871,6 +881,7 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
     branchSettings,
     branchSettingsLoading,
     themeSettings,
+    savedThemeSettings,
     spreadsheetId,
     syncing,
     airtableSyncing,
@@ -885,6 +896,7 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
     updateBranch,
     selectBranch,
     saveBranchSettings,
+    previewThemeSettings,
     saveThemeSettings,
     resetThemeSettings,
     setSpreadsheetId,

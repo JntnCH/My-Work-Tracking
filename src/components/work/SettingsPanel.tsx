@@ -62,6 +62,7 @@ type Props = {
   otTypes: DBOtType[];
   rates: RateSettings;
   themeSettings: CustomColors;
+  savedThemeSettings: CustomColors;
   spreadsheetId: string;
   logs: WorkLog[];
   previewMonth: string;
@@ -83,6 +84,7 @@ type Props = {
   ) => Promise<DBBranch>;
   onSelectBranch: (id: string | null) => void;
   onSaveBranchSettings: (settings: BranchSettings) => Promise<void>;
+  onPreviewThemeSettings: (settings: CustomColors) => void;
   onSaveThemeSettings: (settings: CustomColors) => Promise<void>;
   onSetSpreadsheetId: (id: string) => Promise<void>;
   onSyncAirtableAll: () => Promise<void>;
@@ -109,6 +111,7 @@ export function SettingsPanel({
   otTypes,
   rates,
   themeSettings,
+  savedThemeSettings,
   spreadsheetId,
   logs,
   previewMonth,
@@ -127,6 +130,7 @@ export function SettingsPanel({
   onUpdateBranch,
   onSelectBranch,
   onSaveBranchSettings,
+  onPreviewThemeSettings,
   onSaveThemeSettings,
   onSetSpreadsheetId,
   onSyncAirtableAll,
@@ -173,8 +177,13 @@ export function SettingsPanel({
   }, [spreadsheetId]);
   useEffect(() => {
     setDraftColors(themeSettings);
-    setSavedColors(themeSettings);
   }, [themeSettings]);
+  useEffect(() => {
+    setSavedColors(savedThemeSettings);
+  }, [savedThemeSettings]);
+  useEffect(() => {
+    onPreviewThemeSettings(draftColors);
+  }, [draftColors, onPreviewThemeSettings]);
   useEffect(() => {
     setBranchRateForm(branchSettings);
     setSavedBranchRateForm(branchSettings);
@@ -224,6 +233,7 @@ export function SettingsPanel({
 
   const handleCancel = () => {
     setDraftColors(savedColors);
+    onPreviewThemeSettings(savedColors);
     setRateForm(savedRateForm);
     setSheetIdInput(savedSheetId);
     setBranchRateForm(savedBranchRateForm);
@@ -317,13 +327,29 @@ export function SettingsPanel({
   const handleRatesSave = async () => {
     setIsSaving(true);
     try {
-      const normalizedSheetId = normalizeSheetId();
       const coordinator = createSaveCoordinator([
         {
           scope: "rates",
           dirty: JSON.stringify(rateForm) !== JSON.stringify(savedRateForm),
           save: () => onSaveRates(rateForm),
         },
+      ]);
+      const result = await coordinator.save();
+      commitSavedScopes(result.savedScopes, savedSheetId);
+      if (result.error) throw result.error;
+      toast.success("บันทึกค่าแรง Global แล้ว");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "บันทึกค่าแรงไม่สำเร็จ");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSpreadsheetSave = async () => {
+    setIsSaving(true);
+    try {
+      const normalizedSheetId = normalizeSheetId();
+      const coordinator = createSaveCoordinator([
         {
           scope: "spreadsheet",
           dirty: sheetIdInput !== savedSheetId,
@@ -333,18 +359,43 @@ export function SettingsPanel({
       const result = await coordinator.save();
       commitSavedScopes(result.savedScopes, normalizedSheetId);
       if (result.error) throw result.error;
-      toast.success("บันทึกค่าแรงและ Google Sheets ID แล้ว");
+      toast.success("บันทึก Google Sheets ID แล้ว");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "บันทึกค่าแรงไม่สำเร็จ");
+      toast.error(err instanceof Error ? err.message : "บันทึก Google Sheets ID ไม่สำเร็จ");
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleSaveAll = async () => {
+  const handleThemeSave = async () => {
     setIsSaving(true);
     try {
-      const normalizedSheetId = normalizeSheetId();
+      await onSaveThemeSettings(draftColors);
+      setSavedColors(draftColors);
+      toast.success("บันทึกธีมและสีแล้ว");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "บันทึกธีมไม่สำเร็จ");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleLayoutSave = async () => {
+    setIsSaving(true);
+    try {
+      await layoutEditorRef.current?.saveDraft();
+      setLayoutDirty(false);
+      toast.success("บันทึก Layout Dashboard แล้ว");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "บันทึก Layout ไม่สำเร็จ");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleGeneralSave = async () => {
+    setIsSaving(true);
+    try {
       const branchProfileDirty = Boolean(
         activeBranchId &&
         (branchNameInput !== savedBranchNameInput || branchCodeInput !== savedBranchCodeInput),
@@ -354,19 +405,9 @@ export function SettingsPanel({
       );
       const coordinator = createSaveCoordinator([
         {
-          scope: "theme",
-          dirty: JSON.stringify(draftColors) !== JSON.stringify(savedColors),
-          save: () => onSaveThemeSettings(draftColors),
-        },
-        {
           scope: "rates",
           dirty: JSON.stringify(rateForm) !== JSON.stringify(savedRateForm),
           save: () => onSaveRates(rateForm),
-        },
-        {
-          scope: "spreadsheet",
-          dirty: sheetIdInput !== savedSheetId,
-          save: () => onSetSpreadsheetId(normalizedSheetId),
         },
         {
           scope: "branch-profile",
@@ -386,16 +427,9 @@ export function SettingsPanel({
           dirty: branchRatesDirty,
           save: () => onSaveBranchSettings(branchRateForm),
         },
-        {
-          scope: "layout",
-          dirty: layoutDirty,
-          save: async () => {
-            await layoutEditorRef.current?.saveDraft();
-          },
-        },
       ]);
       const result = await coordinator.save();
-      commitSavedScopes(result.savedScopes, normalizedSheetId);
+      commitSavedScopes(result.savedScopes, savedSheetId);
 
       if (result.error) {
         const scopeLabel = result.failedScope ? ` (${result.failedScope})` : "";
@@ -404,20 +438,40 @@ export function SettingsPanel({
         );
       }
 
-      setIsLocked(true);
-      toast.success("บันทึกการตั้งค่าทั้งหมดลง Supabase เรียบร้อยแล้ว");
+      toast.success("บันทึกค่าแรงและข้อมูลสาขาแล้ว");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "บันทึกการตั้งค่าไม่สำเร็จ");
+      toast.error(err instanceof Error ? err.message : "บันทึกค่าแรงและสาขาไม่สำเร็จ");
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleSaveAll = async () => {
+    switch (activeTab) {
+      case "theme":
+        await handleThemeSave();
+        break;
+      case "general":
+        await handleGeneralSave();
+        break;
+      case "layout":
+        await handleLayoutSave();
+        break;
+      case "integrations":
+        await handleSpreadsheetSave();
+        break;
+      default:
+        toast.info("หมวดนี้บันทึกแยกตามรายการหรือไม่มีค่าที่ต้องบันทึก");
+        return;
+    }
+    setIsLocked(true);
   };
 
   const handleResetColors = () => {
     const isDark = draftColors.themeMode === "dark";
     const defaults = isDark ? DEFAULT_COLORS_DARK : DEFAULT_COLORS_LIGHT;
     setDraftColors(defaults);
-    toast.info("แสดงตัวอย่างสีค่า Google Material แล้ว กด Save เพื่อบันทึก");
+    toast.info("แสดงตัวอย่างสี Google Material แล้ว กด Save เพื่อบันทึกถาวร");
   };
 
   const selectGooglePreset = (presetId: string) => {
@@ -446,7 +500,7 @@ export function SettingsPanel({
       chartColors: palette.chartColors,
     };
     setDraftColors(next);
-    toast.info(`แสดงตัวอย่างชุดสี ${preset.nameEn} แล้ว กด Save เพื่อบันทึก`);
+    toast.info(`แสดงตัวอย่างชุดสี ${preset.nameEn} แล้ว กด Save เพื่อบันทึกถาวร`);
   };
 
   const updateBorderRadius = (radius: BorderRadiusOption) => {
@@ -488,8 +542,8 @@ export function SettingsPanel({
               <Settings2 className="h-5 w-5 text-primary" /> ตั้งค่าระบบ (Settings)
             </h2>
             <p className="text-xs text-muted-foreground">
-              Settings → Unlock → Edit → Preview → Save → Lock ·
-              การเปลี่ยนแปลงจะยังไม่ถูกนำไปใช้จนกด Save
+              Settings → Unlock → Edit → Preview → Save → Lock · การเปลี่ยนแปลงจะแสดงผลทันที
+              และจะบันทึกถาวรเมื่อกด Save
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2 text-[11px] font-semibold">
@@ -536,7 +590,7 @@ export function SettingsPanel({
             disabled={isLocked || !isDirty || isSaving}
             className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <Save className="h-4 w-4" /> {isSaving ? "กำลังบันทึก…" : "Save"}
+            <Save className="h-4 w-4" /> {isSaving ? "กำลังบันทึก…" : "Save หมวดนี้"}
           </button>
           {isDirty && (
             <span className="flex items-center gap-1 text-[11px] text-warning-foreground">
@@ -1140,6 +1194,26 @@ export function SettingsPanel({
               </div>
             </div>
           </fieldset>
+          <div className="mt-5 flex flex-wrap items-center justify-end gap-2 border-t border-border pt-4">
+            <button
+              type="button"
+              onClick={handleCancel}
+              disabled={!isDirty}
+              className="rounded-xl border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              ยกเลิกการแสดงตัวอย่าง
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleThemeSave()}
+              disabled={
+                isLocked || JSON.stringify(draftColors) === JSON.stringify(savedColors) || isSaving
+              }
+              className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Save className="h-4 w-4" /> บันทึกธีมและสี
+            </button>
+          </div>
         </div>
       )}
 
@@ -1342,18 +1416,10 @@ export function SettingsPanel({
                     className="w-full rounded-xl border border-input bg-secondary p-2.5 text-sm"
                   />
                 </div>
-
-                <div>
-                  <label className="text-xs font-bold text-muted-foreground block mb-1">
-                    Google Sheets Spreadsheet ID
-                  </label>
-                  <input
-                    value={sheetIdInput}
-                    onChange={(e) => setSheetIdInput(e.target.value)}
-                    placeholder="วาง Spreadsheet ID หรือ URL เต็มของ Google Sheets"
-                    className="w-full rounded-xl border border-input bg-secondary p-2.5 text-sm"
-                  />
-                </div>
+                <p className="self-end pb-2 text-xs text-muted-foreground">
+                  Google Sheets ID อยู่ในหมวด <strong>Supabase &amp; Airtable</strong>{" "}
+                  เพื่อแยกการบันทึกออกจากค่าแรง
+                </p>
               </div>
 
               <div className="pt-2">
@@ -1361,7 +1427,7 @@ export function SettingsPanel({
                   onClick={() => void handleRatesSave()}
                   className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground active:scale-95"
                 >
-                  <Save className="h-4 w-4" /> บันทึกค่าแรงและ Google Sheets ID
+                  <Save className="h-4 w-4" /> บันทึกค่าแรง Global
                 </button>
               </div>
             </div>
@@ -1402,6 +1468,16 @@ export function SettingsPanel({
             </div>
 
             <SheetsPanel spreadsheetId={sheetIdInput} onChange={(id) => setSheetIdInput(id)} />
+            <div className="flex justify-end border-b border-border pb-4">
+              <button
+                type="button"
+                onClick={() => void handleSpreadsheetSave()}
+                disabled={isLocked || sheetIdInput === savedSheetId || isSaving}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Save className="h-4 w-4" /> บันทึก Google Sheets ID
+              </button>
+            </div>
 
             <div className="rounded-xl border border-border bg-card p-4 space-y-3">
               <div className="flex items-center justify-between">
