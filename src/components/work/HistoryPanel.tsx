@@ -109,9 +109,11 @@ export function HistoryPanel({
   const [editing, setEditing] = useState<string | null>(null);
   const [month, setMonth] = useState("all");
   const [draft, setDraft] = useState<Draft>(emptyDraft);
+  const [taskSelection, setTaskSelection] = useState("");
 
   const startEdit = (log: WorkLog) => {
     setEditing(log.id);
+    setTaskSelection("");
     setDraft({
       inAt: toLocalInput(log.checkInTime),
       outAt: toLocalInput(log.checkOutTime),
@@ -126,6 +128,26 @@ export function HistoryPanel({
       gpsIn: gpsText(log.checkInGPS) === "-" ? "" : gpsText(log.checkInGPS),
       gpsOut: gpsText(log.checkOutGPS) === "-" ? "" : gpsText(log.checkOutGPS),
       tasks: (log.tasks ?? []).join("\n"),
+    });
+  };
+
+  const taskItems = draft.tasks
+    .split("\n")
+    .map((task) => task.trim())
+    .filter(Boolean);
+  const taskOptions = [...new Set([...categories.filter(Boolean), ...taskItems])];
+
+  const addTask = () => {
+    const task = taskSelection.trim();
+    if (!task) return;
+    setDraft({ ...draft, tasks: [...taskItems, task].join("\n") });
+    setTaskSelection("");
+  };
+
+  const removeTask = (index: number) => {
+    setDraft({
+      ...draft,
+      tasks: taskItems.filter((_, taskIndex) => taskIndex !== index).join("\n"),
     });
   };
 
@@ -146,10 +168,7 @@ export function HistoryPanel({
       otherDeductions: toNum(draft.otherDeductions),
       checkInGPS: gpsFromText(draft.gpsIn),
       checkOutGPS: gpsFromText(draft.gpsOut),
-      tasks: draft.tasks
-        .split("\n")
-        .map((t) => t.trim())
-        .filter(Boolean),
+      tasks: taskItems,
     });
     setEditing(null);
   };
@@ -496,16 +515,60 @@ export function HistoryPanel({
 
                   <section className="space-y-2">
                     <h4 className="text-xs font-bold text-primary">รายการงานที่ทำเสร็จ</h4>
-                    <Field label="บรรทัดละ 1 งาน">
-                      <textarea
-                        aria-label="รายการงานที่ทำเสร็จ"
-                        value={draft.tasks}
-                        rows={3}
-                        onChange={(e) => setDraft({ ...draft, tasks: e.target.value })}
-                        placeholder="รายการงาน บรรทัดละ 1 งาน"
-                        className={inputCls}
-                      />
+                    <Field label="เลือกจากประเภทงาน">
+                      <div className="flex gap-2">
+                        <select
+                          aria-label="เลือกประเภทงานที่ทำเสร็จ"
+                          value={taskSelection}
+                          onChange={(e) => setTaskSelection(e.target.value)}
+                          className={`${inputCls} flex-1`}
+                        >
+                          <option value="">เลือกประเภทงาน</option>
+                          {taskOptions.map((task) => (
+                            <option key={task} value={task}>
+                              {task}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={addTask}
+                          disabled={!taskSelection}
+                          className="rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          เพิ่ม
+                        </button>
+                      </div>
                     </Field>
+                    {taskItems.length > 0 ? (
+                      <ol className="space-y-1.5 rounded-lg border border-border bg-card p-2 text-sm">
+                        {taskItems.map((task, index) => (
+                          <li
+                            key={`${task}-${index}`}
+                            className="flex items-center justify-between gap-2 rounded-md border border-border/70 px-2 py-1.5"
+                          >
+                            <span className="min-w-0 truncate">
+                              <span className="mr-2 text-xs font-bold text-muted-foreground">
+                                {index + 1}.
+                              </span>
+                              {task}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => removeTask(index)}
+                              aria-label={`ลบรายการงาน ${task}`}
+                              className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/10"
+                            >
+                              ลบ
+                            </button>
+                          </li>
+                        ))}
+                      </ol>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        ยังไม่มีรายการงาน — เลือกประเภทงานแล้วกดเพิ่ม
+                      </p>
+                    )}
                   </section>
 
                   <div className="flex gap-2 pt-1">
