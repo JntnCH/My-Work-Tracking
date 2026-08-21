@@ -172,7 +172,7 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
           setSavedThemeSettings(colors);
           applyTheme(colors);
 
-          if (dbSettings.daily_rate) {
+          if (dbSettings.daily_rate !== null && dbSettings.daily_rate !== undefined) {
             const nextRates: RateSettings = {
               dailyRate: dbSettings.daily_rate,
               otType: dbSettings.default_ot_type ?? 0,

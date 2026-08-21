@@ -85,12 +85,16 @@ export function CheckInPanel({
   const [gpsLoading, setGpsLoading] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
   const [form, setForm] = useState<RateSettings>(rates);
+  const [dailyRateInput, setDailyRateInput] = useState(() => String(rates.dailyRate ?? ""));
   const [elapsed, setElapsed] = useState(0);
   const [catOpen, setCatOpen] = useState(false);
   const [taskInput, setTaskInput] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => setForm(rates), [rates]);
+  useEffect(() => {
+    setForm(rates);
+    setDailyRateInput(String(rates.dailyRate ?? ""));
+  }, [rates]);
   useEffect(() => {
     if (!categories.includes(workType)) setWorkType(categories[0] ?? "");
   }, [categories, workType]);
@@ -209,12 +213,19 @@ export function CheckInPanel({
   };
 
   const doCheckIn = () => {
+    const rawDailyRate = dailyRateInput.trim();
+    const dailyRate = Number(rawDailyRate);
+    if (!rawDailyRate || !Number.isFinite(dailyRate) || dailyRate < 0) {
+      toast.error("กรุณากรอกค่าแรงปกติเป็นตัวเลขที่ไม่ติดลบก่อน Check-in");
+      return;
+    }
+
     onCheckIn({
       workType,
       locationName: locationName.trim() || gps.addressName || "ไม่ได้ระบุสถานที่",
       gps,
       photo,
-      rates: form,
+      rates: { ...form, dailyRate },
       tasks: [],
     });
     setTaskInput("");
@@ -499,9 +510,22 @@ export function CheckInPanel({
               <input
                 id="dailyRate"
                 type="number"
-                value={form.dailyRate}
+                min="0"
+                value={dailyRateInput}
                 disabled={!!active}
-                onChange={(e) => setForm({ ...form, dailyRate: num(e.target.value) })}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  setDailyRateInput(raw);
+                  if (raw === "") {
+                    setForm({ ...form, dailyRate: 0 });
+                    return;
+                  }
+
+                  const dailyRate = Number(raw);
+                  if (Number.isFinite(dailyRate)) {
+                    setForm({ ...form, dailyRate });
+                  }
+                }}
                 className={inputCls}
               />
             </Field>
