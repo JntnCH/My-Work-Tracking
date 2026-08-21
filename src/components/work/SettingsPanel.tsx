@@ -150,6 +150,7 @@ export function SettingsPanel({
   const [isLocked, setIsLocked] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [rateForm, setRateForm] = useState<RateSettings>(rates);
+  const [dailyRateInput, setDailyRateInput] = useState(() => String(rates.dailyRate ?? ""));
   const [savedRateForm, setSavedRateForm] = useState<RateSettings>(rates);
   const [sheetIdInput, setSheetIdInput] = useState(spreadsheetId);
   const [savedSheetId, setSavedSheetId] = useState(spreadsheetId);
@@ -169,6 +170,7 @@ export function SettingsPanel({
 
   useEffect(() => {
     setRateForm(rates);
+    setDailyRateInput(String(rates.dailyRate ?? ""));
     setSavedRateForm(rates);
   }, [rates]);
   useEffect(() => {
@@ -196,9 +198,14 @@ export function SettingsPanel({
     setSavedBranchCodeInput(nextCode);
   }, [activeBranchId, branchSettings, branches]);
 
+  const ratesDirty =
+    dailyRateInput !== String(savedRateForm.dailyRate ?? "") ||
+    JSON.stringify({ ...rateForm, dailyRate: 0 }) !==
+      JSON.stringify({ ...savedRateForm, dailyRate: 0 });
+
   const isDirty =
     JSON.stringify(draftColors) !== JSON.stringify(savedColors) ||
-    JSON.stringify(rateForm) !== JSON.stringify(savedRateForm) ||
+    ratesDirty ||
     sheetIdInput !== savedSheetId ||
     JSON.stringify(branchRateForm) !== JSON.stringify(savedBranchRateForm) ||
     branchNameInput !== savedBranchNameInput ||
@@ -235,6 +242,7 @@ export function SettingsPanel({
     setDraftColors(savedColors);
     onPreviewThemeSettings(savedColors);
     setRateForm(savedRateForm);
+    setDailyRateInput(String(savedRateForm.dailyRate ?? ""));
     setSheetIdInput(savedSheetId);
     setBranchRateForm(savedBranchRateForm);
     setBranchNameInput(savedBranchNameInput);
@@ -310,9 +318,17 @@ export function SettingsPanel({
     return normalized;
   };
 
-  const commitSavedScopes = (savedScopes: readonly SaveScope[], normalizedSheetId: string) => {
+  const commitSavedScopes = (
+    savedScopes: readonly SaveScope[],
+    normalizedSheetId: string,
+    savedRates: RateSettings = rateForm,
+  ) => {
     if (savedScopes.includes("theme")) setSavedColors(draftColors);
-    if (savedScopes.includes("rates")) setSavedRateForm(rateForm);
+    if (savedScopes.includes("rates")) {
+      setRateForm(savedRates);
+      setDailyRateInput(String(savedRates.dailyRate ?? ""));
+      setSavedRateForm(savedRates);
+    }
     if (savedScopes.includes("spreadsheet")) {
       setSheetIdInput(normalizedSheetId);
       setSavedSheetId(normalizedSheetId);
@@ -324,18 +340,31 @@ export function SettingsPanel({
     }
   };
 
+  const getValidatedRates = () => {
+    const rawDailyRate = dailyRateInput.trim();
+    if (!rawDailyRate) throw new Error("กรุณากรอกค่าแรงปกติก่อนบันทึก");
+
+    const dailyRate = Number(rawDailyRate);
+    if (!Number.isFinite(dailyRate) || dailyRate < 0) {
+      throw new Error("ค่าแรงปกติต้องเป็นตัวเลขที่ไม่ติดลบ");
+    }
+
+    return { ...rateForm, dailyRate };
+  };
+
   const handleRatesSave = async () => {
     setIsSaving(true);
     try {
+      const nextRates = getValidatedRates();
       const coordinator = createSaveCoordinator([
         {
           scope: "rates",
-          dirty: JSON.stringify(rateForm) !== JSON.stringify(savedRateForm),
-          save: () => onSaveRates(rateForm),
+          dirty: ratesDirty,
+          save: () => onSaveRates(nextRates),
         },
       ]);
       const result = await coordinator.save();
-      commitSavedScopes(result.savedScopes, savedSheetId);
+      commitSavedScopes(result.savedScopes, savedSheetId, nextRates);
       if (result.error) throw result.error;
       toast.success("บันทึกค่าแรง Global แล้ว");
     } catch (err) {
@@ -406,8 +435,8 @@ export function SettingsPanel({
       const coordinator = createSaveCoordinator([
         {
           scope: "rates",
-          dirty: JSON.stringify(rateForm) !== JSON.stringify(savedRateForm),
-          save: () => onSaveRates(rateForm),
+          dirty: ratesDirty,
+          save: () => onSaveRates(getValidatedRates()),
         },
         {
           scope: "branch-profile",
@@ -1409,10 +1438,21 @@ export function SettingsPanel({
                   </label>
                   <input
                     type="number"
-                    value={rateForm.dailyRate}
-                    onChange={(e) =>
-                      setRateForm({ ...rateForm, dailyRate: Number(e.target.value) })
-                    }
+                    min="0"
+                    value={dailyRateInput}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      setDailyRateInput(raw);
+                      if (raw === "") {
+                        setRateForm({ ...rateForm, dailyRate: 0 });
+                        return;
+                      }
+
+                      const dailyRate = Number(raw);
+                      if (Number.isFinite(dailyRate)) {
+                        setRateForm({ ...rateForm, dailyRate });
+                      }
+                    }}
                     className="w-full rounded-xl border border-input bg-secondary p-2.5 text-sm"
                   />
                 </div>
