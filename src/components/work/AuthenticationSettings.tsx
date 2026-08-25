@@ -95,10 +95,13 @@ export function AuthenticationSettings({ user, isGuest = false, onSignOut }: Pro
     void loadIdentities();
   }, [loadIdentities, user]);
 
-  const connectedProviders = useMemo(
-    () => new Set(identities.map((identity) => identity.provider)),
-    [identities],
-  );
+  const connectedProviders = useMemo(() => {
+    const list = identities.map((identity) => identity.provider);
+    if (user?.app_metadata?.provider) {
+      list.push(user.app_metadata.provider);
+    }
+    return new Set(list);
+  }, [identities, user]);
 
   const emailConnected = Boolean(
     user?.email && (connectedProviders.has("email") || identities.length === 0),

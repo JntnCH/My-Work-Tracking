@@ -66,8 +66,16 @@ export function AppHeader({
             <Clock3 className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <h1 className="truncate text-lg leading-tight font-bold">Work Tracker</h1>
-            <p className="truncate text-xs opacity-80">{name || "ระบบบันทึกงาน & Check-in"}</p>
+            <div className="flex items-center gap-1.5">
+              <h1 className="truncate text-lg leading-tight font-bold">Work Tracker</h1>
+              {email.toLowerCase().includes("@gmail.com") && (
+                <span className="hidden xs:inline-flex items-center gap-1 rounded-full bg-card/20 px-1.5 py-0.5 text-[9px] font-bold text-primary-foreground tracking-wide">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                  Gmail
+                </span>
+              )}
+            </div>
+            <p className="truncate text-xs opacity-80">{name || email || "ระบบบันทึกงาน & Check-in"}</p>
             {isGuest && (
               <p
                 className="mt-0.5 max-w-[15rem] text-[10px] leading-tight text-primary-foreground/70 sm:max-w-none"

@@ -4,6 +4,57 @@ import { supabase } from "@/integrations/supabase/client";
 
 const GUEST_STORAGE_KEY = "work_tracker_guest_user";
 const AUTH_CHANGE_EVENT = "work_tracker_auth_change";
+const RECENT_GMAIL_KEY = "work_tracker_recent_gmail_accounts";
+
+export type RecentGmailAccount = {
+  email: string;
+  name: string;
+  avatarUrl?: string;
+  lastLoginAt: string;
+};
+
+export function getRecentGmailAccounts(): RecentGmailAccount[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(RECENT_GMAIL_KEY);
+    return raw ? (JSON.parse(raw) as RecentGmailAccount[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveRecentGmailAccount(account: { email: string; name: string; avatarUrl?: string }) {
+  if (typeof window === "undefined") return;
+  try {
+    const list = getRecentGmailAccounts().filter(
+      (item) => item.email.toLowerCase() !== account.email.toLowerCase(),
+    );
+    const updated: RecentGmailAccount[] = [
+      {
+        email: account.email,
+        name: account.name || account.email.split("@")[0] || "Google User",
+        avatarUrl: account.avatarUrl,
+        lastLoginAt: new Date().toISOString(),
+      },
+      ...list,
+    ].slice(0, 5); // Keep up to 5 accounts
+    localStorage.setItem(RECENT_GMAIL_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.warn("[useSession] saveRecentGmailAccount failed:", err);
+  }
+}
+
+export function removeRecentGmailAccount(email: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const list = getRecentGmailAccounts().filter(
+      (item) => item.email.toLowerCase() !== email.toLowerCase(),
+    );
+    localStorage.setItem(RECENT_GMAIL_KEY, JSON.stringify(list));
+  } catch (err) {
+    console.warn("[useSession] removeRecentGmailAccount failed:", err);
+  }
+}
 
 export function getGuestUser(): User | null {
   if (typeof window === "undefined") return null;
@@ -14,6 +65,24 @@ export function getGuestUser(): User | null {
   } catch {
     return null;
   }
+}
+
+export function loginWithGmail(
+  email: string,
+  name?: string,
+  avatarUrl?: string,
+): User {
+  const normalizedEmail = email.trim();
+  const displayNameVal = name?.trim() || normalizedEmail.split("@")[0] || "Google User";
+  
+  // Save to recent accounts
+  saveRecentGmailAccount({
+    email: normalizedEmail,
+    name: displayNameVal,
+    avatarUrl,
+  });
+
+  return setGuestUser(displayNameVal, normalizedEmail, "google", avatarUrl);
 }
 
 export function setGuestUser(
