@@ -12,12 +12,16 @@ export function CategoryDialog({ open, categories, onSave, onClose }: Props) {
   const [draft, setDraft] = useState<string[]>(categories);
   const [value, setValue] = useState("");
   const [error, setError] = useState("");
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState("");
 
   useEffect(() => {
     if (open) {
       setDraft(categories);
       setValue("");
       setError("");
+      setEditingIndex(null);
+      setEditValue("");
     }
   }, [open, categories]);
 
@@ -37,13 +41,28 @@ export function CategoryDialog({ open, categories, onSave, onClose }: Props) {
     setError("");
   };
 
-  const rename = (index: number) => {
-    const current = draft[index]!;
-    const nextName = window.prompt("แก้ไขชื่อประเภทงาน:", current);
-    if (!nextName?.trim()) return;
-    const next = draft.map((c, i) => (i === index ? nextName.trim() : c));
+  const startRename = (index: number) => {
+    setEditingIndex(index);
+    setEditValue(draft[index] || "");
+    setError("");
+  };
+
+  const saveRename = (index: number) => {
+    const nextName = editValue.trim();
+    if (!nextName) {
+      setEditingIndex(null);
+      return;
+    }
+    if (draft.some((c, i) => i !== index && c.toLowerCase() === nextName.toLowerCase())) {
+      setError("ชื่อประเภทงานนี้ซ้ำกับรายการอื่น");
+      return;
+    }
+    const next = draft.map((c, i) => (i === index ? nextName : c));
     setDraft(next);
     onSave(next);
+    setEditingIndex(null);
+    setEditValue("");
+    setError("");
   };
 
   const remove = (index: number) => {
@@ -54,6 +73,9 @@ export function CategoryDialog({ open, categories, onSave, onClose }: Props) {
     const next = draft.filter((_, i) => i !== index);
     setDraft(next);
     onSave(next);
+    if (editingIndex === index) {
+      setEditingIndex(null);
+    }
   };
 
   return (
@@ -87,26 +109,56 @@ export function CategoryDialog({ open, categories, onSave, onClose }: Props) {
         <div className="max-h-64 space-y-2 overflow-y-auto" data-testid="category-list">
           {draft.map((cat, index) => (
             <div
-              key={cat}
-              className="flex items-center justify-between rounded-lg border border-border bg-card p-2.5 text-sm"
+              key={`${cat}-${index}`}
+              className="flex items-center justify-between gap-2 rounded-lg border border-border bg-card p-2.5 text-sm"
             >
-              <span className="font-medium">{cat}</span>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => rename(index)}
-                  aria-label={`แก้ไข ${cat}`}
-                  className="rounded p-1.5 text-primary hover:bg-accent"
-                >
-                  <Pencil className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => remove(index)}
-                  aria-label={`ลบ ${cat}`}
-                  className="rounded p-1.5 text-destructive hover:bg-destructive/10"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
+              {editingIndex === index ? (
+                <div className="flex flex-1 items-center gap-2">
+                  <input
+                    type="text"
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") saveRename(index);
+                      if (e.key === "Escape") setEditingIndex(null);
+                    }}
+                    autoFocus
+                    className="w-full rounded-md border border-primary bg-background px-2 py-1 text-sm focus:outline-none"
+                  />
+                  <button
+                    onClick={() => saveRename(index)}
+                    className="rounded-md bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground"
+                  >
+                    บันทึก
+                  </button>
+                  <button
+                    onClick={() => setEditingIndex(null)}
+                    className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground hover:bg-muted/80"
+                  >
+                    ยกเลิก
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <span className="font-medium">{cat}</span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => startRename(index)}
+                      aria-label={`แก้ไข ${cat}`}
+                      className="rounded p-1.5 text-primary hover:bg-accent cursor-pointer"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => remove(index)}
+                      aria-label={`ลบ ${cat}`}
+                      className="rounded p-1.5 text-destructive hover:bg-destructive/10 cursor-pointer"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           ))}
         </div>
