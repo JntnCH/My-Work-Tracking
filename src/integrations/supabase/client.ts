@@ -6,8 +6,35 @@ function isNewSupabaseApiKey(value: string): boolean {
   return value.startsWith("sb_publishable_") || value.startsWith("sb_secret_");
 }
 
+export function isSupabaseConfigured(): boolean {
+  const url =
+    import.meta.env["VITE_SUPABASE_URL"] ||
+    (typeof process !== "undefined" ? process.env?.["SUPABASE_URL"] : "");
+  const key =
+    import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] ||
+    import.meta.env["VITE_SUPABASE_ANON_KEY"] ||
+    (typeof process !== "undefined"
+      ? process.env?.["SUPABASE_PUBLISHABLE_KEY"] || process.env?.["SUPABASE_ANON_KEY"]
+      : "");
+
+  return Boolean(
+    url &&
+      key &&
+      !url.includes("placeholder") &&
+      !key.includes("placeholder") &&
+      (url.startsWith("http://") || url.startsWith("https://")),
+  );
+}
+
 function createSupabaseFetch(supabaseKey: string): typeof fetch {
-  return (input, init) => {
+  return async (input, init) => {
+    if (!isSupabaseConfigured()) {
+      return new Response(JSON.stringify([]), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
     const headers = new Headers(
       typeof Request !== "undefined" && input instanceof Request ? input.headers : undefined,
     );
@@ -25,7 +52,23 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
     }
 
     headers.set("apikey", supabaseKey);
-    return fetch(input, { ...init, headers });
+
+    try {
+      return await fetch(input, { ...init, headers });
+    } catch (err) {
+      console.warn("[Supabase fetch intercepted network error]:", err);
+      return new Response(
+        JSON.stringify({
+          error: {
+            message: err instanceof Error ? err.message : "Load failed / Network error",
+          },
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
   };
 }
 
@@ -39,16 +82,23 @@ function createSupabaseClient() {
     process.env["SUPABASE_PUBLISHABLE_KEY"] ||
     process.env["SUPABASE_ANON_KEY"];
 
-  if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+  if (!isSupabaseConfigured()) {
     const missing = [
       ...(!SUPABASE_URL ? ["SUPABASE_URL"] : []),
       ...(!SUPABASE_PUBLISHABLE_KEY ? ["SUPABASE_PUBLISHABLE_KEY"] : []),
     ];
-    const message = `Missing Supabase environment variable(s): ${missing.join(", ")}.`;
+    const message = `Missing or placeholder Supabase environment variable(s): ${missing.join(", ")}.`;
     console.warn(`[Supabase] ${message}`);
-    // Return a dummy client instead of throwing to prevent app crash
+    // Return a dummy client with mock fetch to prevent app crashes and network failures
     return createClient<Database>("https://placeholder.supabase.co", "placeholder", {
-      auth: { persistSession: false },
+      global: {
+        fetch: createSupabaseFetch("placeholder"),
+      },
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
     });
   }
 
@@ -76,3 +126,4 @@ export const supabase = new Proxy({} as ReturnType<typeof createSupabaseClient>,
     return Reflect.get(_supabase, prop, receiver);
   },
 });
+

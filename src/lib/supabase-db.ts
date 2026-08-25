@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { isSupabaseConfigured, supabase } from "@/integrations/supabase/client";
 import { DEFAULT_CATEGORIES, OT_OPTIONS, type WorkLog } from "@/lib/work-log";
 import type { CustomColors } from "@/lib/theme";
 

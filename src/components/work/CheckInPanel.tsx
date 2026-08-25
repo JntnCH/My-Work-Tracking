@@ -86,6 +86,18 @@ export function CheckInPanel({
   const [photo, setPhoto] = useState<string | null>(null);
   const [form, setForm] = useState<RateSettings>(rates);
   const [dailyRateInput, setDailyRateInput] = useState(() => String(rates.dailyRate ?? ""));
+  const [travelCostInput, setTravelCostInput] = useState(() =>
+    rates.travelCost ? String(rates.travelCost) : "",
+  );
+  const [foodCostInput, setFoodCostInput] = useState(() =>
+    rates.foodCost ? String(rates.foodCost) : "",
+  );
+  const [otherIncomeInput, setOtherIncomeInput] = useState(() =>
+    rates.otherIncome ? String(rates.otherIncome) : "",
+  );
+  const [otherDeductionsInput, setOtherDeductionsInput] = useState(() =>
+    rates.otherDeductions ? String(rates.otherDeductions) : "",
+  );
   const [elapsed, setElapsed] = useState(0);
   const [catOpen, setCatOpen] = useState(false);
   const [taskInput, setTaskInput] = useState("");
@@ -94,6 +106,10 @@ export function CheckInPanel({
   useEffect(() => {
     setForm(rates);
     setDailyRateInput(String(rates.dailyRate ?? ""));
+    setTravelCostInput(rates.travelCost ? String(rates.travelCost) : "");
+    setFoodCostInput(rates.foodCost ? String(rates.foodCost) : "");
+    setOtherIncomeInput(rates.otherIncome ? String(rates.otherIncome) : "");
+    setOtherDeductionsInput(rates.otherDeductions ? String(rates.otherDeductions) : "");
   }, [rates]);
   useEffect(() => {
     if (!categories.includes(workType)) setWorkType(categories[0] ?? "");
@@ -220,12 +236,24 @@ export function CheckInPanel({
       return;
     }
 
+    const travelCost = travelCostInput.trim() ? Number(travelCostInput) : 0;
+    const foodCost = foodCostInput.trim() ? Number(foodCostInput) : 0;
+    const otherIncome = otherIncomeInput.trim() ? Number(otherIncomeInput) : 0;
+    const otherDeductions = otherDeductionsInput.trim() ? Number(otherDeductionsInput) : 0;
+
     onCheckIn({
       workType,
       locationName: locationName.trim() || gps.addressName || "ไม่ได้ระบุสถานที่",
       gps,
       photo,
-      rates: { ...form, dailyRate },
+      rates: {
+        ...form,
+        dailyRate,
+        travelCost: Number.isFinite(travelCost) ? travelCost : 0,
+        foodCost: Number.isFinite(foodCost) ? foodCost : 0,
+        otherIncome: Number.isFinite(otherIncome) ? otherIncome : 0,
+        otherDeductions: Number.isFinite(otherDeductions) ? otherDeductions : 0,
+      },
       tasks: [],
     });
     setTaskInput("");
@@ -555,9 +583,17 @@ export function CheckInPanel({
               <input
                 id="travelCost"
                 type="number"
-                value={form.travelCost}
+                min="0"
+                step="any"
+                placeholder="0"
+                value={travelCostInput}
                 disabled={!!active}
-                onChange={(e) => setForm({ ...form, travelCost: num(e.target.value) })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setTravelCostInput(val);
+                  const n = Number(val);
+                  setForm((f) => ({ ...f, travelCost: Number.isFinite(n) && val !== "" ? n : 0 }));
+                }}
                 className={inputCls}
               />
             </Field>
@@ -565,9 +601,17 @@ export function CheckInPanel({
               <input
                 id="foodCost"
                 type="number"
-                value={form.foodCost}
+                min="0"
+                step="any"
+                placeholder="0"
+                value={foodCostInput}
                 disabled={!!active}
-                onChange={(e) => setForm({ ...form, foodCost: num(e.target.value) })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFoodCostInput(val);
+                  const n = Number(val);
+                  setForm((f) => ({ ...f, foodCost: Number.isFinite(n) && val !== "" ? n : 0 }));
+                }}
                 className={inputCls}
               />
             </Field>
@@ -575,9 +619,20 @@ export function CheckInPanel({
               <input
                 id="otherIncome"
                 type="number"
-                value={form.otherIncome}
+                min="0"
+                step="any"
+                placeholder="0"
+                value={otherIncomeInput}
                 disabled={!!active}
-                onChange={(e) => setForm({ ...form, otherIncome: num(e.target.value) })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setOtherIncomeInput(val);
+                  const n = Number(val);
+                  setForm((f) => ({
+                    ...f,
+                    otherIncome: Number.isFinite(n) && val !== "" ? n : 0,
+                  }));
+                }}
                 className={`${inputCls} text-success`}
               />
             </Field>
@@ -585,9 +640,20 @@ export function CheckInPanel({
               <input
                 id="otherDeductions"
                 type="number"
-                value={form.otherDeductions}
+                min="0"
+                step="any"
+                placeholder="0"
+                value={otherDeductionsInput}
                 disabled={!!active}
-                onChange={(e) => setForm({ ...form, otherDeductions: num(e.target.value) })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setOtherDeductionsInput(val);
+                  const n = Number(val);
+                  setForm((f) => ({
+                    ...f,
+                    otherDeductions: Number.isFinite(n) && val !== "" ? n : 0,
+                  }));
+                }}
                 className={`${inputCls} text-destructive`}
               />
             </Field>

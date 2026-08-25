@@ -54,12 +54,12 @@ const emptyDraft: Draft = {
   outAt: "",
   workType: "",
   locationName: "",
-  dailyRate: "0",
+  dailyRate: "",
   otType: "1.5",
-  travelCost: "0",
-  foodCost: "0",
-  otherIncome: "0",
-  otherDeductions: "0",
+  travelCost: "",
+  foodCost: "",
+  otherIncome: "",
+  otherDeductions: "",
   gpsIn: "",
   gpsOut: "",
   tasks: "",
@@ -119,12 +119,13 @@ export function HistoryPanel({
       outAt: toLocalInput(log.checkOutTime),
       workType: log.workType ?? "",
       locationName: log.locationName ?? "",
-      dailyRate: String(log.dailyRate ?? 0),
+      dailyRate:
+        log.dailyRate !== undefined && log.dailyRate !== null ? String(log.dailyRate) : "",
       otType: String(log.otType ?? 1.5),
-      travelCost: String(log.travelCost ?? 0),
-      foodCost: String(log.foodCost ?? 0),
-      otherIncome: String(log.otherIncome ?? 0),
-      otherDeductions: String(log.otherDeductions ?? 0),
+      travelCost: log.travelCost ? String(log.travelCost) : "",
+      foodCost: log.foodCost ? String(log.foodCost) : "",
+      otherIncome: log.otherIncome ? String(log.otherIncome) : "",
+      otherDeductions: log.otherDeductions ? String(log.otherDeductions) : "",
       gpsIn: gpsText(log.checkInGPS) === "-" ? "" : gpsText(log.checkInGPS),
       gpsOut: gpsText(log.checkOutGPS) === "-" ? "" : gpsText(log.checkOutGPS),
       tasks: (log.tasks ?? []).join("\n"),
@@ -426,6 +427,9 @@ export function HistoryPanel({
                         <input
                           type="number"
                           inputMode="decimal"
+                          min="0"
+                          step="any"
+                          placeholder="0"
                           aria-label="ค่าแรงต่อวัน"
                           value={draft.dailyRate}
                           onChange={(e) => setDraft({ ...draft, dailyRate: e.target.value })}
@@ -450,6 +454,9 @@ export function HistoryPanel({
                         <input
                           type="number"
                           inputMode="decimal"
+                          min="0"
+                          step="any"
+                          placeholder="0"
                           aria-label="ค่าเดินทาง"
                           value={draft.travelCost}
                           onChange={(e) => setDraft({ ...draft, travelCost: e.target.value })}
@@ -460,6 +467,9 @@ export function HistoryPanel({
                         <input
                           type="number"
                           inputMode="decimal"
+                          min="0"
+                          step="any"
+                          placeholder="0"
                           aria-label="ค่าอาหาร"
                           value={draft.foodCost}
                           onChange={(e) => setDraft({ ...draft, foodCost: e.target.value })}
@@ -470,6 +480,9 @@ export function HistoryPanel({
                         <input
                           type="number"
                           inputMode="decimal"
+                          min="0"
+                          step="any"
+                          placeholder="0"
                           aria-label="รายรับอื่น"
                           value={draft.otherIncome}
                           onChange={(e) => setDraft({ ...draft, otherIncome: e.target.value })}
@@ -480,6 +493,9 @@ export function HistoryPanel({
                         <input
                           type="number"
                           inputMode="decimal"
+                          min="0"
+                          step="any"
+                          placeholder="0"
                           aria-label="รายการหัก"
                           value={draft.otherDeductions}
                           onChange={(e) => setDraft({ ...draft, otherDeductions: e.target.value })}

@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { isSupabaseConfigured, supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 
 export type DashboardViewport = "mobile" | "desktop";
@@ -243,15 +243,42 @@ export async function loadDashboardLayout(
   userId: string,
   viewport: DashboardViewport,
 ): Promise<DashboardLayout> {
-  const { data, error } = await supabase
-    .from("dashboard_layouts")
-    .select("layout")
-    .eq("user_id", userId)
-    .eq("viewport", viewport)
-    .maybeSingle();
+  const localKey = `dashboard_layout_${userId}_${viewport}`;
+  if (!isSupabaseConfigured()) {
+    try {
+      const raw = localStorage.getItem(localKey);
+      if (raw) return normalizeDashboardLayout(JSON.parse(raw), viewport);
+    } catch {
+      // Ignore parse error
+    }
+    return createDefaultDashboardLayout(viewport);
+  }
 
-  if (error) throw error;
-  return normalizeDashboardLayout(data?.layout, viewport);
+  try {
+    const { data, error } = await supabase
+      .from("dashboard_layouts")
+      .select("layout")
+      .eq("user_id", userId)
+      .eq("viewport", viewport)
+      .maybeSingle();
+
+    if (error) {
+      console.warn("loadDashboardLayout warning:", error.message);
+      const raw = localStorage.getItem(localKey);
+      if (raw) return normalizeDashboardLayout(JSON.parse(raw), viewport);
+      return createDefaultDashboardLayout(viewport);
+    }
+    return normalizeDashboardLayout(data?.layout, viewport);
+  } catch (err) {
+    console.warn("loadDashboardLayout network error:", err);
+    try {
+      const raw = localStorage.getItem(localKey);
+      if (raw) return normalizeDashboardLayout(JSON.parse(raw), viewport);
+    } catch {
+      // Ignore
+    }
+    return createDefaultDashboardLayout(viewport);
+  }
 }
 
 export async function saveDashboardLayout(
@@ -259,16 +286,29 @@ export async function saveDashboardLayout(
   viewport: DashboardViewport,
   layout: DashboardLayout,
 ): Promise<void> {
-  const { error } = await supabase.from("dashboard_layouts").upsert(
-    {
-      user_id: userId,
-      viewport,
-      layout: layout as unknown as Json,
-    },
-    { onConflict: "user_id,viewport" },
-  );
+  const localKey = `dashboard_layout_${userId}_${viewport}`;
+  try {
+    localStorage.setItem(localKey, JSON.stringify(layout));
+  } catch {
+    // Ignore storage quota
+  }
 
-  if (error) throw error;
+  if (!isSupabaseConfigured()) return;
+
+  try {
+    const { error } = await supabase.from("dashboard_layouts").upsert(
+      {
+        user_id: userId,
+        viewport,
+        layout: layout as unknown as Json,
+      },
+      { onConflict: "user_id,viewport" },
+    );
+
+    if (error) console.warn("saveDashboardLayout error:", error.message);
+  } catch (err) {
+    console.warn("saveDashboardLayout network exception:", err);
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

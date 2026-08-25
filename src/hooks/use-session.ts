@@ -182,7 +182,7 @@ export function useSession() {
       clearTimeout(timeout);
       window.removeEventListener(AUTH_CHANGE_EVENT, syncUserState);
       window.removeEventListener("storage", syncUserState);
-      sub.subscription.unsubscribe();
+      sub?.subscription?.unsubscribe?.();
     };
   }, []);
 

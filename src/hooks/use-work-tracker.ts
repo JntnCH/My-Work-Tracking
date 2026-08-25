@@ -49,6 +49,7 @@ import {
 } from "@/lib/supabase-db";
 import { applyTheme, DEFAULT_COLORS_LIGHT, type CustomColors } from "@/lib/theme";
 import { syncRecordToAirtable } from "@/lib/airtable.functions";
+import { isSupabaseConfigured } from "@/integrations/supabase/client";
 
 function mergeBranchRates(base: RateSettings, settings: BranchSettings): RateSettings {
   return {
@@ -90,7 +91,7 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
 
   const [themeSettings, setThemeSettings] = useState<CustomColors>(DEFAULT_COLORS_LIGHT);
   const [savedThemeSettings, setSavedThemeSettings] = useState<CustomColors>(DEFAULT_COLORS_LIGHT);
-  const useSupabase = Boolean(userId && !isGuest);
+  const useSupabase = Boolean(userId && !isGuest && isSupabaseConfigured());
 
   // Load local state first; only authenticated sessions hydrate from Supabase.
   useEffect(() => {
