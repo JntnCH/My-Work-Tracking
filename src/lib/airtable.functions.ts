@@ -62,7 +62,7 @@ function bangkokDateTime(iso?: string | null) {
 }
 
 export const syncRecordToAirtable = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         log: workLogSchema,

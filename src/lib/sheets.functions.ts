@@ -158,7 +158,7 @@ function spreadsheetResult(
 
 /** Creates a new spreadsheet with the WorkLogs tab and header row. */
 export const createWorkSpreadsheet = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z.object({ title: z.string().min(1).max(120).optional() }).parse(input ?? {}),
   )
   .handler(async ({ data }) => {
@@ -195,7 +195,7 @@ export const createWorkSpreadsheet = createServerFn({ method: "POST" })
 
 /** Verifies access to a spreadsheet and ensures WorkLogs plus its header row exist. */
 export const prepareSpreadsheet = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => spreadsheetInputSchema.parse(input))
+  .validator((input: unknown) => spreadsheetInputSchema.parse(input))
   .handler(async ({ data }) => {
     try {
       const sheets = await sheetsClient();
@@ -222,7 +222,7 @@ export const prepareSpreadsheet = createServerFn({ method: "POST" })
 
 /** Appends one or more work-log rows to the WorkLogs tab. */
 export const appendWorkLogRows = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         spreadsheetId: z.string().min(10).transform(normalizeSpreadsheetId),
@@ -254,7 +254,7 @@ export const appendWorkLogRows = createServerFn({ method: "POST" })
 
 /** Overwrites the WorkLogs tab so the sheet mirrors app history exactly. */
 export const replaceWorkLogRows = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         spreadsheetId: z.string().min(10).transform(normalizeSpreadsheetId),
@@ -292,7 +292,7 @@ export const replaceWorkLogRows = createServerFn({ method: "POST" })
 
 /** Reads the saved work-type list from the Settings tab. */
 export const readCategoryList = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => spreadsheetInputSchema.parse(input))
+  .validator((input: unknown) => spreadsheetInputSchema.parse(input))
   .handler(async ({ data }) => {
     try {
       const sheets = await sheetsClient();
@@ -311,7 +311,7 @@ export const readCategoryList = createServerFn({ method: "POST" })
 
 /** Stores the work-type list in the Settings tab. */
 export const writeCategoryList = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         spreadsheetId: z.string().min(10).transform(normalizeSpreadsheetId),
@@ -344,7 +344,7 @@ export const writeCategoryList = createServerFn({ method: "POST" })
 
 /** Reads every data row from the WorkLogs tab. */
 export const readWorkLogRows = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => spreadsheetInputSchema.parse(input))
+  .validator((input: unknown) => spreadsheetInputSchema.parse(input))
   .handler(async ({ data }) => {
     try {
       const sheets = await sheetsClient();
@@ -365,7 +365,7 @@ export const readWorkLogRows = createServerFn({ method: "POST" })
  * tab that is deleted in finally, so WorkLogs never receives test rows.
  */
 export const testGoogleSheetsConnection = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => spreadsheetInputSchema.parse(input))
+  .validator((input: unknown) => spreadsheetInputSchema.parse(input))
   .handler(async ({ data }): Promise<ConnectionTestResult> => {
     const result: ConnectionTestResult = {
       googleAccount: false,
