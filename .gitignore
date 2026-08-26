@@ -9,6 +9,7 @@ lerna-debug.log*
 
 node_modules
 .vercel/
+.netlify/
 dist
 dist-ssr
 .output
