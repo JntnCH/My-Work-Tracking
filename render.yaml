@@ -4,7 +4,8 @@ services:
     runtime: node
     plan: free
     rootDir: .
-    buildCommand: npm ci --include=dev && npm run build:render
+    # This repository intentionally does not commit package-lock.json; npm ci would fail.
+    buildCommand: npm install --no-audit --no-fund && npm run build:render
     startCommand: npm run start:render
     healthCheckPath: /
     envVars:
