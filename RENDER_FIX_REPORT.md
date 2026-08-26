@@ -62,7 +62,7 @@
 
 หากหน้าเว็บเปิดได้แต่ปุ่ม “เชื่อมต่อ”, “สร้างชีตใหม่” หรือ “Connection Test” ใช้งานไม่ได้ ให้เพิ่ม environment variables ต่อไปนี้ใน Render Dashboard > Environment:
 
-- `LOVABLE_API_KEY` — gateway credential ฝั่ง server
-- `GOOGLE_SHEETS_API_KEY` — Google Sheets connection credential ฝั่ง server
+- `GOOGLE_SERVICE_ACCOUNT_JSON` — service-account JSON ฝั่ง server (ตัวเลือกที่แนะนำ)
+- หรือ `GOOGLE_SERVICE_ACCOUNT_EMAIL` และ `GOOGLE_PRIVATE_KEY` — credential แบบแยกค่า ฝั่ง server
 
 ห้ามใส่ค่าจริงลงใน GitHub, `render.yaml` หรือไฟล์ frontend หลังเพิ่มค่าแล้ว ให้เลือก **Manual Deploy > Clear build cache & deploy** จาก commit ล่าสุด แล้วเปิด Settings > Integrations เพื่อกด Connection Test ระบบจะแสดงผล 8 ขั้นตอนและชื่อ credential ที่ขาดหากตั้งค่าไม่ครบ

@@ -11,13 +11,9 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  initializeLineLiffOnPrimaryRedirect,
-  isLineLiffPrimaryRedirect,
-} from "@/lib/line-auth";
+import { initializeLineLiffOnPrimaryRedirect, isLineLiffPrimaryRedirect } from "@/lib/line-auth";
 
 import appCss from "../styles.css?url";
-import { reportLovableError } from "../lib/lovable-error-reporting";
 import { EngineWorkingAnimation } from "@/components/ui/engine-working-animation";
 
 function NotFoundComponent() {
@@ -50,10 +46,6 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
-  useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
-  }, [error]);
-
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
@@ -106,16 +98,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "twitter:description",
         content: "บันทึกเวลาเข้า-ออกงาน พิกัด GPS ค่าแรง OT และซิงก์ลง Google Sheets",
-      },
-      {
-        property: "og:image",
-        content:
-          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/18cd3937-beb4-41d7-ac0f-214b6401b89c/id-preview-710e52f7--291cc49f-164d-41b8-bc71-ccebcac01bf4.lovable.app-1785875522608.png",
-      },
-      {
-        name: "twitter:image",
-        content:
-          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/18cd3937-beb4-41d7-ac0f-214b6401b89c/id-preview-710e52f7--291cc49f-164d-41b8-bc71-ccebcac01bf4.lovable.app-1785875522608.png",
       },
     ],
     links: [
@@ -191,6 +173,7 @@ function RootComponent() {
       return () => data?.subscription?.unsubscribe?.();
     } catch (err) {
       console.warn("[Root] onAuthStateChange error:", err);
+      return undefined;
     }
   }, [queryClient, router]);
 
