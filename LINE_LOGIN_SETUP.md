@@ -6,9 +6,9 @@
 
 ลำดับการทำงานของ LIFF path คือ `liff.init()` → `liff.login()` หากยังไม่ login → LINE redirect กลับมายัง `/auth?line_login=1` → `liff.init()` อีกครั้ง → `liff.getIDToken()` → `supabase.auth.signInWithIdToken()` → Supabase session เดิมของแอป การยืนยันตัวตนเกิดขึ้นที่ Supabase/LINE ไม่ใช่จากข้อมูล profile ที่ browser ถอดหรือส่งเอง
 
-## ค่าที่ต้องตั้งใน Render
+## ค่าที่ต้องตั้งใน Netlify
 
-เพิ่มตัวแปร public ต่อไปนี้ใน Render Environment Variables โดยใช้ LIFF ID จริงจาก LINE Developers Console ช่องนี้ไม่ใช่ Channel Secret และสามารถถูกฝังใน browser build ได้ตามการออกแบบของ LIFF
+เพิ่มตัวแปร public ต่อไปนี้ใน Netlify ที่ **Site configuration → Environment variables** แล้ว trigger deploy ใหม่ โดยใช้ LIFF ID จริงจาก LINE Developers Console ช่องนี้ไม่ใช่ Channel Secret และสามารถถูกฝังใน browser build ได้ตามการออกแบบของ LIFF
 
 | Variable            | ค่า                                      |
 | ------------------- | ---------------------------------------- |
@@ -20,7 +20,7 @@
 
 ใช้ Channel เดียวกับ LIFF App ที่มีอยู่แล้ว และตรวจว่า OpenID Connect เปิดใช้งานพร้อม scope `openid` และ `profile` หากต้องการ email ต้องขอสิทธิ์ email ตามขั้นตอนของ LINE ก่อน เพราะ scope email ไม่ได้พร้อมใช้โดยอัตโนมัติสำหรับทุก Channel
 
-สำหรับการใช้ LIFF ให้ตรวจ Endpoint URL ให้ครอบคลุมเว็บไซต์จริงของระบบ และอนุญาตเส้นทาง `/auth` ที่ระบบใช้เริ่มต้น/รับผลกลับ หาก LIFF Console ต้องการ URL เฉพาะ ให้ใช้ URL ที่สอดคล้องกับ Endpoint URL ตามข้อกำหนดของ LIFF และอย่าแก้ query parameters ของ LIFF ก่อน `liff.init()` เสร็จ
+สำหรับการใช้ LIFF ให้ตั้ง **Endpoint URL เป็นโดเมนเดียวกับเว็บที่ผู้ใช้เปิดปุ่ม login** เช่น `https://<ชื่อ-site>.netlify.app/` หรือ custom domain จริงของ Netlify และห้ามสลับระหว่าง Render, Netlify preview URL และ production URL เพราะ LIFF กำหนดให้ `redirectUri` ต้องอยู่ที่ Endpoint URL หรือ path ที่อยู่ด้านล่างของ Endpoint URL [2] เส้นทางที่ระบบใช้รับผลกลับคือ `/auth?line_login=1` และโค้ดจะเรียก `liff.init()` ก่อนแก้ query/hash ของ LIFF เสมอ
 
 ## ค่าที่ต้องตั้งใน Supabase Custom OIDC Provider
 
@@ -42,18 +42,20 @@
 
 ## Redirect URLs
 
-สำหรับหน้าเว็บที่ deploy บน Render ให้เพิ่ม URL ต่อไปนี้ใน **Supabase → Authentication → URL Configuration → Redirect URLs**
+สำหรับ Netlify ให้แทน `<NETLIFY_SITE_URL>` ด้วย URL production จริงของ site แล้วเพิ่มค่าเหล่านี้ใน **Supabase → Authentication → URL Configuration → Redirect URLs**
 
 ```text
-https://google-sheet-organizer.onrender.com/auth/callback
-https://google-sheet-organizer.onrender.com/auth
+<NETLIFY_SITE_URL>/auth/callback
+<NETLIFY_SITE_URL>/auth
 ```
 
-ถ้าใช้ local development ให้เพิ่ม origin local ที่ใช้งานจริงของ Vite พร้อม `/auth/callback` และ `/auth` เป็นรายการแยกต่างหาก อย่าใช้ wildcard กว้างเกินจำเป็น
+ตัวอย่างเช่น `https://my-work-tracking.netlify.app/auth/callback` และ `https://my-work-tracking.netlify.app/auth` ส่วน LIFF Endpoint URL ต้องเป็น origin เดียวกันกับ `<NETLIFY_SITE_URL>` และควรใช้ production URL ไม่ใช่ Deploy Preview URL หากไม่ได้เพิ่ม preview host นั้นไว้ใน LINE Developers Console สำหรับ local development ให้เพิ่ม origin local ที่ใช้งานจริงของ Vite พร้อม `/auth/callback` และ `/auth` เป็นรายการแยกต่างหาก อย่าใช้ wildcard กว้างเกินจำเป็น
+
+ถ้าเห็น `400 Bad Request` จาก `access.line.me` ให้ตรวจตามลำดับนี้: เปิดเว็บจาก URL เดียวกับ Endpoint URL, ตรวจว่า `VITE_LINE_LIFF_ID` ใน Netlify เป็น LIFF ID ของ channel เดียวกับ Endpoint URL, ตรวจว่า Endpoint URL ครอบคลุม `/auth`, และ trigger deploy ใหม่หลังแก้ environment variable ค่า 400 ในช่วงก่อน consent มักเกิดจาก `redirect_uri` ไม่อยู่ใต้ Endpoint URL หรือใช้ LIFF ID/channel ผิดชุด
 
 ## ขั้นตอนทดสอบบนโทรศัพท์
 
-เปิด `https://google-sheet-organizer.onrender.com/auth` จาก browser หรือเปิด LIFF URL ในแอป LINE แล้วกด **เข้าสู่ระบบด้วย LINE LIFF** ควรเห็นหน้าอนุญาตของ LINE หรือถูกเข้าสู่ระบบอัตโนมัติตาม session ของ LINE หลังอนุญาต ระบบต้องกลับมายัง Work Tracker, แสดงชื่อผู้ใช้จาก Supabase session และโหลดข้อมูลของ `auth.uid()` เดิมโดยไม่สร้างบัญชีซ้ำ
+เปิด `<NETLIFY_SITE_URL>/auth` จาก browser หรือเปิด LIFF URL ในแอป LINE แล้วกด **เข้าสู่ระบบด้วย LINE LIFF** ควรเห็นหน้าอนุญาตของ LINE หรือถูกเข้าสู่ระบบอัตโนมัติตาม session ของ LINE หลังอนุญาต ระบบต้องกลับมายัง Work Tracker, แสดงชื่อผู้ใช้จาก Supabase session และโหลดข้อมูลของ `auth.uid()` เดิมโดยไม่สร้างบัญชีซ้ำ
 
 ทดสอบกรณีผู้ใช้กดยกเลิก, provider ยังไม่เปิด, LIFF ID ผิด, ไม่มี `openid` scope, เปิด `/auth?line_login=1` โดยไม่มี session LINE และกลับมาเปิดหน้าเว็บใหม่ด้วย หากเกิดข้อผิดพลาด ระบบต้องแสดงข้อความที่อ่านได้และไม่แสดง ID token, Channel Secret หรือ service-role key ในหน้าจอและ console
 

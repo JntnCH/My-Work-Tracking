@@ -24,10 +24,10 @@ describe("configured LINE LIFF authentication", () => {
     vi.stubGlobal("window", {
       location: {
         origin: "https://tracker.example",
-        href: "https://tracker.example/auth?line_login=1",
+        href: "https://tracker.example/auth?line_login=1&access_token=secret#access_token=secret",
         pathname: "/auth",
-        search: "?line_login=1",
-        hash: "",
+        search: "?line_login=1&access_token=secret",
+        hash: "#access_token=secret",
         assign: vi.fn(),
       },
       history: { replaceState: vi.fn() },

@@ -25,7 +25,7 @@ function getLiffReturnUrl() {
 function getErrorCode(error: unknown) {
   if (!error || typeof error !== "object") return "";
   const code = "code" in error ? error.code : "";
-  return typeof code === "string" ? code.toLowerCase() : "";
+  return typeof code === "string" || typeof code === "number" ? String(code).toLowerCase() : "";
 }
 
 function getErrorMessage(error: unknown) {
@@ -47,6 +47,9 @@ export function getLineAuthErrorMessage(error: unknown) {
   }
   if (code === "unauthorized" || code === "access_denied" || message.includes("cancel")) {
     return "คุณยกเลิกการเข้าสู่ระบบ LINE แล้ว หากต้องการใช้งานต่อ กรุณาลองใหม่อีกครั้ง";
+  }
+  if (code === "400" || message.includes("bad request") || message.includes("redirect_uri")) {
+    return "LINE ปฏิเสธ redirect URI กรุณาตั้ง LIFF Endpoint URL ให้เป็นโดเมนเดียวกับเว็บที่เปิดอยู่ และตรวจสอบ LIFF ID ใน Netlify";
   }
   if (
     code === "invalid_id_token" ||
@@ -124,7 +127,14 @@ function removeLineCallbackParams() {
   url.searchParams.delete("liff.state");
   url.searchParams.delete("liff.referrer");
   url.searchParams.delete("lineAppVersion");
-  window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
+  url.searchParams.delete("access_token");
+  url.searchParams.delete("id_token");
+  url.searchParams.delete("refresh_token");
+  url.searchParams.delete("expires_in");
+  url.searchParams.delete("token_type");
+  url.searchParams.delete("code");
+  url.searchParams.delete("state");
+  window.history.replaceState({}, document.title, `${url.pathname}${url.search}`);
 }
 
 export async function initializeLineLiffOnPrimaryRedirect() {

@@ -85,6 +85,7 @@ describe("LINE LIFF authentication", () => {
       "ยืนยันตัวตนไม่สำเร็จ",
     );
     expect(getLineAuthErrorMessage({ code: "UNAUTHORIZED" })).toContain("ยกเลิก");
+    expect(getLineAuthErrorMessage({ code: 400 })).toContain("redirect URI");
     expect(getLineAuthErrorMessage(new Error("custom provider is not enabled"))).toContain(
       "provider ใน Supabase",
     );
