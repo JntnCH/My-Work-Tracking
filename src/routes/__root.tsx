@@ -11,7 +11,11 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { initializeLineLiffOnPrimaryRedirect, isLineLiffPrimaryRedirect } from "@/lib/line-auth";
+import {
+  getLineAuthErrorMessage,
+  initializeLineLiffOnPrimaryRedirect,
+  isLineLiffPrimaryRedirect,
+} from "@/lib/line-auth";
 
 import appCss from "../styles.css?url";
 import { EngineWorkingAnimation } from "@/components/ui/engine-working-animation";
@@ -153,8 +157,9 @@ function RootComponent() {
       .catch((error) => {
         if (cancelled) return;
 
-        const message = error instanceof Error ? error.message : String(error);
-        toast.error("เชื่อมต่อ LINE ไม่สำเร็จ", { description: message });
+        toast.error("เชื่อมต่อ LINE ไม่สำเร็จ", {
+          description: getLineAuthErrorMessage(error),
+        });
         window.history.replaceState({}, document.title, window.location.pathname);
       })
       .finally(() => {

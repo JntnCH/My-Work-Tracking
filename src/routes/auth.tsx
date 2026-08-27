@@ -30,7 +30,12 @@ import {
   type RecentGmailAccount,
 } from "@/hooks/use-session";
 import { supabase } from "@/integrations/supabase/client";
-import { completeLineLiffLoginIfNeeded, isLineLiffCallback, startLineLogin } from "@/lib/line-auth";
+import {
+  completeLineLiffLoginIfNeeded,
+  getLineAuthErrorMessage,
+  isLineLiffCallback,
+  startLineLogin,
+} from "@/lib/line-auth";
 import { EngineWorkingAnimation } from "@/components/ui/engine-working-animation";
 
 export const Route = createFileRoute("/auth")({
@@ -131,7 +136,7 @@ function AuthPage() {
       } catch (error) {
         if (!cancelled) {
           toast.error("เข้าสู่ระบบด้วย LINE ไม่สำเร็จ", {
-            description: error instanceof Error ? error.message : String(error),
+            description: getLineAuthErrorMessage(error),
           });
         }
       } finally {
@@ -257,7 +262,7 @@ function AuthPage() {
       }
     } catch (err) {
       toast.error("เข้าสู่ระบบด้วย LINE ไม่สำเร็จ", {
-        description: err instanceof Error ? err.message : String(err),
+        description: getLineAuthErrorMessage(err),
       });
     } finally {
       setBusy(false);
@@ -671,10 +676,11 @@ function AuthPage() {
                 type="button"
                 onClick={() => void signInLine()}
                 disabled={busy}
+                aria-label="เข้าสู่ระบบด้วย LINE LIFF"
                 className="flex items-center justify-center gap-2 rounded-xl border border-[#06C755]/40 bg-[#06C755]/10 py-2.5 px-3 text-xs font-bold text-foreground transition hover:bg-[#06C755]/20 active:scale-[0.99] disabled:opacity-60 cursor-pointer"
               >
                 <MessageCircle className="h-3.5 w-3.5 text-[#06C755] shrink-0" />
-                <span>LINE</span>
+                <span>LINE LIFF</span>
               </button>
             </div>
 
