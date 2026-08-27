@@ -574,6 +574,19 @@ export function SettingsPanel({
               Settings → Unlock → Edit → Preview → Save → Lock · การเปลี่ยนแปลงจะแสดงผลทันที
               และจะบันทึกถาวรเมื่อกด Save
             </p>
+            <div
+              className={`mt-2 flex items-start gap-2 rounded-lg px-3 py-2 text-xs ${
+                isGuest ? "bg-warning-soft text-warning-foreground" : "bg-info-soft text-primary"
+              }`}
+              data-testid="settings-source"
+            >
+              <Database className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                {isGuest
+                  ? "Guest Mode: การตั้งค่าถูกเก็บเฉพาะเบราว์เซอร์นี้ ไม่ซิงก์ข้ามอุปกรณ์"
+                  : "บัญชีนี้: Supabase เป็นแหล่งข้อมูลหลัก การตั้งค่าจะซิงก์ข้ามเบราว์เซอร์เมื่อใช้บัญชีเดียวกัน"}
+              </span>
+            </div>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2 text-[11px] font-semibold">
             <span

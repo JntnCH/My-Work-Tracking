@@ -50,6 +50,7 @@ import {
 import { applyTheme, DEFAULT_COLORS_LIGHT, type CustomColors } from "@/lib/theme";
 import { syncRecordToAirtable } from "@/lib/airtable.functions";
 import { isSupabaseConfigured } from "@/integrations/supabase/client";
+import { chooseInitialCategories } from "@/lib/settings-sync";
 
 function mergeBranchRates(base: RateSettings, settings: BranchSettings): RateSettings {
   return {
@@ -92,12 +93,14 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
   const [themeSettings, setThemeSettings] = useState<CustomColors>(DEFAULT_COLORS_LIGHT);
   const [savedThemeSettings, setSavedThemeSettings] = useState<CustomColors>(DEFAULT_COLORS_LIGHT);
   const useSupabase = Boolean(userId && !isGuest && isSupabaseConfigured());
+  const scopedUserId = userId;
 
   // Load local state first; only authenticated sessions hydrate from Supabase.
   useEffect(() => {
     setReady(false);
-    setStorageNamespace(useSupabase ? userId : null);
-    if (!userId) return;
+    setStorageNamespace(useSupabase ? scopedUserId : null);
+    if (!scopedUserId) return;
+    const authenticatedUserId = scopedUserId;
 
     let isMounted = true;
 
@@ -122,7 +125,7 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
       setDbWorkTypes(
         localCategories.map((name, index) => ({
           id: `guest-work-type-${index}-${name}`,
-          user_id: userId,
+          user_id: authenticatedUserId,
           name,
           is_active: true,
           created_at: "",
@@ -145,8 +148,11 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
       }
 
       try {
-        // 1. Load User Settings
-        const dbSettings = await fetchDBUserSettings(userId);
+        // 1. Load User Settings. Supabase wins over browser-local cache.
+        const dbSettings = await fetchDBUserSettings(authenticatedUserId);
+        const sheetIdForImport = dbSettings
+          ? String(dbSettings.spreadsheet_id ?? "").trim()
+          : localSheetId.trim();
         if (dbSettings && isMounted) {
           const colors: CustomColors = {
             themeMode: (dbSettings.theme as CustomColors["themeMode"]) || "light",
@@ -187,27 +193,73 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
             storage.setRates(nextRates);
           }
 
-          if (dbSettings.spreadsheet_id) {
-            setSpreadsheetIdState(dbSettings.spreadsheet_id);
-            storage.setSheetId(dbSettings.spreadsheet_id);
-          }
+          const remoteSheetId = String(dbSettings.spreadsheet_id ?? "").trim();
+          setSpreadsheetIdState(remoteSheetId);
+          storage.setSheetId(remoteSheetId);
         } else {
           applyTheme(DEFAULT_COLORS_LIGHT);
+          // A real account may have legacy browser-local settings from the old
+          // pseudo-login. Persist them once so another browser can hydrate them.
+          await saveDBUserSettings(authenticatedUserId, {
+            theme: localTheme.themeMode,
+            background_color: localTheme.backgroundColor,
+            card_color: localTheme.cardColor,
+            foreground_color: localTheme.foregroundColor,
+            border_color: localTheme.borderColor,
+            primary_color: localTheme.primaryColor,
+            secondary_color: localTheme.secondaryColor,
+            accent_color: localTheme.accentColor,
+            success_color: localTheme.successColor,
+            warning_color: localTheme.warningColor,
+            destructive_color: localTheme.destructiveColor,
+            chart_colors: localTheme.chartColors,
+            daily_rate: localRates.dailyRate,
+            default_ot_type: localRates.otType,
+            travel_cost: localRates.travelCost,
+            food_cost: localRates.foodCost,
+            other_income: localRates.otherIncome,
+            other_deductions: localRates.otherDeductions,
+            ...(localSheetId ? { spreadsheet_id: localSheetId } : {}),
+          });
         }
 
         // 2. Load branches before settings so the user can choose a branch.
-        const dbBranches = await fetchDBBranches(userId);
+        const dbBranches = await fetchDBBranches(authenticatedUserId);
         if (isMounted) {
           setBranches(dbBranches);
           if (dbBranches.length > 0) {
-            setActiveBranchId((current) => current ?? dbBranches[0].id);
+            setActiveBranchId((current) => current ?? dbBranches[0]?.id ?? null);
           }
         }
 
         // Branch settings are loaded by the active-branch effect below.
 
-        // 3. Load Work Types. Merge only; never replace existing rows with local state.
-        const mergedTypes = await syncDBWorkTypes(userId, localCategories);
+        // 3. Load Work Types. Remote rows are authoritative. Only an empty
+        // account may be seeded from the linked sheet, then from local/default values.
+        const remoteTypes = await fetchDBWorkTypes(authenticatedUserId);
+        let mergedTypes = remoteTypes;
+        let importedCategories = 0;
+        if (remoteTypes.length === 0) {
+          let seedCategories: string[] = [];
+          if (sheetIdForImport) {
+            try {
+              const sheetResult = await callServer(readCategoryList, {
+                data: { spreadsheetId: sheetIdForImport },
+              });
+              seedCategories = sheetResult.categories;
+              importedCategories = seedCategories.length;
+            } catch (error) {
+              console.warn("Google Sheets category import warning:", error);
+            }
+          }
+          const initialCategories = chooseInitialCategories({
+            remote: [],
+            sheet: seedCategories,
+            local: localCategories,
+            fallback: DEFAULT_CATEGORIES,
+          });
+          mergedTypes = await syncDBWorkTypes(authenticatedUserId, initialCategories);
+        }
         if (isMounted) {
           setDbWorkTypes(mergedTypes);
           const activeNames = mergedTypes.filter((w) => w.is_active).map((w) => w.name);
@@ -215,26 +267,29 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
             setCategories(activeNames);
             storage.setCategories(activeNames);
           }
+          if (importedCategories > 0) {
+            toast.success(`นำเข้าประเภทงานจาก Google Sheets แล้ว ${importedCategories} รายการ`);
+          }
         }
 
         // 4. Load OT Types
-        const dbOt = await fetchDBOtTypes(userId);
+        const dbOt = await fetchDBOtTypes(authenticatedUserId);
         if (isMounted) {
           setOtTypes(dbOt);
         }
 
         // 5. Load Work Logs from Supabase (Source of Truth).
         // If the remote table is empty, migrate local records once; a failed read never overwrites local data.
-        const dbLogs = await fetchDBWorkLogs(userId);
+        const dbLogs = await fetchDBWorkLogs(authenticatedUserId);
         if (isMounted) {
           if (dbLogs.length > 0) {
             setLogs(dbLogs);
             storage.setLogs(dbLogs);
           } else if (localLogs.length > 0) {
             for (const l of localLogs) {
-              await saveDBWorkLog(userId, l);
+              await saveDBWorkLog(authenticatedUserId, l);
             }
-            const migratedLogs = await fetchDBWorkLogs(userId);
+            const migratedLogs = await fetchDBWorkLogs(authenticatedUserId);
             setLogs(migratedLogs.length > 0 ? migratedLogs : localLogs);
             storage.setLogs(migratedLogs.length > 0 ? migratedLogs : localLogs);
           }
@@ -251,7 +306,7 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
     return () => {
       isMounted = false;
     };
-  }, [isGuest, useSupabase, userId]);
+  }, [isGuest, scopedUserId, useSupabase]);
 
   const persistLogs = useCallback((next: WorkLog[]) => {
     setLogs(next);

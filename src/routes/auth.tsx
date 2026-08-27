@@ -24,7 +24,6 @@ import {
 import { toast } from "sonner";
 import {
   getRecentGmailAccounts,
-  loginWithGmail,
   removeRecentGmailAccount,
   setGuestUser,
   useSession,
@@ -172,30 +171,18 @@ function AuthPage() {
     return trimmed;
   }
 
-  function handleDirectGmailLogin(targetEmail?: string, targetName?: string) {
+  async function handleDirectGmailLogin(targetEmail?: string, targetName?: string) {
     if (busy) return;
     const finalEmail = normalizeGmailInput(targetEmail || gmailAddress);
     if (!finalEmail || !finalEmail.includes("@")) {
       toast.error("กรุณาระบุอีเมล Gmail เช่น yourname@gmail.com");
       return;
     }
-    setBusy(true);
-    try {
-      const finalName = targetName || gmailName || finalEmail.split("@")[0] || "Google User";
-      const initialLetter = (finalName[0] || "G").toUpperCase();
-      // Generate standard Google-style avatar
-      const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(finalName)}&background=4285F4&color=fff&size=128&bold=true`;
-      
-      loginWithGmail(finalEmail, finalName, avatar);
-      toast.success(`เข้าสู่ระบบด้วยบัญชี Google (${finalEmail}) สำเร็จแล้ว!`);
-      void navigate({ to: "/", replace: true });
-    } catch (err) {
-      toast.error("เข้าสู่ระบบด้วย Gmail ไม่สำเร็จ", {
-        description: err instanceof Error ? err.message : String(err),
-      });
-    } finally {
-      setBusy(false);
-    }
+    setGmailAddress(finalEmail);
+    if (targetName) setGmailName(targetName);
+    // The email is only a hint for the account chooser. Identity and session
+    // must come from Supabase OAuth, never from a local pseudo-user.
+    await signInGoogle(finalEmail);
   }
 
   function handleRemoveRecent(e: React.MouseEvent, accountEmail: string) {
@@ -205,7 +192,7 @@ function AuthPage() {
     toast.success("ลบบัญชีออกจากประวัติแล้ว");
   }
 
-  async function signInGoogle() {
+  async function signInGoogle(loginHint?: string) {
     if (busy) return;
     setBusy(true);
     try {
@@ -217,22 +204,21 @@ function AuthPage() {
           queryParams: {
             access_type: "offline",
             prompt: "consent",
+            ...(loginHint ? { login_hint: loginHint } : {}),
           },
         },
       });
 
       if (error) {
-        // If Supabase OAuth backend isn't ready or URL is placeholder, use direct Gmail login fallback
-        console.warn("[Auth] Supabase Google OAuth error, falling back to direct Gmail login:", error);
-        handleDirectGmailLogin(gmailAddress || "jayautobot.dev@gmail.com", gmailName || "Jay Autobot");
-        return;
+        throw error;
       }
       if (data?.url) {
         window.location.assign(data.url);
       }
     } catch (err) {
-      console.warn("[Auth] signInGoogle fallback:", err);
-      handleDirectGmailLogin(gmailAddress || "jayautobot.dev@gmail.com", gmailName || "Jay Autobot");
+      toast.error("เข้าสู่ระบบ Google ไม่สำเร็จ", {
+        description: err instanceof Error ? err.message : String(err),
+      });
     } finally {
       setBusy(false);
     }
@@ -394,20 +380,7 @@ function AuthPage() {
             data: { full_name: name || email.split("@")[0] },
           },
         });
-        if (error) {
-          // If Supabase is offline / misconfigured, establish local session
-          if (
-            error.message.includes("fetch") ||
-            error.message.includes("placeholder") ||
-            error.message.includes("API key")
-          ) {
-            setGuestUser(name || email.split("@")[0], email, "email");
-            toast.success("สมัครสมาชิกและเข้าสู่ระบบเรียบร้อยแล้ว");
-            void navigate({ to: "/", replace: true });
-            return;
-          }
-          throw error;
-        }
+        if (error) throw error;
         toast.success("สมัครสมาชิกสำเร็จ! ระบบกำลังเข้าสู่ระบบให้อัตโนมัติ");
         void navigate({ to: "/", replace: true });
       } else {
@@ -415,19 +388,7 @@ function AuthPage() {
           email,
           password,
         });
-        if (error) {
-          if (
-            error.message.includes("fetch") ||
-            error.message.includes("placeholder") ||
-            error.message.includes("API key")
-          ) {
-            setGuestUser(email.split("@")[0], email, "email");
-            toast.success(`เข้าสู่ระบบในชื่อ ${email} เรียบร้อยแล้ว`);
-            void navigate({ to: "/", replace: true });
-            return;
-          }
-          throw error;
-        }
+        if (error) throw error;
         toast.success("เข้าสู่ระบบสำเร็จ");
         void navigate({ to: "/", replace: true });
       }
@@ -556,7 +517,9 @@ function AuthPage() {
                     <Clock3 className="h-3.5 w-3.5 text-primary" />
                     บัญชี Gmail ล่าสุดบนเครื่องนี้
                   </span>
-                  <span className="text-[10px] text-muted-foreground/80">คลิกเพื่อเข้าใช้งานด่วน</span>
+                  <span className="text-[10px] text-muted-foreground/80">
+                    คลิกเพื่อเริ่ม Google OAuth
+                  </span>
                 </div>
                 <div className="space-y-1.5">
                   {recentAccounts.map((acc) => (
@@ -610,10 +573,10 @@ function AuthPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
                   <Zap className="h-3.5 w-3.5" />
-                  <span>เข้าสู่ระบบด้วย Gmail ทันที (พร้อมใช้งาน)</span>
+                  <span>เชื่อมต่อบัญชี Google ผ่าน Supabase</span>
                 </div>
-                <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-bold text-success">
-                  Ready
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+                  OAuth
                 </span>
               </div>
 
@@ -680,7 +643,7 @@ function AuthPage() {
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-xs font-bold text-primary-foreground shadow transition hover:bg-primary/90 active:scale-[0.99] disabled:opacity-50 cursor-pointer"
               >
                 <GoogleIcon className="h-4 w-4 shrink-0" />
-                <span>เข้าสู่ระบบด้วย Gmail นี้ทันที</span>
+                <span>ดำเนินการต่อด้วย Google OAuth</span>
               </button>
             </form>
 

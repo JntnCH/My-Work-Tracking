@@ -290,21 +290,51 @@ export const replaceWorkLogRows = createServerFn({ method: "POST" })
     }
   });
 
-/** Reads the saved work-type list from the Settings tab. */
+/** Extracts unique work types from the WorkLogs rows, where column E is work type. */
+export function categoriesFromWorkLogRows(rows: unknown[][]): string[] {
+  return [...new Set(rows.map((row) => String(row[4] ?? "").trim()).filter(Boolean))];
+}
+
+/**
+ * Reads work types from Settings first. Older sheets may not have Settings,
+ * so WorkLogs column E is a safe first-time import fallback.
+ */
 export const readCategoryList = createServerFn({ method: "POST" })
   .validator((input: unknown) => spreadsheetInputSchema.parse(input))
   .handler(async ({ data }) => {
+    let sheets: Awaited<ReturnType<typeof sheetsClient>>;
     try {
-      const sheets = await sheetsClient();
-      const res = await sheets.spreadsheets.values.get({
+      sheets = await sheetsClient();
+    } catch (error) {
+      console.warn(
+        "Google Sheets client unavailable for category import:",
+        googleSheetsError(error),
+      );
+      return { categories: [] as string[] };
+    }
+
+    try {
+      const settingsRes = await sheets.spreadsheets.values.get({
         spreadsheetId: data.spreadsheetId,
         range: `${SETTINGS_TITLE}!A2:A200`,
       });
-      const rows: unknown[][] = res.data.values ?? [];
-      const categories = rows.map((row) => String(row[0] ?? "").trim()).filter(Boolean);
-      return { categories };
+      const settingsCategories = (settingsRes.data.values ?? [])
+        .map((row) => String(row[0] ?? "").trim())
+        .filter(Boolean);
+      if (settingsCategories.length > 0) return { categories: [...new Set(settingsCategories)] };
     } catch (error) {
-      console.warn(googleSheetsError(error));
+      console.warn("Google Sheets Settings category read warning:", googleSheetsError(error));
+    }
+
+    try {
+      const logsRes = await sheets.spreadsheets.values.get({
+        spreadsheetId: data.spreadsheetId,
+        range: `${SHEET_TITLE}!A2:U`,
+        valueRenderOption: "UNFORMATTED_VALUE",
+      });
+      return { categories: categoriesFromWorkLogRows(logsRes.data.values ?? []) };
+    } catch (error) {
+      console.warn("Google Sheets WorkLogs category fallback warning:", googleSheetsError(error));
       return { categories: [] as string[] };
     }
   });

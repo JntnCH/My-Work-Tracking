@@ -5,6 +5,32 @@ import { supabase } from "@/integrations/supabase/client";
 const GUEST_STORAGE_KEY = "work_tracker_guest_user";
 const AUTH_CHANGE_EVENT = "work_tracker_auth_change";
 const RECENT_GMAIL_KEY = "work_tracker_recent_gmail_accounts";
+const USER_SCOPED_STORAGE_KEYS = [
+  "work_tracker_logs",
+  "work_tracker_active",
+  "work_tracker_categories",
+  "work_tracker_settings",
+  "work_tracker_theme",
+  "work_tracker_sheet",
+] as const;
+
+/** Move legacy local data into the real Supabase user's namespace once. */
+export function migrateLocalUserData(fromUserId: string, toUserId: string) {
+  if (typeof window === "undefined" || !fromUserId || !toUserId || fromUserId === toUserId) return;
+  try {
+    for (const key of USER_SCOPED_STORAGE_KEYS) {
+      const sourceKey = `${key}::${fromUserId}`;
+      const targetKey = `${key}::${toUserId}`;
+      const sourceValue = localStorage.getItem(sourceKey);
+      if (sourceValue !== null && localStorage.getItem(targetKey) === null) {
+        localStorage.setItem(targetKey, sourceValue);
+      }
+    }
+    localStorage.removeItem(GUEST_STORAGE_KEY);
+  } catch (error) {
+    console.warn("[useSession] migrateLocalUserData failed:", error);
+  }
+}
 
 export type RecentGmailAccount = {
   email: string;
@@ -23,27 +49,6 @@ export function getRecentGmailAccounts(): RecentGmailAccount[] {
   }
 }
 
-export function saveRecentGmailAccount(account: { email: string; name: string; avatarUrl?: string }) {
-  if (typeof window === "undefined") return;
-  try {
-    const list = getRecentGmailAccounts().filter(
-      (item) => item.email.toLowerCase() !== account.email.toLowerCase(),
-    );
-    const updated: RecentGmailAccount[] = [
-      {
-        email: account.email,
-        name: account.name || account.email.split("@")[0] || "Google User",
-        avatarUrl: account.avatarUrl,
-        lastLoginAt: new Date().toISOString(),
-      },
-      ...list,
-    ].slice(0, 5); // Keep up to 5 accounts
-    localStorage.setItem(RECENT_GMAIL_KEY, JSON.stringify(updated));
-  } catch (err) {
-    console.warn("[useSession] saveRecentGmailAccount failed:", err);
-  }
-}
-
 export function removeRecentGmailAccount(email: string) {
   if (typeof window === "undefined") return;
   try {
@@ -56,6 +61,10 @@ export function removeRecentGmailAccount(email: string) {
   }
 }
 
+export function isLocalGuestUser(user: User | null): boolean {
+  return user?.app_metadata?.provider === "guest";
+}
+
 export function getGuestUser(): User | null {
   if (typeof window === "undefined") return null;
   const raw = localStorage.getItem(GUEST_STORAGE_KEY);
@@ -65,24 +74,6 @@ export function getGuestUser(): User | null {
   } catch {
     return null;
   }
-}
-
-export function loginWithGmail(
-  email: string,
-  name?: string,
-  avatarUrl?: string,
-): User {
-  const normalizedEmail = email.trim();
-  const displayNameVal = name?.trim() || normalizedEmail.split("@")[0] || "Google User";
-  
-  // Save to recent accounts
-  saveRecentGmailAccount({
-    email: normalizedEmail,
-    name: displayNameVal,
-    avatarUrl,
-  });
-
-  return setGuestUser(displayNameVal, normalizedEmail, "google", avatarUrl);
 }
 
 export function setGuestUser(
@@ -186,12 +177,20 @@ export function useSession() {
     };
   }, []);
 
-  const user: User | null = session?.user ?? guestUser ?? null;
+  useEffect(() => {
+    if (!session?.user || !guestUser || isLocalGuestUser(guestUser)) return;
+    migrateLocalUserData(guestUser.id, session.user.id);
+  }, [guestUser, session?.user]);
+
+  // Only the explicit Guest Mode is local-only. Legacy "direct Gmail"/"email" pseudo-users
+  // are intentionally ignored so the user can sign in with a real Supabase session.
+  const localGuest = isLocalGuestUser(guestUser) ? guestUser : null;
+  const user: User | null = session?.user ?? localGuest;
   return {
     session,
     user,
     loading,
-    isGuest: !session?.user && !!guestUser && guestUser.app_metadata?.provider === "guest",
+    isGuest: !session?.user && !!localGuest,
   };
 }
 
@@ -200,4 +199,3 @@ export function displayName(user: User | null) {
   const meta = user.user_metadata as { full_name?: string; name?: string } | undefined;
   return meta?.full_name || meta?.name || user.email?.split("@")[0] || "ผู้ใช้";
 }
-

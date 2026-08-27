@@ -171,26 +171,26 @@ export async function softDeleteDBWorkType(id: string): Promise<boolean> {
 }
 
 /**
- * Merges local categories into Supabase without deleting or overwriting existing rows.
- * This is intentionally idempotent so a refresh or a second browser cannot erase work types.
+ * Seeds Supabase only when the account has no work-type rows at all.
+ * A browser-local cache must never merge into or overwrite an existing remote list.
  */
 export async function syncDBWorkTypes(userId: string, categories: string[]): Promise<DBWorkType[]> {
   const current = await fetchDBWorkTypes(userId);
-  const existingNames = new Set(current.map((item) => item.name.trim().toLocaleLowerCase("th-TH")));
+  if (current.length > 0) return current;
+
   const namesToInsert = [
     ...new Set(
       (categories.length > 0 ? categories : DEFAULT_CATEGORIES)
         .map((name) => name.trim())
         .filter(Boolean),
     ),
-  ].filter((name) => !existingNames.has(name.toLocaleLowerCase("th-TH")));
+  ];
+  if (namesToInsert.length === 0) return current;
 
-  if (namesToInsert.length > 0) {
-    const { error } = await supabase
-      .from("work_types")
-      .insert(namesToInsert.map((name) => ({ user_id: userId, name, is_active: true })));
-    if (error && error.code !== "23505") throw error;
-  }
+  const { error } = await supabase
+    .from("work_types")
+    .insert(namesToInsert.map((name) => ({ user_id: userId, name, is_active: true })));
+  if (error && error.code !== "23505") throw error;
 
   return fetchDBWorkTypes(userId);
 }
@@ -307,11 +307,7 @@ export async function fetchDBBranches(userId: string): Promise<DBBranch[]> {
   return (data as DBBranch[]) || [];
 }
 
-export async function addDBBranch(
-  userId: string,
-  name: string,
-  code?: string,
-): Promise<DBBranch> {
+export async function addDBBranch(userId: string, name: string, code?: string): Promise<DBBranch> {
   const trimmedName = name.trim();
   if (!trimmedName) throw new Error("กรุณาระบุชื่อสาขา");
   const { data, error } = await supabase
@@ -391,22 +387,14 @@ export async function saveDBBranchSettings(
 /* ------------------------------------------------------------------ */
 
 export async function fetchDBUserSettings(userId: string): Promise<Partial<DBUserSettings> | null> {
-  try {
-    const { data, error } = await supabase
-      .from("user_settings")
-      .select("*")
-      .eq("user_id", userId)
-      .maybeSingle();
+  const { data, error } = await supabase
+    .from("user_settings")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
 
-    if (error) {
-      console.warn("fetchDBUserSettings warning:", error.message);
-      return null;
-    }
-    return (data as DBUserSettings) || null;
-  } catch (err) {
-    console.warn("fetchDBUserSettings exception:", err);
-    return null;
-  }
+  if (error) throw error;
+  return (data as DBUserSettings) || null;
 }
 
 export async function saveDBUserSettings(
