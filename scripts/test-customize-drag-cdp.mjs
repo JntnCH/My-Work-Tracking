@@ -2,7 +2,9 @@ import process from "node:process";
 
 const response = await fetch("http://127.0.0.1:9222/json");
 const targets = await response.json();
-const target = targets.find((item) => item.type === "page" && item.url.startsWith("http://localhost:3000"));
+const target = targets.find(
+  (item) => item.type === "page" && item.url.startsWith("http://localhost:3000"),
+);
 if (!target?.webSocketDebuggerUrl) {
   throw new Error("ไม่พบหน้า localhost:3000 สำหรับทดสอบ Customize Canvas");
 }
@@ -68,10 +70,27 @@ const startY = before.y + Math.min(35, before.height / 2);
 const endX = startX + 64;
 const endY = startY + 42;
 
-await command("Input.dispatchMouseEvent", { type: "mouseMoved", x: startX, y: startY, button: "none" });
-await command("Input.dispatchMouseEvent", { type: "mousePressed", x: startX, y: startY, button: "left", clickCount: 1 });
+await command("Input.dispatchMouseEvent", {
+  type: "mouseMoved",
+  x: startX,
+  y: startY,
+  button: "none",
+});
+await command("Input.dispatchMouseEvent", {
+  type: "mousePressed",
+  x: startX,
+  y: startY,
+  button: "left",
+  clickCount: 1,
+});
 await new Promise((resolve) => setTimeout(resolve, 40));
-await command("Input.dispatchMouseEvent", { type: "mouseMoved", x: endX, y: endY, button: "left", buttons: 1 });
+await command("Input.dispatchMouseEvent", {
+  type: "mouseMoved",
+  x: endX,
+  y: endY,
+  button: "left",
+  buttons: 1,
+});
 await new Promise((resolve) => setTimeout(resolve, 40));
 const during = await evaluate(`(() => {
   const element = document.querySelector('[data-dashboard-customization-viewport="mobile"] [data-dashboard-card-id="work-days"]');
@@ -83,7 +102,13 @@ const during = await evaluate(`(() => {
     selected: element.getAttribute('data-dashboard-card-selected'),
   };
 })()`);
-await command("Input.dispatchMouseEvent", { type: "mouseReleased", x: endX, y: endY, button: "left", clickCount: 1 });
+await command("Input.dispatchMouseEvent", {
+  type: "mouseReleased",
+  x: endX,
+  y: endY,
+  button: "left",
+  clickCount: 1,
+});
 await new Promise((resolve) => setTimeout(resolve, 80));
 const after = await evaluate(`(() => {
   const element = document.querySelector('[data-dashboard-customization-viewport="mobile"] [data-dashboard-card-id="work-days"]');
@@ -96,5 +121,11 @@ const after = await evaluate(`(() => {
   };
 })()`);
 
-console.log(JSON.stringify({ before, during, after, moved: before.left !== after?.left || before.top !== after?.top }, null, 2));
+console.log(
+  JSON.stringify(
+    { before, during, after, moved: before.left !== after?.left || before.top !== after?.top },
+    null,
+    2,
+  ),
+);
 socket.close();

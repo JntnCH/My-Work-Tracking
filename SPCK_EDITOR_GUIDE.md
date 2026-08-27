@@ -41,16 +41,16 @@ feature/line-login-settings-audit
 
 ## 4. ไฟล์สำคัญที่เปิดแก้ไขได้
 
-| งาน | ตำแหน่งไฟล์ |
-|---|---|
-| หน้า Login และ callback LINE | `src/routes/auth.tsx` |
-| Root LIFF callback | `src/routes/__root.tsx` |
-| LINE LIFF helper | `src/lib/line-auth.ts` |
-| ตั้งค่าหน้าระบบ | `src/components/work/SettingsPanel.tsx` |
-| การคำนวณชั่วโมง ค่าแรง และ OT | `src/lib/work-log.ts` |
+| งาน                                      | ตำแหน่งไฟล์                                               |
+| ---------------------------------------- | --------------------------------------------------------- |
+| หน้า Login และ callback LINE             | `src/routes/auth.tsx`                                     |
+| Root LIFF callback                       | `src/routes/__root.tsx`                                   |
+| LINE LIFF helper                         | `src/lib/line-auth.ts`                                    |
+| ตั้งค่าหน้าระบบ                          | `src/components/work/SettingsPanel.tsx`                   |
+| การคำนวณชั่วโมง ค่าแรง และ OT            | `src/lib/work-log.ts`                                     |
 | การเชื่อมต่อ Supabase และข้อมูล Work Log | `src/lib/supabase-db.ts`, `src/hooks/use-work-tracker.ts` |
-| Dashboard และกราฟ | `src/components/work/DashboardPanel.tsx` |
-| คำสั่ง build | `package.json` |
+| Dashboard และกราฟ                        | `src/components/work/DashboardPanel.tsx`                  |
+| คำสั่ง build                             | `package.json`                                            |
 
 ก่อนเพิ่ม field ใหม่ ให้ค้นหาชื่อ field เดิมใน `src/`, schema และ mapping ที่เกี่ยวข้องก่อนเสมอ เพื่อไม่ให้ข้อมูลซ้ำกับระบบบันทึกงานเดิม
 
@@ -93,13 +93,13 @@ https://google-sheet-organizer.onrender.com
 
 ## 8. ปัญหาที่พบบ่อย
 
-| อาการ | แนวทางแก้ |
-|---|---|
-| Clone ไม่สำเร็จ | ตรวจ URL และสิทธิ์ repository; หากเป็น private ให้ตั้งค่า GitHub credentials ใน Spck |
-| ไม่เห็น branch ที่ต้องการ | Pull หรือ Refresh remote branches ในเมนู GIT แล้วเลือก `feature/line-login-settings-audit` |
-| Push ไม่ได้ | ตรวจว่าอยู่บน branch ที่มีสิทธิ์เขียน และตรวจรายการ Modified/Staged files ก่อน |
-| เปิดไฟล์ได้แต่รันระบบไม่ได้ | เป็นข้อจำกัดของ runtime บนมือถือ ให้ใช้ Render หรือเครื่องที่ติดตั้ง Node.js |
-| พบไฟล์ลับในรายการเปลี่ยนแปลง | ยกเลิก commit ทันที ลบไฟล์ลับออกจาก staging และแจ้งผู้ดูแลก่อน Push |
+| อาการ                        | แนวทางแก้                                                                                  |
+| ---------------------------- | ------------------------------------------------------------------------------------------ |
+| Clone ไม่สำเร็จ              | ตรวจ URL และสิทธิ์ repository; หากเป็น private ให้ตั้งค่า GitHub credentials ใน Spck       |
+| ไม่เห็น branch ที่ต้องการ    | Pull หรือ Refresh remote branches ในเมนู GIT แล้วเลือก `feature/line-login-settings-audit` |
+| Push ไม่ได้                  | ตรวจว่าอยู่บน branch ที่มีสิทธิ์เขียน และตรวจรายการ Modified/Staged files ก่อน             |
+| เปิดไฟล์ได้แต่รันระบบไม่ได้  | เป็นข้อจำกัดของ runtime บนมือถือ ให้ใช้ Render หรือเครื่องที่ติดตั้ง Node.js               |
+| พบไฟล์ลับในรายการเปลี่ยนแปลง | ยกเลิก commit ทันที ลบไฟล์ลับออกจาก staging และแจ้งผู้ดูแลก่อน Push                        |
 
 ## References
 

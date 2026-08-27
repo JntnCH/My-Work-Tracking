@@ -42,13 +42,13 @@ Phase 3 มีเป้าหมายทำให้ Interactive Customization 
 
 State ทั้งหมดควรแบ่งเป็น 5 ชั้น ไม่ควรรวมเป็น object เดียวที่แก้ได้จากทุก component
 
-| ชั้นของ state | ความหมาย | เจ้าของที่แนะนำ | เขียน Supabase ได้หรือไม่ |
-|---|---|---|---|
-| Committed/Saved state | ค่าที่โหลดจาก persistence ล่าสุด | `SettingsPanel` หรือ coordinator snapshot | ไม่เขียนจากการอ่าน |
-| Draft state | ค่าที่ผู้ใช้กำลังแก้ไข | `SettingsPanel` และ `DashboardLayoutEditor` | ไม่ได้ |
-| History state | past/future ของ Layout transactions | `useEditorHistory` แยก Mobile/Desktop | ไม่ได้ |
-| UI state | tab, selected card, viewport, focus | component editor | ไม่ได้ |
-| Persistence state | loading, saving, error, committed scopes | SaveCoordinator/adapter | เขียนเฉพาะตอน Save |
+| ชั้นของ state         | ความหมาย                                 | เจ้าของที่แนะนำ                             | เขียน Supabase ได้หรือไม่ |
+| --------------------- | ---------------------------------------- | ------------------------------------------- | ------------------------- |
+| Committed/Saved state | ค่าที่โหลดจาก persistence ล่าสุด         | `SettingsPanel` หรือ coordinator snapshot   | ไม่เขียนจากการอ่าน        |
+| Draft state           | ค่าที่ผู้ใช้กำลังแก้ไข                   | `SettingsPanel` และ `DashboardLayoutEditor` | ไม่ได้                    |
+| History state         | past/future ของ Layout transactions      | `useEditorHistory` แยก Mobile/Desktop       | ไม่ได้                    |
+| UI state              | tab, selected card, viewport, focus      | component editor                            | ไม่ได้                    |
+| Persistence state     | loading, saving, error, committed scopes | SaveCoordinator/adapter                     | เขียนเฉพาะตอน Save        |
 
 โมเดลการไหลของข้อมูลที่ต้องการคือ:
 
@@ -89,10 +89,7 @@ Draft state ───────────────┐
 สร้างไฟล์ `src/lib/editor-history.ts` สำหรับ type และ pure history utilities
 
 ```ts
-import type {
-  DashboardLayout,
-  DashboardViewport,
-} from "@/lib/dashboard-layout";
+import type { DashboardLayout, DashboardViewport } from "@/lib/dashboard-layout";
 
 export type EditorHistoryScope = "dashboard-layout";
 
@@ -126,16 +123,16 @@ export const DEFAULT_EDITOR_HISTORY_LIMIT = 50;
 
 ตัวอย่าง:
 
-| การกระทำของผู้ใช้ | Transaction ที่ควรสร้าง |
-|---|---|
-| กดเลื่อนการ์ดขึ้น | `reorder card` หนึ่งรายการ |
-| เปลี่ยนความกว้างจาก 1 เป็น 2 | `resize width` หนึ่งรายการ |
-| เปลี่ยนความสูงจาก 1 เป็น 3 | `resize height` หนึ่งรายการ |
-| กด Reset Layout | `reset mobile layout` หนึ่งรายการ |
-| ลากต่อเนื่องด้วย pointer | รวมเป็นรายการเดียวด้วย `mergeKey` |
-| เลือกการ์ด | ไม่สร้าง transaction |
-| เปลี่ยน viewport | ไม่สร้าง transaction |
-| กด Undo/Redo | ย้าย transaction ระหว่าง past/future ไม่สร้าง transaction ใหม่ |
+| การกระทำของผู้ใช้            | Transaction ที่ควรสร้าง                                        |
+| ---------------------------- | -------------------------------------------------------------- |
+| กดเลื่อนการ์ดขึ้น            | `reorder card` หนึ่งรายการ                                     |
+| เปลี่ยนความกว้างจาก 1 เป็น 2 | `resize width` หนึ่งรายการ                                     |
+| เปลี่ยนความสูงจาก 1 เป็น 3   | `resize height` หนึ่งรายการ                                    |
+| กด Reset Layout              | `reset mobile layout` หนึ่งรายการ                              |
+| ลากต่อเนื่องด้วย pointer     | รวมเป็นรายการเดียวด้วย `mergeKey`                              |
+| เลือกการ์ด                   | ไม่สร้าง transaction                                           |
+| เปลี่ยน viewport             | ไม่สร้าง transaction                                           |
+| กด Undo/Redo                 | ย้าย transaction ระหว่าง past/future ไม่สร้าง transaction ใหม่ |
 
 ### 4.3 No-op transaction
 
@@ -499,19 +496,19 @@ const resetSelectedLayout = () => {
 
 ตารางนี้กำหนด lifecycle ของ history ให้ชัดเจน
 
-| เหตุการณ์ | Draft | Snapshot | History |
-|---|---|---|---|
-| โหลด Layout จาก Supabase สำเร็จ | ตั้งเป็นค่าที่โหลด | ตั้งเป็นค่าที่โหลด | Clear |
-| Guest เริ่มต้น | ใช้ default/session draft | ตั้งเป็นค่าเริ่มต้น | Clear |
-| แก้ไข Layout | เปลี่ยนเป็น after | คงเดิม | Push past, clear future |
-| Undo | เปลี่ยนเป็น before | คงเดิม | ย้าย past → future |
-| Redo | เปลี่ยนเป็น after | คงเดิม | ย้าย future → past |
-| Undo จนเท่ากับ snapshot | เท่ากับ saved | คงเดิม | อาจยังมีรายการ แต่ `isDirty=false` |
-| Reset | เปลี่ยนเป็น default | คงเดิม | Push transaction เดียว |
-| Save สำเร็จ | คงค่าเดิม | เปลี่ยนเป็น Draft ใหม่ | Clear |
-| Save ล้มเหลว | คง Draft | คง snapshot เดิม | คง history เพื่อ retry |
-| Cancel | คืน snapshot | คง snapshot เดิม | Clear |
-| เปลี่ยน user/viewport | โหลดชุดใหม่ | ตั้ง snapshot ใหม่ | Clear |
+| เหตุการณ์                       | Draft                     | Snapshot               | History                            |
+| ------------------------------- | ------------------------- | ---------------------- | ---------------------------------- |
+| โหลด Layout จาก Supabase สำเร็จ | ตั้งเป็นค่าที่โหลด        | ตั้งเป็นค่าที่โหลด     | Clear                              |
+| Guest เริ่มต้น                  | ใช้ default/session draft | ตั้งเป็นค่าเริ่มต้น    | Clear                              |
+| แก้ไข Layout                    | เปลี่ยนเป็น after         | คงเดิม                 | Push past, clear future            |
+| Undo                            | เปลี่ยนเป็น before        | คงเดิม                 | ย้าย past → future                 |
+| Redo                            | เปลี่ยนเป็น after         | คงเดิม                 | ย้าย future → past                 |
+| Undo จนเท่ากับ snapshot         | เท่ากับ saved             | คงเดิม                 | อาจยังมีรายการ แต่ `isDirty=false` |
+| Reset                           | เปลี่ยนเป็น default       | คงเดิม                 | Push transaction เดียว             |
+| Save สำเร็จ                     | คงค่าเดิม                 | เปลี่ยนเป็น Draft ใหม่ | Clear                              |
+| Save ล้มเหลว                    | คง Draft                  | คง snapshot เดิม       | คง history เพื่อ retry             |
+| Cancel                          | คืน snapshot              | คง snapshot เดิม       | Clear                              |
+| เปลี่ยน user/viewport           | โหลดชุดใหม่               | ตั้ง snapshot ใหม่     | Clear                              |
 
 ## 10. ปรับ `DashboardLayoutEditorHandle`
 
@@ -630,15 +627,9 @@ export type SaveCoordinator = {
 ### 11.2 Pure coordinator implementation
 
 ```ts
-import type {
-  SaveCoordinator,
-  SaveParticipant,
-  SaveResult,
-} from "@/lib/save-coordinator";
+import type { SaveCoordinator, SaveParticipant, SaveResult } from "@/lib/save-coordinator";
 
-export function createSaveCoordinator(
-  participants: readonly SaveParticipant[],
-): SaveCoordinator {
+export function createSaveCoordinator(participants: readonly SaveParticipant[]): SaveCoordinator {
   return {
     hasDirtyParticipants: () => participants.some((participant) => participant.dirty),
 
@@ -725,10 +716,10 @@ const participants: SaveParticipant[] = [
 
 ใน implementation จริงไม่ควรให้ทั้ง `layout-mobile` และ `layout-desktop` เรียก `saveDraft()` ซ้ำเป็นราย participant เพราะ handle เดิมบันทึกทั้งสอง viewport ที่ dirty อยู่แล้ว ให้เลือกหนึ่งในสองแบบต่อไปนี้:
 
-| วิธี | ข้อดี | ข้อควรระวัง |
-|---|---|---|
-| `layout` participant เดียว | ใช้ handle เดิมและ diff เล็ก | รายงาน failed scope ต้องละเอียดใน `saveDraft()` |
-| แยก Mobile/Desktop participant | รายงานผลละเอียด | ต้องเพิ่ม `saveViewportDraft(viewport)` ใน handle |
+| วิธี                           | ข้อดี                        | ข้อควรระวัง                                       |
+| ------------------------------ | ---------------------------- | ------------------------------------------------- |
+| `layout` participant เดียว     | ใช้ handle เดิมและ diff เล็ก | รายงาน failed scope ต้องละเอียดใน `saveDraft()`   |
+| แยก Mobile/Desktop participant | รายงานผลละเอียด              | ต้องเพิ่ม `saveViewportDraft(viewport)` ใน handle |
 
 สำหรับ Phase 3 แนะนำ **layout participant เดียว** ก่อน เพื่อไม่สร้าง save call ซ้ำและลดความเสี่ยงของ race condition
 
@@ -901,14 +892,14 @@ const handleCancel = () => {
 
 ## 15. Lock/Unlock Rules
 
-| สถานะ | แก้ Draft ได้หรือไม่ | Undo/Redo | Save | Cancel |
-|---|---:|---:|---:|---:|
-| Locked | ไม่ได้ | ไม่ได้ | ไม่ได้ | ไม่จำเป็น |
-| Editing ไม่มีการเปลี่ยน | ได้ | ปุ่ม disabled | disabled หรือ no-op | ได้ |
-| Editing มี Unsaved changes | ได้ | ได้ตาม stack | ได้ | ได้ |
-| Saving | ไม่ได้ | ไม่ได้ | disabled | disabled จนกว่าจะจบ |
-| Save สำเร็จ | กลับ Locked | ไม่ได้ | ไม่ได้ | ไม่จำเป็น |
-| Save ล้มเหลว | ยังคง Editing | ได้ | Retry ได้ | ได้ |
+| สถานะ                      | แก้ Draft ได้หรือไม่ |     Undo/Redo |                Save |              Cancel |
+| -------------------------- | -------------------: | ------------: | ------------------: | ------------------: |
+| Locked                     |               ไม่ได้ |        ไม่ได้ |              ไม่ได้ |           ไม่จำเป็น |
+| Editing ไม่มีการเปลี่ยน    |                  ได้ | ปุ่ม disabled | disabled หรือ no-op |                 ได้ |
+| Editing มี Unsaved changes |                  ได้ |  ได้ตาม stack |                 ได้ |                 ได้ |
+| Saving                     |               ไม่ได้ |        ไม่ได้ |            disabled | disabled จนกว่าจะจบ |
+| Save สำเร็จ                |          กลับ Locked |        ไม่ได้ |              ไม่ได้ |           ไม่จำเป็น |
+| Save ล้มเหลว               |        ยังคง Editing |           ได้ |           Retry ได้ |                 ได้ |
 
 `fieldset disabled={isLocked || isSaving}` ควรยังเป็นกลไกหลักที่ครอบ controls เหมือนปัจจุบัน [1] แต่ปุ่ม status/Unlock/Lock ที่อยู่นอก fieldset ต้องกำหนด disabled state แยกกัน เพื่อไม่ให้ผู้ใช้กด Undo ระหว่าง Save หรือกด Save ซ้ำจนเกิด concurrent write
 
@@ -934,10 +925,8 @@ export function hasSettingsDirty(state: SettingsDirtyState): boolean {
 สำหรับ Layout:
 
 ```ts
-const mobileDirty =
-  mobile.loaded && !layoutsEqual(mobile.layout, mobileSnapshotRef.current);
-const desktopDirty =
-  desktop.loaded && !layoutsEqual(desktop.layout, desktopSnapshotRef.current);
+const mobileDirty = mobile.loaded && !layoutsEqual(mobile.layout, mobileSnapshotRef.current);
+const desktopDirty = desktop.loaded && !layoutsEqual(desktop.layout, desktopSnapshotRef.current);
 const layoutDirty = mobileDirty || desktopDirty;
 ```
 
@@ -947,15 +936,15 @@ const layoutDirty = mobileDirty || desktopDirty;
 
 Guest Mode ต้องใช้ Draft และ history ในหน่วยความจำหรือ local storage ตาม behavior เดิม แต่ต้องไม่เรียก Supabase
 
-| การทำงาน | Authenticated | Guest |
-|---|---|---|
-| Load Layout | `loadDashboardLayout()` | default/session state |
-| Undo/Redo | local only | local only |
-| Save Layout | upsert Supabase | local/session save ตามที่ระบบเดิมรองรับ |
-| Save Theme/Rates | Supabase + local | local only |
-| Save Spreadsheet ID | Supabase + local | local only |
-| Save Branch settings | ต้องมี user/branch | ไม่ควรเรียก callback ที่ต้องล็อกอิน |
-| Toast | ระบุบันทึกลง Supabase | ระบุบันทึกสำหรับ Session นี้ |
+| การทำงาน             | Authenticated           | Guest                                   |
+| -------------------- | ----------------------- | --------------------------------------- |
+| Load Layout          | `loadDashboardLayout()` | default/session state                   |
+| Undo/Redo            | local only              | local only                              |
+| Save Layout          | upsert Supabase         | local/session save ตามที่ระบบเดิมรองรับ |
+| Save Theme/Rates     | Supabase + local        | local only                              |
+| Save Spreadsheet ID  | Supabase + local        | local only                              |
+| Save Branch settings | ต้องมี user/branch      | ไม่ควรเรียก callback ที่ต้องล็อกอิน     |
+| Toast                | ระบุบันทึกลง Supabase   | ระบุบันทึกสำหรับ Session นี้            |
 
 `useDashboardLayout.saveLayout()` มี guard ไม่เรียก remote เมื่อไม่มี `userId` หรือเป็น Guest อยู่แล้ว [3] ส่วน `use-work-tracker` มี guard `useSupabase && userId` ใน Theme/Rates [4] Coordinator ต้องไม่ bypass guard เหล่านี้ และไม่ควรเรียก raw Supabase จาก component
 
@@ -998,10 +987,10 @@ describe("editorHistoryReducer", () => {
       past: [],
       future: [transaction(layoutB, layoutC)],
     };
-    const next = editorHistoryReducer(
-      withFuture,
-      { type: "push", entry: transaction(layoutA, layoutB) },
-    );
+    const next = editorHistoryReducer(withFuture, {
+      type: "push",
+      entry: transaction(layoutA, layoutB),
+    });
 
     expect(next.past).toHaveLength(1);
     expect(next.future).toHaveLength(0);
@@ -1009,19 +998,19 @@ describe("editorHistoryReducer", () => {
 
   it("does not push a no-op transaction", () => {
     const initial = createEmptyHistory();
-    const next = editorHistoryReducer(
-      initial,
-      { type: "push", entry: transaction(layoutA, layoutA) },
-    );
+    const next = editorHistoryReducer(initial, {
+      type: "push",
+      entry: transaction(layoutA, layoutA),
+    });
 
     expect(next).toEqual(initial);
   });
 
   it("moves entries between past and future", () => {
-    const pushed = editorHistoryReducer(
-      createEmptyHistory(),
-      { type: "push", entry: transaction(layoutA, layoutB) },
-    );
+    const pushed = editorHistoryReducer(createEmptyHistory(), {
+      type: "push",
+      entry: transaction(layoutA, layoutB),
+    });
     const undone = editorHistoryReducer(pushed, { type: "undo" });
     const redone = editorHistoryReducer(undone, { type: "redo" });
 
@@ -1034,11 +1023,7 @@ describe("editorHistoryReducer", () => {
   it("limits history entries", () => {
     let state = createEmptyHistory();
     for (let index = 0; index < 3; index++) {
-      state = editorHistoryReducer(
-        state,
-        { type: "push", entry: createTransaction(index) },
-        2,
-      );
+      state = editorHistoryReducer(state, { type: "push", entry: createTransaction(index) }, 2);
     }
 
     expect(state.past).toHaveLength(2);
@@ -1138,21 +1123,21 @@ it("keeps the failure scope for retry", async () => {
 
 ควรเพิ่ม component/integration tests อย่างน้อยดังนี้:
 
-| Test case | ผลที่ต้องได้ |
-|---|---|
-| เปิด Settings ตอน Locked | ทุก field และ Layout editor disabled |
-| Unlock แล้วเปลี่ยน Layout | Preview เปลี่ยน, Supabase mock ยังไม่ถูกเรียก |
-| กด Undo | Layout กลับค่า before, Supabase mock ยังไม่ถูกเรียก |
-| กด Redo | Layout กลับค่า after, Supabase mock ยังไม่ถูกเรียก |
-| แก้แล้ว Undo จนเท่า snapshot | `onDirtyChange(false)` |
-| กด Cancel | ทุก draft รวม Layout คืน snapshot และ history ว่าง |
-| กด Save เมื่อไม่มี dirty | ไม่เรียก persistence และไม่สร้าง error |
-| กด Save สำเร็จ | snapshot ใหม่, history ว่าง, Locked, success toast |
-| กด Save ล้มเหลว | Draft/history คงอยู่, ไม่ Lock, error toast |
-| Guest Save | Supabase adapter ไม่ถูกเรียก |
-| เปลี่ยน viewport | history ของ Mobile และ Desktop ไม่ปะปนกัน |
-| โหลด Layout ใหม่ | history เดิมถูก clear และไม่แสดง unsaved change ปลอม |
-| กด Save ซ้ำระหว่าง saving | มีเพียง request ชุดเดียว |
+| Test case                    | ผลที่ต้องได้                                         |
+| ---------------------------- | ---------------------------------------------------- |
+| เปิด Settings ตอน Locked     | ทุก field และ Layout editor disabled                 |
+| Unlock แล้วเปลี่ยน Layout    | Preview เปลี่ยน, Supabase mock ยังไม่ถูกเรียก        |
+| กด Undo                      | Layout กลับค่า before, Supabase mock ยังไม่ถูกเรียก  |
+| กด Redo                      | Layout กลับค่า after, Supabase mock ยังไม่ถูกเรียก   |
+| แก้แล้ว Undo จนเท่า snapshot | `onDirtyChange(false)`                               |
+| กด Cancel                    | ทุก draft รวม Layout คืน snapshot และ history ว่าง   |
+| กด Save เมื่อไม่มี dirty     | ไม่เรียก persistence และไม่สร้าง error               |
+| กด Save สำเร็จ               | snapshot ใหม่, history ว่าง, Locked, success toast   |
+| กด Save ล้มเหลว              | Draft/history คงอยู่, ไม่ Lock, error toast          |
+| Guest Save                   | Supabase adapter ไม่ถูกเรียก                         |
+| เปลี่ยน viewport             | history ของ Mobile และ Desktop ไม่ปะปนกัน            |
+| โหลด Layout ใหม่             | history เดิมถูก clear และไม่แสดง unsaved change ปลอม |
+| กด Save ซ้ำระหว่าง saving    | มีเพียง request ชุดเดียว                             |
 
 ## 20. Acceptance Criteria ของ Phase 3
 
@@ -1185,19 +1170,19 @@ Phase 3 จะถือว่าผ่านเมื่อเกณฑ์ต่
 
 ตารางนี้เป็นรายการวางแผนเท่านั้น ยังไม่มีการแก้ไฟล์จริงจากเอกสารฉบับนี้
 
-| ไฟล์ | ประเภทการเปลี่ยนแปลง | เหตุผล |
-|---|---|---|
-| `src/lib/editor-history.ts` | เพิ่มใหม่ | contracts และ pure reducer |
-| `src/hooks/use-editor-history.ts` | เพิ่มใหม่ | React hook สำหรับ past/future |
-| `src/lib/save-coordinator.ts` | เพิ่มใหม่ | Save participant/result contract และ orchestration |
-| `src/components/work/DashboardLayoutEditor.tsx` | แก้ | เชื่อม history, Undo/Redo และ clear lifecycle |
-| `src/components/work/SettingsPanel.tsx` | แก้ | ใช้ coordinator รวม Save และ failure behavior |
-| `src/hooks/use-work-tracker.ts` | อาจแก้ | เพิ่ม async Spreadsheet save boundary |
-| `src/routes/_authenticated/index.tsx` | อาจแก้ | ส่ง async callback หรือ public handle ใหม่ |
-| `src/test/editor-history.test.ts` | เพิ่มใหม่ | reducer/transaction tests |
-| `src/test/use-editor-history.test.tsx` | เพิ่มใหม่ | hook tests |
-| `src/test/save-coordinator.test.ts` | เพิ่มใหม่ | validation, partial failure, clean scope tests |
-| Supabase migration | ไม่ควรเพิ่มใน Phase 3 | ไม่จำเป็นต่อ history และ coordinator |
+| ไฟล์                                            | ประเภทการเปลี่ยนแปลง  | เหตุผล                                             |
+| ----------------------------------------------- | --------------------- | -------------------------------------------------- |
+| `src/lib/editor-history.ts`                     | เพิ่มใหม่             | contracts และ pure reducer                         |
+| `src/hooks/use-editor-history.ts`               | เพิ่มใหม่             | React hook สำหรับ past/future                      |
+| `src/lib/save-coordinator.ts`                   | เพิ่มใหม่             | Save participant/result contract และ orchestration |
+| `src/components/work/DashboardLayoutEditor.tsx` | แก้                   | เชื่อม history, Undo/Redo และ clear lifecycle      |
+| `src/components/work/SettingsPanel.tsx`         | แก้                   | ใช้ coordinator รวม Save และ failure behavior      |
+| `src/hooks/use-work-tracker.ts`                 | อาจแก้                | เพิ่ม async Spreadsheet save boundary              |
+| `src/routes/_authenticated/index.tsx`           | อาจแก้                | ส่ง async callback หรือ public handle ใหม่         |
+| `src/test/editor-history.test.ts`               | เพิ่มใหม่             | reducer/transaction tests                          |
+| `src/test/use-editor-history.test.tsx`          | เพิ่มใหม่             | hook tests                                         |
+| `src/test/save-coordinator.test.ts`             | เพิ่มใหม่             | validation, partial failure, clean scope tests     |
+| Supabase migration                              | ไม่ควรเพิ่มใน Phase 3 | ไม่จำเป็นต่อ history และ coordinator               |
 
 ## 22. สิ่งที่ไม่ทำใน Phase 3
 

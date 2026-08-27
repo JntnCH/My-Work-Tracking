@@ -19,15 +19,15 @@ Preview Canvas ในระยะนี้ยังเป็น **Read-only Prev
 
 หน้า Dashboard จริงมี `cardMap`, `renderCard` และ `DashboardCard` wrapper ที่คำนวณ `gridColumn`, `order` และ `minHeight` จาก Layout ปัจจุบัน ดังนั้น Preview Canvas ควรใช้กติกา grid เดียวกัน หรือแยก utility กลางออกมาใช้ร่วมกัน ไม่ควรสร้างสูตรการคำนวณชุดที่สอง [4]
 
-| สัญญาที่มีอยู่ | การใช้ใน Phase 1 | การตัดสินใจ |
-|---|---|---|
-| `DashboardLayout.version = 1` | เป็น input ของ Canvas | คงเดิม ไม่ทำ migration |
-| `DashboardCardLayout.width/height` | คำนวณขนาด preview | ใช้กติกาเดิมและ clamp ค่า |
-| `DashboardCardLayout.order` | เรียงการ์ดในแต่ละ group | ใช้ `getDashboardCards()` เดิม |
-| `DashboardViewport` | เปลี่ยน Mobile/Desktop | ใช้ type เดิม |
-| `useDashboardLayout` | จัดการ draft และ persistence | ไม่ให้ Canvas เรียก save เอง |
-| `SettingsPanel` coordinator | Save/Cancel/Lock/Unlock | คงเป็นเจ้าของ transaction |
-| Dashboard renderer | อ้างอิง visual frame | แยกเฉพาะ wrapper ที่ใช้ร่วมกันได้ |
+| สัญญาที่มีอยู่                     | การใช้ใน Phase 1             | การตัดสินใจ                       |
+| ---------------------------------- | ---------------------------- | --------------------------------- |
+| `DashboardLayout.version = 1`      | เป็น input ของ Canvas        | คงเดิม ไม่ทำ migration            |
+| `DashboardCardLayout.width/height` | คำนวณขนาด preview            | ใช้กติกาเดิมและ clamp ค่า         |
+| `DashboardCardLayout.order`        | เรียงการ์ดในแต่ละ group      | ใช้ `getDashboardCards()` เดิม    |
+| `DashboardViewport`                | เปลี่ยน Mobile/Desktop       | ใช้ type เดิม                     |
+| `useDashboardLayout`               | จัดการ draft และ persistence | ไม่ให้ Canvas เรียก save เอง      |
+| `SettingsPanel` coordinator        | Save/Cancel/Lock/Unlock      | คงเป็นเจ้าของ transaction         |
+| Dashboard renderer                 | อ้างอิง visual frame         | แยกเฉพาะ wrapper ที่ใช้ร่วมกันได้ |
 
 ## 3. ขอบเขตงานของ Phase 1
 
@@ -87,11 +87,7 @@ Canvas รับ `layout` เป็น prop และไม่ควรรู้
 สร้างไฟล์ `src/components/work/DashboardPreviewCanvas.tsx` โดยเริ่มจาก contract ที่ไม่ผูกกับ persistence ดังนี้
 
 ```tsx
-import type {
-  DashboardCardId,
-  DashboardLayout,
-  DashboardViewport,
-} from "@/lib/dashboard-layout";
+import type { DashboardCardId, DashboardLayout, DashboardViewport } from "@/lib/dashboard-layout";
 
 export type DashboardPreviewCanvasProps = {
   layout: DashboardLayout;
@@ -220,10 +216,7 @@ function getPreviewColumns(group: DashboardCardGroup, viewport: DashboardViewpor
 สร้างไฟล์ `src/components/work/DashboardPreviewCard.tsx` โดยใช้ข้อมูลตัวอย่างที่ไม่ใช่ข้อมูลจริงของผู้ใช้ การใช้ placeholder ทำให้ Preview แยกจากสูตรคำนวณและไม่ทำให้ผู้ใช้เข้าใจว่าค่าตัวอย่างถูกบันทึกเป็นรายได้จริง
 
 ```tsx
-import type {
-  DashboardCardLayout,
-  DashboardViewport,
-} from "@/lib/dashboard-layout";
+import type { DashboardCardLayout, DashboardViewport } from "@/lib/dashboard-layout";
 
 const CARD_LABELS: Record<DashboardCardLayout["id"], string> = {
   "net-income": "รายได้สุทธิรวม",
@@ -250,14 +243,9 @@ type Props = {
   onSelect?: (cardId: DashboardCardLayout["id"]) => void;
 };
 
-export function DashboardPreviewCard({
-  card,
-  viewport,
-  selected,
-  disabled,
-  onSelect,
-}: Props) {
-  const columns = card.group === "charts" ? (viewport === "mobile" ? 1 : 2) : viewport === "mobile" ? 2 : 3;
+export function DashboardPreviewCard({ card, viewport, selected, disabled, onSelect }: Props) {
+  const columns =
+    card.group === "charts" ? (viewport === "mobile" ? 1 : 2) : viewport === "mobile" ? 2 : 3;
   const width = clamp(card.width, 1, columns);
   const minHeight = card.group === "charts" ? card.height * 96 : card.height * 80;
   const canSelect = Boolean(onSelect) && !disabled;
@@ -417,14 +405,14 @@ export type DashboardLayoutEditorHandle = {
 
 Phase 1 ไม่ควรเพิ่ม `savePreview()` หรือ `persistCanvas()` เพราะจะทำให้มีเส้นทางบันทึกมากกว่าหนึ่งจุด ปุ่ม Save หลักของ `SettingsPanel` ยังคงเรียก `layoutEditorRef.current?.saveDraft()` และปุ่ม Cancel ยังคงเรียก `cancelDraft()` ตามลำดับเดิม [2]
 
-| การกระทำ | เจ้าของ state | ผลที่คาดหวัง |
-|---|---|---|
-| เปลี่ยน Mobile/Desktop | `DashboardLayoutEditor` | เปลี่ยนเฉพาะ viewport ที่กำลังดู |
-| เลือกการ์ดใน Canvas | `DashboardPreviewCanvas` local state | เปลี่ยนกรอบ selection เท่านั้น |
-| เปลี่ยน width/height/order | `useDashboardLayout` draft | Canvas เปลี่ยนทันทีและ dirty เป็น true |
-| กด Cancel | `SettingsPanel` → editor ref | คืน snapshot ล่าสุดที่บันทึกแล้ว |
-| กด Save | `SettingsPanel` → editor ref | เรียก persistence ตาม hook เดิม |
-| กด Lock | `SettingsPanel` | ป้องกันการแก้ controls และ interaction |
+| การกระทำ                   | เจ้าของ state                        | ผลที่คาดหวัง                           |
+| -------------------------- | ------------------------------------ | -------------------------------------- |
+| เปลี่ยน Mobile/Desktop     | `DashboardLayoutEditor`              | เปลี่ยนเฉพาะ viewport ที่กำลังดู       |
+| เลือกการ์ดใน Canvas        | `DashboardPreviewCanvas` local state | เปลี่ยนกรอบ selection เท่านั้น         |
+| เปลี่ยน width/height/order | `useDashboardLayout` draft           | Canvas เปลี่ยนทันทีและ dirty เป็น true |
+| กด Cancel                  | `SettingsPanel` → editor ref         | คืน snapshot ล่าสุดที่บันทึกแล้ว       |
+| กด Save                    | `SettingsPanel` → editor ref         | เรียก persistence ตาม hook เดิม        |
+| กด Lock                    | `SettingsPanel`                      | ป้องกันการแก้ controls และ interaction |
 
 ## 12. เกณฑ์ยอมรับของ Phase 1
 
@@ -462,13 +450,7 @@ describe("DashboardPreviewCanvas", () => {
   it("renders all cards from the layout once", () => {
     const layout = createDefaultDashboardLayout("mobile");
 
-    render(
-      <DashboardPreviewCanvas
-        layout={layout}
-        viewport="mobile"
-        disabled
-      />,
-    );
+    render(<DashboardPreviewCanvas layout={layout} viewport="mobile" disabled />);
 
     expect(screen.getByTestId("dashboard-preview-canvas")).toBeInTheDocument();
     expect(screen.getAllByTestId(/dashboard-preview-card-/)).toHaveLength(layout.cards.length);
@@ -479,11 +461,7 @@ describe("DashboardPreviewCanvas", () => {
     const onSelectCard = vi.fn();
 
     render(
-      <DashboardPreviewCanvas
-        layout={layout}
-        viewport="desktop"
-        onSelectCard={onSelectCard}
-      />,
+      <DashboardPreviewCanvas layout={layout} viewport="desktop" onSelectCard={onSelectCard} />,
     );
 
     await userEvent.click(screen.getByTestId("dashboard-preview-card-net-income"));
@@ -502,14 +480,14 @@ describe("DashboardPreviewCanvas", () => {
 
 หลังจากนั้นจึงทดสอบการเปลี่ยน width/height/order ผ่าน control เดิม โดยตรวจว่า Canvas เปลี่ยนตาม draft และ Cancel/Save coordinator ยังทำงานเหมือนเดิม ระยะสุดท้ายของ Phase 1 คือทดสอบ Guest Mode, viewport มือถือ, Render build และ `git diff --check` แล้วจัดทำภาพตัวอย่างก่อนเสนอให้ผู้ใช้อนุมัติ
 
-| ขั้น | ไฟล์หลัก | ผลลัพธ์ | Persistence |
-|---|---|---|---|
-| 1 | `DashboardCardFrame.tsx`, `DashboardPanel.tsx` | shared grid/frame rule | ไม่มี |
-| 2 | `DashboardPreviewCard.tsx` | card placeholder แบบ read-only | ไม่มี |
-| 3 | `DashboardPreviewCanvas.tsx` | Canvas Mobile/Desktop | ไม่มี |
-| 4 | `DashboardLayoutEditor.tsx` | แสดง Canvas จาก draft | ใช้ของเดิม |
-| 5 | test file | ตรวจ rendering และ no mutation | mock/local |
-| 6 | Settings/Render validation | ตรวจ Save/Cancel/Lock และ production build | ใช้ Supabase flow เดิม |
+| ขั้น | ไฟล์หลัก                                       | ผลลัพธ์                                    | Persistence            |
+| ---- | ---------------------------------------------- | ------------------------------------------ | ---------------------- |
+| 1    | `DashboardCardFrame.tsx`, `DashboardPanel.tsx` | shared grid/frame rule                     | ไม่มี                  |
+| 2    | `DashboardPreviewCard.tsx`                     | card placeholder แบบ read-only             | ไม่มี                  |
+| 3    | `DashboardPreviewCanvas.tsx`                   | Canvas Mobile/Desktop                      | ไม่มี                  |
+| 4    | `DashboardLayoutEditor.tsx`                    | แสดง Canvas จาก draft                      | ใช้ของเดิม             |
+| 5    | test file                                      | ตรวจ rendering และ no mutation             | mock/local             |
+| 6    | Settings/Render validation                     | ตรวจ Save/Cancel/Lock และ production build | ใช้ Supabase flow เดิม |
 
 ## 15. สิ่งที่จะยังไม่แก้ใน Phase 1
 
@@ -520,11 +498,7 @@ describe("DashboardPreviewCanvas", () => {
 ## References
 
 [1]: https://github.com/JntnCH/My-Work-Tracking/blob/main/src/lib/dashboard-layout.ts "My-Work-Tracking: dashboard-layout.ts"
-
 [2]: https://github.com/JntnCH/My-Work-Tracking/blob/main/src/components/work/DashboardLayoutEditor.tsx "My-Work-Tracking: DashboardLayoutEditor.tsx"
-
 [3]: https://github.com/JntnCH/My-Work-Tracking/blob/main/src/hooks/use-dashboard-layout.ts "My-Work-Tracking: use-dashboard-layout.ts"
-
 [4]: https://github.com/JntnCH/My-Work-Tracking/blob/main/src/components/work/DashboardPanel.tsx "My-Work-Tracking: DashboardPanel.tsx"
-
 [5]: https://github.com/JntnCH/My-Work-Tracking/blob/main/src/components/work/SettingsPanel.tsx "My-Work-Tracking: SettingsPanel.tsx"

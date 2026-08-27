@@ -33,16 +33,16 @@ export type DashboardLayout = {
 
 ข้อมูลที่มีอยู่แล้วต้องใช้ซ้ำ ไม่สร้าง field ใหม่แทนของเดิม
 
-| ความต้องการ | ข้อมูลเดิมที่ต้องใช้ | แนวทาง Phase 2 |
-|---|---|---|
-| รหัสการ์ด | `DashboardCardId` | ใช้เป็น `componentId` โดยตรง |
-| กลุ่มการ์ด | `DashboardCardGroup` | ใช้กำหนดหมวดใน Component Library |
-| ลำดับ | `DashboardCardLayout.order` | ใช้ต่อ ไม่เพิ่ม `positionIndex` |
-| ความกว้าง | `DashboardCardLayout.width` | ใช้ต่อ ไม่เพิ่ม `columnSpan` ซ้ำ |
-| ความสูง | `DashboardCardLayout.height` | ใช้ต่อ ไม่เพิ่ม `rowSpan` ซ้ำ |
-| Mobile/Desktop | `DashboardViewport` | ใช้ hook เดิมแยก layout ต่อ viewport |
-| Draft/Saved | snapshot ใน `DashboardLayoutEditor` และ SettingsPanel | ใช้ coordinator เดิม |
-| การคำนวณรายได้/ชั่วโมง/OT | `summarizeMonth` และข้อมูล `work_logs` | ห้ามแก้และห้ามนำเข้า customization model |
+| ความต้องการ               | ข้อมูลเดิมที่ต้องใช้                                  | แนวทาง Phase 2                           |
+| ------------------------- | ----------------------------------------------------- | ---------------------------------------- |
+| รหัสการ์ด                 | `DashboardCardId`                                     | ใช้เป็น `componentId` โดยตรง             |
+| กลุ่มการ์ด                | `DashboardCardGroup`                                  | ใช้กำหนดหมวดใน Component Library         |
+| ลำดับ                     | `DashboardCardLayout.order`                           | ใช้ต่อ ไม่เพิ่ม `positionIndex`          |
+| ความกว้าง                 | `DashboardCardLayout.width`                           | ใช้ต่อ ไม่เพิ่ม `columnSpan` ซ้ำ         |
+| ความสูง                   | `DashboardCardLayout.height`                          | ใช้ต่อ ไม่เพิ่ม `rowSpan` ซ้ำ            |
+| Mobile/Desktop            | `DashboardViewport`                                   | ใช้ hook เดิมแยก layout ต่อ viewport     |
+| Draft/Saved               | snapshot ใน `DashboardLayoutEditor` และ SettingsPanel | ใช้ coordinator เดิม                     |
+| การคำนวณรายได้/ชั่วโมง/OT | `summarizeMonth` และข้อมูล `work_logs`                | ห้ามแก้และห้ามนำเข้า customization model |
 
 ค่าที่เป็นของใหม่จริง เช่น visibility, title/icon display หรือ semantic tone สามารถเพิ่มเป็น `customizations` ภายใน JSON ของ `dashboard_layouts.layout` ได้ เพราะตาราง `dashboard_layouts` มีคอลัมน์ JSON อยู่แล้ว ไม่ควรเพิ่มคอลัมน์ซ้ำในตารางเพียงเพื่อเก็บ property ย่อยของการ์ด
 
@@ -92,13 +92,7 @@ import {
 import type { DashboardCardGroup, DashboardCardId } from "@/lib/dashboard-layout";
 
 export type ComponentCapability =
-  | "visibility"
-  | "order"
-  | "size"
-  | "tone"
-  | "title"
-  | "icon"
-  | "density";
+  "visibility" | "order" | "size" | "tone" | "title" | "icon" | "density";
 
 export type DashboardComponentDefinition = {
   id: DashboardCardId;
@@ -260,12 +254,7 @@ export function getDashboardComponentDefinition(id: DashboardCardId) {
 import type { DashboardCardId, DashboardLayout } from "@/lib/dashboard-layout";
 
 export type DashboardSemanticTone =
-  | "default"
-  | "primary"
-  | "success"
-  | "warning"
-  | "destructive"
-  | "muted";
+  "default" | "primary" | "success" | "warning" | "destructive" | "muted";
 
 export type DashboardCardCustomization = {
   visible: boolean;
@@ -275,9 +264,7 @@ export type DashboardCardCustomization = {
   density?: "compact" | "comfortable";
 };
 
-export type DashboardCustomizations = Partial<
-  Record<DashboardCardId, DashboardCardCustomization>
->;
+export type DashboardCustomizations = Partial<Record<DashboardCardId, DashboardCardCustomization>>;
 
 export type DashboardLayoutDocument = DashboardLayout & {
   // Optional เพื่อให้ข้อมูล version 1 เดิมยังอ่านได้
@@ -364,9 +351,7 @@ export function ComponentLibrary({
   return (
     <aside aria-label="รายการองค์ประกอบ Dashboard" className="space-y-2">
       <h3 className="text-sm font-bold">องค์ประกอบ Dashboard</h3>
-      <p className="text-xs text-muted-foreground">
-        เลือกการ์ดเพื่อปรับแต่งใน Preview ทางด้านขวา
-      </p>
+      <p className="text-xs text-muted-foreground">เลือกการ์ดเพื่อปรับแต่งใน Preview ทางด้านขวา</p>
 
       <div className="space-y-1.5">
         {DASHBOARD_COMPONENTS.map((component) => {
@@ -485,9 +470,7 @@ export function CustomizationPanel({
           <select
             value={value.tone ?? "default"}
             disabled={disabled}
-            onChange={(event) =>
-              onChange({ tone: event.target.value as DashboardSemanticTone })
-            }
+            onChange={(event) => onChange({ tone: event.target.value as DashboardSemanticTone })}
             className="w-full rounded-xl border border-input bg-secondary px-3 py-2 text-sm"
           >
             {TONES.map((tone) => (
@@ -503,7 +486,9 @@ export function CustomizationPanel({
         <label className="flex items-center justify-between gap-3 text-sm">
           <span>
             แสดงชื่อหัวข้อ
-            <span className="block text-xs text-muted-foreground">ต้องมี renderer รองรับก่อนจึงมีผลจริง</span>
+            <span className="block text-xs text-muted-foreground">
+              ต้องมี renderer รองรับก่อนจึงมีผลจริง
+            </span>
           </span>
           <input
             type="checkbox"
@@ -518,7 +503,9 @@ export function CustomizationPanel({
         <label className="flex items-center justify-between gap-3 text-sm">
           <span>
             แสดงไอคอน
-            <span className="block text-xs text-muted-foreground">ใช้เฉพาะการ์ดที่ renderer รองรับ</span>
+            <span className="block text-xs text-muted-foreground">
+              ใช้เฉพาะการ์ดที่ renderer รองรับ
+            </span>
           </span>
           <input
             type="checkbox"
@@ -603,15 +590,11 @@ export function DashboardPreviewCanvas({
                 minHeight: `${card.height * (card.group === "charts" ? 96 : 80)}px`,
               }}
             >
-              <span className="pointer-events-none block h-full">
-                {renderCard(card.id)}
-              </span>
+              <span className="pointer-events-none block h-full">{renderCard(card.id)}</span>
               {selectedId === card.id && (
                 <span className="pointer-events-none absolute inset-0 rounded-xl border-2 border-primary" />
               )}
-              {customization?.visible === false && (
-                <span className="sr-only">ซ่อนอยู่</span>
-              )}
+              {customization?.visible === false && <span className="sr-only">ซ่อนอยู่</span>}
             </button>
           );
         })}
@@ -632,14 +615,10 @@ const selectedLayout = selectedViewport === "mobile" ? mobile.layout : desktop.l
 const selectedCards = selectedLayout.cards;
 const selectedCustomizations = selectedLayout.customizations ?? {};
 
-const updateCustomization = (
-  patch: Partial<DashboardCardCustomization>,
-) => {
+const updateCustomization = (patch: Partial<DashboardCardCustomization>) => {
   if (!selectedCardId || disabled) return;
 
-  selected.updateLayout((current) =>
-    updateCardCustomization(current, selectedCardId, patch),
-  );
+  selected.updateLayout((current) => updateCardCustomization(current, selectedCardId, patch));
 };
 
 return (
@@ -663,11 +642,7 @@ return (
 
     <CustomizationPanel
       componentId={selectedCardId}
-      value={
-        selectedCardId
-          ? getCardCustomization(selectedCustomizations, selectedCardId)
-          : null
-      }
+      value={selectedCardId ? getCardCustomization(selectedCustomizations, selectedCardId) : null}
       disabled={disabled || selected.loading}
       onChange={updateCustomization}
     />
@@ -786,15 +761,17 @@ function getToneClass(tone: DashboardSemanticTone | undefined): string {
 ใน `SettingsPanel.tsx` ควรคงแท็บ `layout` เดิม แล้วส่ง props ผ่าน `DashboardLayoutEditor` ไม่ควรสร้างแท็บใหม่ชื่อ `customization` หาก Layout tab เป็นพื้นที่ที่ผู้ใช้เข้าใจอยู่แล้ว
 
 ```tsx
-{activeTab === "layout" && (
-  <DashboardLayoutEditor
-    ref={layoutEditorRef}
-    userId={userId}
-    isGuest={isGuest}
-    disabled={isLocked || isSaving}
-    onDirtyChange={setLayoutDirty}
-  />
-)}
+{
+  activeTab === "layout" && (
+    <DashboardLayoutEditor
+      ref={layoutEditorRef}
+      userId={userId}
+      isGuest={isGuest}
+      disabled={isLocked || isSaving}
+      onDirtyChange={setLayoutDirty}
+    />
+  );
+}
 ```
 
 ถ้าต้องการแยก UI เป็นสอง section ให้ใช้ sub-navigation ภายใน Layout tab เช่น `จัดวาง` และ `ปรับแต่ง` แต่ต้องใช้ `layoutEditorRef` และ dirty state เดียวกัน

@@ -19,10 +19,10 @@ export function isSupabaseConfigured(): boolean {
 
   return Boolean(
     url &&
-      key &&
-      !url.includes("placeholder") &&
-      !key.includes("placeholder") &&
-      (url.startsWith("http://") || url.startsWith("https://")),
+    key &&
+    !url.includes("placeholder") &&
+    !key.includes("placeholder") &&
+    (url.startsWith("http://") || url.startsWith("https://")),
   );
 }
 
@@ -126,4 +126,3 @@ export const supabase = new Proxy({} as ReturnType<typeof createSupabaseClient>,
     return Reflect.get(_supabase, prop, receiver);
   },
 });
-

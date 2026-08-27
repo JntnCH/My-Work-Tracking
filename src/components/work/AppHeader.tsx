@@ -75,7 +75,9 @@ export function AppHeader({
                 </span>
               )}
             </div>
-            <p className="truncate text-xs opacity-80">{name || email || "ระบบบันทึกงาน & Check-in"}</p>
+            <p className="truncate text-xs opacity-80">
+              {name || email || "ระบบบันทึกงาน & Check-in"}
+            </p>
             {isGuest && (
               <p
                 className="mt-0.5 max-w-[15rem] text-[10px] leading-tight text-primary-foreground/70 sm:max-w-none"

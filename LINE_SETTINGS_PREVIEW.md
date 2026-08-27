@@ -6,32 +6,32 @@
 
 ## ผลลัพธ์ที่พัฒนา
 
-| ประเด็น | ผลลัพธ์ |
-|---|---|
-| LINE Login | เพิ่มปุ่ม `เข้าสู่ระบบด้วย LINE` บนหน้า Login และเพิ่ม identity linking ใน Authentication Settings |
-| LIFF | หากมี `VITE_LINE_LIFF_ID` ระบบ initialize LIFF, เรียก `liff.login()` และส่ง raw ID token ผ่าน Supabase `signInWithIdToken({ provider: "custom:line" })` |
-| Custom OIDC fallback | หากไม่มี LIFF ID ระบบใช้ Supabase Custom OIDC browser flow ด้วย provider `custom:line` |
-| Dark/Light toggle | ปุ่ม header ใช้ runtime theme preview แทนการเรียก `requestTabChange("settings")`; กดแล้วไม่เปลี่ยน URL หรือ tab |
-| Live preview | เปลี่ยน palette, mode, color token, radius หรือ density แล้ว app shell และ preview card เปลี่ยนทันทีโดยยังไม่เขียนถาวร |
-| Settings isolation | ปุ่ม `Save หมวดนี้` บันทึกเฉพาะ category ปัจจุบัน; Theme, General, Layout และ Integrations ไม่ใช้ global coordinator ร่วมกันอีก |
-| Cancel | `ยกเลิกการแสดงตัวอย่าง` คืนค่า runtime และ draft กลับไปยัง saved baseline ล่าสุด |
-| Interaction audit | ตรวจ buttons, form boundaries, submit controls, navigation calls, tabs และ external links; ไม่พบจุดที่เกิด accidental navigation แบบเดียวกับ theme toggle เพิ่มเติม |
+| ประเด็น              | ผลลัพธ์                                                                                                                                                             |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| LINE Login           | เพิ่มปุ่ม `เข้าสู่ระบบด้วย LINE` บนหน้า Login และเพิ่ม identity linking ใน Authentication Settings                                                                  |
+| LIFF                 | หากมี `VITE_LINE_LIFF_ID` ระบบ initialize LIFF, เรียก `liff.login()` และส่ง raw ID token ผ่าน Supabase `signInWithIdToken({ provider: "custom:line" })`             |
+| Custom OIDC fallback | หากไม่มี LIFF ID ระบบใช้ Supabase Custom OIDC browser flow ด้วย provider `custom:line`                                                                              |
+| Dark/Light toggle    | ปุ่ม header ใช้ runtime theme preview แทนการเรียก `requestTabChange("settings")`; กดแล้วไม่เปลี่ยน URL หรือ tab                                                     |
+| Live preview         | เปลี่ยน palette, mode, color token, radius หรือ density แล้ว app shell และ preview card เปลี่ยนทันทีโดยยังไม่เขียนถาวร                                              |
+| Settings isolation   | ปุ่ม `Save หมวดนี้` บันทึกเฉพาะ category ปัจจุบัน; Theme, General, Layout และ Integrations ไม่ใช้ global coordinator ร่วมกันอีก                                     |
+| Cancel               | `ยกเลิกการแสดงตัวอย่าง` คืนค่า runtime และ draft กลับไปยัง saved baseline ล่าสุด                                                                                    |
+| Interaction audit    | ตรวจ buttons, form boundaries, submit controls, navigation calls, tabs และ external links; ไม่พบจุดที่เกิด accidental navigation แบบเดียวกับ theme toggle เพิ่มเติม |
 
 ## ไฟล์สำคัญที่เปลี่ยน
 
-| ไฟล์ | หน้าที่ |
-|---|---|
-| `src/lib/line-auth.ts` | LIFF initialization, ID-token sign-in และ Custom OIDC fallback |
-| `src/routes/auth.tsx` | ปุ่ม LINE, LIFF callback completion และข้อความช่วยตั้งค่า |
-| `src/components/work/AuthenticationSettings.tsx` | เพิ่ม LINE ใน provider linking โดยรองรับทั้ง `custom:line` และ provider identity เดิมที่ชื่อ `line` |
-| `src/hooks/use-work-tracker.ts` | แยก `savedThemeSettings` จาก runtime theme และเพิ่ม `previewThemeSettings()` |
-| `src/routes/_authenticated/index.tsx` | ต่อ header toggle และ Settings ให้ใช้ runtime preview callback |
-| `src/components/work/SettingsPanel.tsx` | แยก Save/Cancel และ category-scoped coordinator; ย้าย Spreadsheet ID ไปอยู่ Integrations เป็นเจ้าของเดียว |
-| `.env.example` | เพิ่ม placeholder เฉพาะ `VITE_LINE_LIFF_ID` โดยไม่เพิ่ม secret |
-| `package.json`, `package-lock.json` | เพิ่ม `@line/liff@2.30.0` |
-| `LINE_LOGIN_SETUP.md` | คู่มือ Supabase Custom OIDC, LINE Developers, LIFF, Redirect URL และ Render environment |
-| `interaction-audit.md` | baseline และ post-change interaction audit |
-| `browser-smoke-findings.md` | หลักฐาน browser smoke test และ visual verification |
+| ไฟล์                                             | หน้าที่                                                                                                   |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `src/lib/line-auth.ts`                           | LIFF initialization, ID-token sign-in และ Custom OIDC fallback                                            |
+| `src/routes/auth.tsx`                            | ปุ่ม LINE, LIFF callback completion และข้อความช่วยตั้งค่า                                                 |
+| `src/components/work/AuthenticationSettings.tsx` | เพิ่ม LINE ใน provider linking โดยรองรับทั้ง `custom:line` และ provider identity เดิมที่ชื่อ `line`       |
+| `src/hooks/use-work-tracker.ts`                  | แยก `savedThemeSettings` จาก runtime theme และเพิ่ม `previewThemeSettings()`                              |
+| `src/routes/_authenticated/index.tsx`            | ต่อ header toggle และ Settings ให้ใช้ runtime preview callback                                            |
+| `src/components/work/SettingsPanel.tsx`          | แยก Save/Cancel และ category-scoped coordinator; ย้าย Spreadsheet ID ไปอยู่ Integrations เป็นเจ้าของเดียว |
+| `.env.example`                                   | เพิ่ม placeholder เฉพาะ `VITE_LINE_LIFF_ID` โดยไม่เพิ่ม secret                                            |
+| `package.json`, `package-lock.json`              | เพิ่ม `@line/liff@2.30.0`                                                                                 |
+| `LINE_LOGIN_SETUP.md`                            | คู่มือ Supabase Custom OIDC, LINE Developers, LIFF, Redirect URL และ Render environment                   |
+| `interaction-audit.md`                           | baseline และ post-change interaction audit                                                                |
+| `browser-smoke-findings.md`                      | หลักฐาน browser smoke test และ visual verification                                                        |
 
 ## หลักฐานการตรวจสอบ
 

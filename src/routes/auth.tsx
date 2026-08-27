@@ -7,6 +7,7 @@ import {
   Clock3,
   Copy,
   ExternalLink,
+  Flame,
   Github,
   HelpCircle,
   LogIn,
@@ -14,6 +15,7 @@ import {
   MessageCircle,
   Phone,
   ScanFace,
+  Settings,
   Sparkles,
   Trash2,
   User,
@@ -37,6 +39,13 @@ import {
   startLineLogin,
 } from "@/lib/line-auth";
 import { EngineWorkingAnimation } from "@/components/ui/engine-working-animation";
+import {
+  isFirebaseConfigured,
+  signInWithGoogleFirebase,
+  checkFirebaseRedirectResult,
+  getFirebaseConfig,
+} from "@/lib/firebase";
+import { FirebaseConfigDialog } from "@/components/work/FirebaseConfigDialog";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -106,6 +115,8 @@ function AuthPage() {
   const [phoneOtpSent, setPhoneOtpSent] = useState(false);
   const [resetMode, setResetMode] = useState(false);
   const [showConfigHelp, setShowConfigHelp] = useState(false);
+  const [showFirebaseDialog, setShowFirebaseDialog] = useState(false);
+  const [firebaseConfigured, setFirebaseConfigured] = useState(() => isFirebaseConfigured());
   const [copiedUrl, setCopiedUrl] = useState(false);
 
   // Gmail-specific state
@@ -115,6 +126,7 @@ function AuthPage() {
 
   useEffect(() => {
     setRecentAccounts(getRecentGmailAccounts());
+    void checkFirebaseRedirectResult().catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -185,9 +197,13 @@ function AuthPage() {
     }
     setGmailAddress(finalEmail);
     if (targetName) setGmailName(targetName);
-    // The email is only a hint for the account chooser. Identity and session
-    // must come from Supabase OAuth, never from a local pseudo-user.
-    await signInGoogle(finalEmail);
+
+    // If Firebase is configured, try Firebase Google Sign-In, otherwise fallback to Supabase Google OAuth
+    if (isFirebaseConfigured()) {
+      await signInWithGoogleViaFirebase();
+    } else {
+      await signInGoogle(finalEmail);
+    }
   }
 
   function handleRemoveRecent(e: React.MouseEvent, accountEmail: string) {
@@ -195,6 +211,33 @@ function AuthPage() {
     removeRecentGmailAccount(accountEmail);
     setRecentAccounts(getRecentGmailAccounts());
     toast.success("ลบบัญชีออกจากประวัติแล้ว");
+  }
+
+  async function signInWithGoogleViaFirebase() {
+    if (busy) return;
+    if (!isFirebaseConfigured()) {
+      setShowFirebaseDialog(true);
+      toast.info("กรุณาระบุการตั้งค่า Firebase ก่อนเข้าสู่ระบบ");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await signInWithGoogleFirebase();
+      if (res?.user) {
+        toast.success(`เข้าสู่ระบบสำเร็จ: ${res.user.displayName || res.user.email || ""}`);
+        void navigate({ to: "/", replace: true });
+      }
+    } catch (err: unknown) {
+      const errorObj = err as { message?: string };
+      if (errorObj?.message === "REDIRECTING") {
+        return;
+      }
+      toast.error("เข้าสู่ระบบ Google ผ่าน Firebase ไม่สำเร็จ", {
+        description: errorObj?.message || String(err),
+      });
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function signInGoogle(loginHint?: string) {
@@ -493,26 +536,61 @@ function AuthPage() {
 
         {mode === "google" ? (
           <div className="space-y-4 pt-1 text-left">
-            {/* Google Official Button Style */}
-            <button
-              type="button"
-              onClick={() => void signInGoogle()}
-              disabled={busy}
-              aria-label="Sign in with Google"
-              className="flex w-full items-center justify-center gap-3 rounded-xl border border-border bg-card py-3 px-4 text-sm font-semibold text-foreground shadow-sm transition hover:bg-accent/70 hover:border-primary/40 active:scale-[0.99] disabled:opacity-60 cursor-pointer"
-            >
-              {busy ? (
-                <>
-                  <EngineWorkingAnimation size="sm" label="กำลังเชื่อมต่อ Google" />
-                  <span>กำลังเชื่อมต่อ Google OAuth...</span>
-                </>
-              ) : (
-                <>
-                  <GoogleIcon className="h-5 w-5 shrink-0" />
-                  <span>เข้าสู่ระบบด้วย Google (Sign in with Google)</span>
-                </>
-              )}
-            </button>
+            {/* Firebase Google Auth Primary Button */}
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => void signInWithGoogleViaFirebase()}
+                disabled={busy}
+                aria-label="Sign in with Google via Firebase"
+                className="flex w-full items-center justify-center gap-3 rounded-xl border border-amber-500/30 bg-card py-3 px-4 text-sm font-bold text-foreground shadow-sm transition hover:bg-amber-500/5 hover:border-amber-500/60 active:scale-[0.99] disabled:opacity-60 cursor-pointer"
+              >
+                {busy ? (
+                  <>
+                    <EngineWorkingAnimation size="sm" label="กำลังเข้าสู่ระบบ Google" />
+                    <span>กำลังเข้าสู่ระบบ Google ผ่าน Firebase...</span>
+                  </>
+                ) : (
+                  <>
+                    <GoogleIcon className="h-5 w-5 shrink-0" />
+                    <span className="flex items-center gap-1.5">
+                      เข้าสู่ระบบด้วย Google (Firebase Auth)
+                      <Flame className="h-4 w-4 text-amber-500" />
+                    </span>
+                  </>
+                )}
+              </button>
+
+              <div className="flex items-center justify-between px-1 text-[11px]">
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      firebaseConfigured ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
+                    }`}
+                  />
+                  <span>
+                    Firebase:{" "}
+                    {firebaseConfigured ? (
+                      <strong className="text-emerald-600 dark:text-emerald-400">
+                        เชื่อมต่อแล้ว
+                      </strong>
+                    ) : (
+                      <span className="text-amber-600 dark:text-amber-400">
+                        ยังไม่ได้ใส่ Config
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowFirebaseDialog(true)}
+                  className="inline-flex items-center gap-1 font-semibold text-primary hover:underline cursor-pointer"
+                >
+                  <Settings className="h-3 w-3" />
+                  <span>ตั้งค่า Firebase</span>
+                </button>
+              </div>
+            </div>
 
             {/* Recent Gmail Accounts (if any) */}
             {recentAccounts.length > 0 && (
@@ -520,10 +598,10 @@ function AuthPage() {
                 <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
                   <span className="flex items-center gap-1.5">
                     <Clock3 className="h-3.5 w-3.5 text-primary" />
-                    บัญชี Gmail ล่าสุดบนเครื่องนี้
+                    บัญชี Google / Gmail ล่าสุดบนเครื่องนี้
                   </span>
                   <span className="text-[10px] text-muted-foreground/80">
-                    คลิกเพื่อเริ่ม Google OAuth
+                    คลิกเพื่อเข้าใช้งานทันที
                   </span>
                 </div>
                 <div className="space-y-1.5">
@@ -567,21 +645,21 @@ function AuthPage() {
               </div>
             )}
 
-            {/* Direct Gmail Login Form */}
+            {/* Direct Gmail Login Form (Supabase OAuth Alternative) */}
             <form
               onSubmit={(e) => {
                 e.preventDefault();
                 handleDirectGmailLogin();
               }}
-              className="rounded-2xl border border-primary/20 bg-primary/5 p-3.5 space-y-3 shadow-xs"
+              className="rounded-2xl border border-border bg-muted/20 p-3.5 space-y-3 shadow-xs"
             >
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
-                  <Zap className="h-3.5 w-3.5" />
-                  <span>เชื่อมต่อบัญชี Google ผ่าน Supabase</span>
+                <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+                  <Zap className="h-3.5 w-3.5 text-primary" />
+                  <span>เข้าสู่ระบบผ่าน Google OAuth (Supabase)</span>
                 </div>
-                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
-                  OAuth
+                <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                  ทางเลือก
                 </span>
               </div>
 
@@ -645,10 +723,10 @@ function AuthPage() {
               <button
                 type="submit"
                 disabled={busy || !gmailAddress.trim()}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-xs font-bold text-primary-foreground shadow transition hover:bg-primary/90 active:scale-[0.99] disabled:opacity-50 cursor-pointer"
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card py-2.5 text-xs font-bold text-foreground shadow-xs transition hover:bg-accent active:scale-[0.99] disabled:opacity-50 cursor-pointer"
               >
                 <GoogleIcon className="h-4 w-4 shrink-0" />
-                <span>ดำเนินการต่อด้วย Google OAuth</span>
+                <span>ดำเนินการต่อด้วย Google OAuth (Supabase)</span>
               </button>
             </form>
 
@@ -970,6 +1048,12 @@ function AuthPage() {
           บนอุปกรณ์ที่รองรับ
         </p>
       </div>
+
+      <FirebaseConfigDialog
+        open={showFirebaseDialog}
+        onOpenChange={setShowFirebaseDialog}
+        onConfigSaved={() => setFirebaseConfigured(isFirebaseConfigured())}
+      />
     </div>
   );
 }

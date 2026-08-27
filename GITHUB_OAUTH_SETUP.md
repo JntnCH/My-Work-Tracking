@@ -6,12 +6,12 @@
 
 ระบบมี URL สองชนิดที่ทำหน้าที่ต่างกัน ซึ่งห้ามสลับกัน
 
-| จุดที่ตั้งค่า | ค่าที่ต้องใช้ | หมายเหตุ |
-|---|---|---|
-| GitHub OAuth App → Authorization callback URL | `https://<project-ref>.supabase.co/auth/v1/callback` | ใช้ URL Callback ที่หน้า Supabase Authentication → Providers → GitHub แสดงจริง |
-| Supabase Authentication → URL Configuration → Redirect URLs | `https://<render-domain>/auth/callback` | เป็น route ของเว็บไซต์ที่รับ authorization code แล้วแลกเป็น session |
-| Production Redirect URL | `https://google-sheet-organizer.onrender.com/auth/callback` | ต้องเพิ่มใน Supabase URL Configuration → Redirect URLs |
-| Local Redirect URL | `http://localhost:<port>/auth/callback` | ใช้เฉพาะ port ที่กำลังรันในเครื่อง และต้องเพิ่มใน Supabase allow list ก่อนทดสอบ |
+| จุดที่ตั้งค่า                                               | ค่าที่ต้องใช้                                               | หมายเหตุ                                                                        |
+| ----------------------------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| GitHub OAuth App → Authorization callback URL               | `https://<project-ref>.supabase.co/auth/v1/callback`        | ใช้ URL Callback ที่หน้า Supabase Authentication → Providers → GitHub แสดงจริง  |
+| Supabase Authentication → URL Configuration → Redirect URLs | `https://<render-domain>/auth/callback`                     | เป็น route ของเว็บไซต์ที่รับ authorization code แล้วแลกเป็น session             |
+| Production Redirect URL                                     | `https://google-sheet-organizer.onrender.com/auth/callback` | ต้องเพิ่มใน Supabase URL Configuration → Redirect URLs                          |
+| Local Redirect URL                                          | `http://localhost:<port>/auth/callback`                     | ใช้เฉพาะ port ที่กำลังรันในเครื่อง และต้องเพิ่มใน Supabase allow list ก่อนทดสอบ |
 
 การตรวจเว็บไซต์ Render จริงพบว่า build ปัจจุบันกำลังเรียก Supabase project ref `ppvxmzhgbgjkgfrvzahi` และยังตอบ `Unsupported provider: provider is not enabled` ดังนั้นหากจะ redeploy โดยใช้ Supabase project เดิมของเว็บไซต์ ให้ใช้ API URL `https://ppvxmzhgbgjkgfrvzahi.supabase.co` และ GitHub OAuth App callback URL `https://ppvxmzhgbgjkgfrvzahi.supabase.co/auth/v1/callback` หลังจากเปิด GitHub Provider แล้ว หากเปลี่ยนไปใช้ Supabase project อื่น ให้เปลี่ยนทั้ง `VITE_SUPABASE_URL`, `SUPABASE_URL`, publishable/anon key และ Callback URL ให้เป็น project เดียวกันทั้งหมด
 
@@ -25,12 +25,12 @@
 
 เพิ่มค่าใน Render Dashboard → Environment โดยใช้ค่าจริงของโปรเจ็กต์ และห้าม commit ค่าเหล่านี้ลง GitHub
 
-| ตัวแปร | จำเป็น | ตำแหน่งใช้งาน |
-|---|---:|---|
-| `VITE_SUPABASE_URL` | ใช่ | Browser build |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | ใช่ | Browser build; ใช้ publishable/anon key เท่านั้น |
-| `SUPABASE_URL` | แนะนำ | Runtime/SSR fallback |
-| `SUPABASE_PUBLISHABLE_KEY` | แนะนำ | Runtime/SSR fallback |
+| ตัวแปร                               |   จำเป็น | ตำแหน่งใช้งาน                                                                      |
+| ------------------------------------ | -------: | ---------------------------------------------------------------------------------- |
+| `VITE_SUPABASE_URL`                  |      ใช่ | Browser build                                                                      |
+| `VITE_SUPABASE_PUBLISHABLE_KEY`      |      ใช่ | Browser build; ใช้ publishable/anon key เท่านั้น                                   |
+| `SUPABASE_URL`                       |    แนะนำ | Runtime/SSR fallback                                                               |
+| `SUPABASE_PUBLISHABLE_KEY`           |    แนะนำ | Runtime/SSR fallback                                                               |
 | `VITE_SUPABASE_URL` / `SUPABASE_URL` | ต้องเป็น | `https://ppvxmzhgbgjkgfrvzahi.supabase.co` หากใช้ Supabase project เดิมของเว็บไซต์ |
 
 การเพิ่ม GitHub OAuth ไม่ต้องเพิ่ม Client ID หรือ Client Secret เป็น environment variable ของเว็บไซต์ เพราะค่าลับของ Provider ต้องอยู่ใน Supabase Authentication Provider Configuration ตามหลักการของ Supabase

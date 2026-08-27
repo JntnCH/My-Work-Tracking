@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { subscribeToFirebaseAuthState, signOutFirebase } from "@/lib/firebase";
+import type { User as FirebaseUser } from "firebase/auth";
 
 const GUEST_STORAGE_KEY = "work_tracker_guest_user";
 const AUTH_CHANGE_EVENT = "work_tracker_auth_change";
@@ -14,7 +16,7 @@ const USER_SCOPED_STORAGE_KEYS = [
   "work_tracker_sheet",
 ] as const;
 
-/** Move legacy local data into the real Supabase user's namespace once. */
+/** Move legacy local data into the real user's namespace once. */
 export function migrateLocalUserData(fromUserId: string, toUserId: string) {
   if (typeof window === "undefined" || !fromUserId || !toUserId || fromUserId === toUserId) return;
   try {
@@ -49,6 +51,29 @@ export function getRecentGmailAccounts(): RecentGmailAccount[] {
   }
 }
 
+export function saveRecentGmailAccount(account: {
+  email: string;
+  name?: string;
+  avatarUrl?: string;
+  lastLoginAt?: string;
+}) {
+  if (typeof window === "undefined" || !account.email) return;
+  try {
+    const list = getRecentGmailAccounts().filter(
+      (item) => item.email.toLowerCase() !== account.email.toLowerCase(),
+    );
+    list.unshift({
+      email: account.email,
+      name: account.name || account.email.split("@")[0] || "ผู้ใช้ Google",
+      avatarUrl: account.avatarUrl,
+      lastLoginAt: account.lastLoginAt || new Date().toISOString(),
+    });
+    localStorage.setItem(RECENT_GMAIL_KEY, JSON.stringify(list.slice(0, 5)));
+  } catch (err) {
+    console.warn("[useSession] saveRecentGmailAccount failed:", err);
+  }
+}
+
 export function removeRecentGmailAccount(email: string) {
   if (typeof window === "undefined") return;
   try {
@@ -63,6 +88,36 @@ export function removeRecentGmailAccount(email: string) {
 
 export function isLocalGuestUser(user: User | null): boolean {
   return user?.app_metadata?.provider === "guest";
+}
+
+export function isFirebaseUser(user: User | null): boolean {
+  return (
+    user?.app_metadata?.provider === "firebase:google" ||
+    user?.app_metadata?.provider === "firebase"
+  );
+}
+
+export function firebaseUserToAdapterUser(fbUser: FirebaseUser): User {
+  return {
+    id: fbUser.uid,
+    app_metadata: {
+      provider: "firebase:google",
+      providers: ["google", "firebase"],
+    },
+    user_metadata: {
+      full_name: fbUser.displayName || fbUser.email?.split("@")[0] || "ผู้ใช้ Google",
+      name: fbUser.displayName || fbUser.email?.split("@")[0] || "ผู้ใช้ Google",
+      avatar_url: fbUser.photoURL || undefined,
+      picture: fbUser.photoURL || undefined,
+      email: fbUser.email || undefined,
+    },
+    aud: "authenticated",
+    created_at: fbUser.metadata?.creationTime || new Date().toISOString(),
+    email: fbUser.email || undefined,
+    phone: fbUser.phoneNumber || undefined,
+    role: "authenticated",
+    updated_at: fbUser.metadata?.lastSignInTime || new Date().toISOString(),
+  } as unknown as User;
 }
 
 export function getGuestUser(): User | null {
@@ -118,6 +173,7 @@ const SESSION_CHECK_TIMEOUT_MS = 2500;
 
 export function useSession() {
   const [session, setSession] = useState<Session | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [guestUser, setGuestUserState] = useState<User | null>(() => getGuestUser());
   const [loading, setLoading] = useState(true);
 
@@ -138,6 +194,7 @@ export function useSession() {
       if (mounted) setLoading(false);
     }, SESSION_CHECK_TIMEOUT_MS);
 
+    // 1. Supabase Session Check
     try {
       supabase.auth
         .getSession()
@@ -168,29 +225,52 @@ export function useSession() {
       setLoading(false);
     });
 
+    // 2. Firebase Auth State Listener
+    const unsubscribeFirebase = subscribeToFirebaseAuthState((fbUser) => {
+      if (!mounted) return;
+      if (fbUser) {
+        const adapted = firebaseUserToAdapterUser(fbUser);
+        setFirebaseUser(adapted);
+        if (fbUser.email) {
+          saveRecentGmailAccount({
+            email: fbUser.email,
+            name: fbUser.displayName || undefined,
+            avatarUrl: fbUser.photoURL || undefined,
+          });
+        }
+      } else {
+        setFirebaseUser(null);
+      }
+      setLoading(false);
+    });
+
     return () => {
       mounted = false;
       clearTimeout(timeout);
       window.removeEventListener(AUTH_CHANGE_EVENT, syncUserState);
       window.removeEventListener("storage", syncUserState);
       sub?.subscription?.unsubscribe?.();
+      unsubscribeFirebase();
     };
   }, []);
 
-  useEffect(() => {
-    if (!session?.user || !guestUser || isLocalGuestUser(guestUser)) return;
-    migrateLocalUserData(guestUser.id, session.user.id);
-  }, [guestUser, session?.user]);
+  const activeRealUser = session?.user ?? firebaseUser;
 
-  // Only the explicit Guest Mode is local-only. Legacy "direct Gmail"/"email" pseudo-users
-  // are intentionally ignored so the user can sign in with a real Supabase session.
+  useEffect(() => {
+    if (!activeRealUser || !guestUser || isLocalGuestUser(guestUser)) return;
+    migrateLocalUserData(guestUser.id, activeRealUser.id);
+  }, [guestUser, activeRealUser]);
+
   const localGuest = isLocalGuestUser(guestUser) ? guestUser : null;
-  const user: User | null = session?.user ?? localGuest;
+  const user: User | null = activeRealUser ?? localGuest;
+
   return {
     session,
+    firebaseUser,
     user,
     loading,
-    isGuest: !session?.user && !!localGuest,
+    isGuest: !activeRealUser && !!localGuest,
+    isFirebase: Boolean(firebaseUser && !session?.user),
   };
 }
 

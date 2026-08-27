@@ -306,9 +306,7 @@ function hexToRgb(value: string) {
           .map((c) => `${c}${c}`)
           .join("")
       : hex;
-  return [0, 2, 4].map(
-    (offset) => Number.parseInt(normalized.slice(offset, offset + 2), 16) / 255,
-  );
+  return [0, 2, 4].map((offset) => Number.parseInt(normalized.slice(offset, offset + 2), 16) / 255);
 }
 
 export function readableForeground(color: string, fallback: string) {
@@ -317,7 +315,8 @@ export function readableForeground(color: string, fallback: string) {
   const linear = rgb.map((channel) =>
     channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4,
   );
-  const luminance = 0.2126 * (linear[0] ?? 0) + 0.7152 * (linear[1] ?? 0) + 0.0722 * (linear[2] ?? 0);
+  const luminance =
+    0.2126 * (linear[0] ?? 0) + 0.7152 * (linear[1] ?? 0) + 0.0722 * (linear[2] ?? 0);
   return luminance > 0.48 ? "#202124" : "#F8F9FA";
 }
 
@@ -358,7 +357,9 @@ export function applyTheme(colors: Partial<CustomColors>) {
   }
 
   const preset = GOOGLE_PRESETS.find((p) => p.id === colors.presetName) ?? GOOGLE_PRESETS[0];
-  const defaults = isDark ? (preset?.dark ?? DEFAULT_COLORS_DARK) : (preset?.light ?? DEFAULT_COLORS_LIGHT);
+  const defaults = isDark
+    ? (preset?.dark ?? DEFAULT_COLORS_DARK)
+    : (preset?.light ?? DEFAULT_COLORS_LIGHT);
   const fallbackForeground = isDark ? "#F8F9FA" : "#202124";
 
   const bg = colors.backgroundColor || defaults.backgroundColor;
@@ -451,4 +452,3 @@ export function applyTheme(colors: Partial<CustomColors>) {
     root.style.setProperty(`--chart-${index + 1}`, color);
   });
 }
-

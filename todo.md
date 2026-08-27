@@ -1,4 +1,3 @@
-
 # Project TODO
 
 - [ ] Keep the original google-sheet-organizer structure and continue development there

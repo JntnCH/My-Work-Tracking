@@ -3,6 +3,7 @@ import type { User, UserIdentity } from "@supabase/supabase-js";
 import {
   AlertTriangle,
   CheckCircle2,
+  Flame,
   Github,
   KeyRound,
   Link2,
@@ -11,12 +12,21 @@ import {
   Mail,
   MessageCircle,
   RefreshCw,
+  Settings,
   ShieldCheck,
+  Sparkles,
   Unlink2,
   UserRound,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  isFirebaseConfigured,
+  getFirebaseConfig,
+  testFirebaseConnection,
+  getFirebaseAuth,
+} from "@/lib/firebase";
+import { FirebaseConfigDialog } from "./FirebaseConfigDialog";
 
 type Props = {
   user: User | null;
@@ -73,6 +83,9 @@ export function AuthenticationSettings({ user, isGuest = false, onSignOut }: Pro
   const [confirmPassword, setConfirmPassword] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
   const [signingOut, setSigningOut] = useState<"local" | "global" | null>(null);
+  const [showFirebaseModal, setShowFirebaseModal] = useState(false);
+  const [firebaseConfigured, setFirebaseConfigured] = useState(() => isFirebaseConfigured());
+  const [testingFirebase, setTestingFirebase] = useState(false);
 
   const loadIdentities = useCallback(async () => {
     if (isGuest || !user) return;
@@ -366,6 +379,85 @@ export function AuthenticationSettings({ user, isGuest = false, onSignOut }: Pro
         )}
       </section>
 
+      {/* Firebase Database & Auth Settings Section */}
+      <section className="rounded-2xl border border-amber-500/30 bg-card p-4 shadow-sm space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+              <Flame className="h-4 w-4" />
+            </div>
+            <div>
+              <h4 className="font-bold text-sm flex items-center gap-2">
+                Firebase (Firestore & Auth)
+                {firebaseConfigured ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                    <CheckCircle2 className="h-3 w-3" /> เชื่อมต่อแล้ว
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                    ยังไม่ตั้งค่า
+                  </span>
+                )}
+              </h4>
+              <p className="text-xs text-muted-foreground">
+                เชื่อมต่อฐานข้อมูล Firestore และระบบเข้าสู่ระบบด้วย Google ผ่าน Firebase
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowFirebaseModal(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs font-bold text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 transition cursor-pointer"
+          >
+            <Settings className="h-3.5 w-3.5" />
+            <span>ตั้งค่า Firebase</span>
+          </button>
+        </div>
+
+        {firebaseConfigured && (
+          <div className="rounded-xl border border-border/80 bg-muted/20 p-3 text-xs flex items-center justify-between gap-3">
+            <div className="space-y-0.5 min-w-0">
+              <span className="text-[11px] font-medium text-muted-foreground">
+                Firebase Project:
+              </span>
+              <p className="font-mono text-xs font-semibold truncate text-foreground">
+                {getFirebaseConfig()?.projectId || "N/A"}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              disabled={testingFirebase}
+              onClick={async () => {
+                setTestingFirebase(true);
+                try {
+                  const res = await testFirebaseConnection();
+                  if (res.success) {
+                    toast.success(res.message);
+                  } else {
+                    toast.error("การเชื่อมต่อมีปัญหา", { description: res.message });
+                  }
+                } catch (e: unknown) {
+                  const errMessage = e instanceof Error ? e.message : String(e);
+                  toast.error("ทดสอบไม่สำเร็จ", { description: errMessage });
+                } finally {
+                  setTestingFirebase(false);
+                }
+              }}
+              className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] font-semibold text-foreground hover:bg-accent transition disabled:opacity-50 cursor-pointer shrink-0"
+            >
+              {testingFirebase ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3 w-3 text-amber-500" />
+              )}
+              <span>{testingFirebase ? "กำลังทดสอบ..." : "ทดสอบสถานะ"}</span>
+            </button>
+          </div>
+        )}
+      </section>
+
       {!isGuest && (
         <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
           <div className="flex items-center gap-2">
@@ -454,6 +546,12 @@ export function AuthenticationSettings({ user, isGuest = false, onSignOut }: Pro
           </div>
         </div>
       </section>
+
+      <FirebaseConfigDialog
+        open={showFirebaseModal}
+        onOpenChange={setShowFirebaseModal}
+        onConfigSaved={() => setFirebaseConfigured(isFirebaseConfigured())}
+      />
     </div>
   );
 }

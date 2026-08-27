@@ -119,8 +119,7 @@ export function HistoryPanel({
       outAt: toLocalInput(log.checkOutTime),
       workType: log.workType ?? "",
       locationName: log.locationName ?? "",
-      dailyRate:
-        log.dailyRate !== undefined && log.dailyRate !== null ? String(log.dailyRate) : "",
+      dailyRate: log.dailyRate !== undefined && log.dailyRate !== null ? String(log.dailyRate) : "",
       otType: String(log.otType ?? 1.5),
       travelCost: log.travelCost ? String(log.travelCost) : "",
       foodCost: log.foodCost ? String(log.foodCost) : "",

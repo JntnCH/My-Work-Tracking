@@ -1,6 +1,8 @@
 const response = await fetch("http://127.0.0.1:9222/json");
 const targets = await response.json();
-const target = targets.find((item) => item.type === "page" && item.url.startsWith("http://localhost:3000"));
+const target = targets.find(
+  (item) => item.type === "page" && item.url.startsWith("http://localhost:3000"),
+);
 if (!target?.webSocketDebuggerUrl) throw new Error("ไม่พบหน้า localhost:3000 สำหรับทดสอบ Resize");
 
 const socket = new WebSocket(target.webSocketDebuggerUrl);
@@ -26,8 +28,13 @@ function command(method, params = {}) {
   });
 }
 async function evaluate(expression) {
-  const result = await command("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true });
-  if (result.exceptionDetails) throw new Error(result.exceptionDetails.text ?? "Runtime evaluation failed");
+  const result = await command("Runtime.evaluate", {
+    expression,
+    returnByValue: true,
+    awaitPromise: true,
+  });
+  if (result.exceptionDetails)
+    throw new Error(result.exceptionDetails.text ?? "Runtime evaluation failed");
   return result.result?.value;
 }
 
@@ -64,9 +71,17 @@ const startY = before.handleRect.y + before.handleRect.height / 2;
 const endX = startX + 70;
 const endY = startY + 55;
 const touch = (x, y) => ({ id: 1, x, y, radiusX: 8, radiusY: 8, force: 1 });
-await command("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [touch(startX, startY)], modifiers: 0 });
+await command("Input.dispatchTouchEvent", {
+  type: "touchStart",
+  touchPoints: [touch(startX, startY)],
+  modifiers: 0,
+});
 await new Promise((resolve) => setTimeout(resolve, 40));
-await command("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [touch(endX, endY)], modifiers: 0 });
+await command("Input.dispatchTouchEvent", {
+  type: "touchMove",
+  touchPoints: [touch(endX, endY)],
+  modifiers: 0,
+});
 await new Promise((resolve) => setTimeout(resolve, 60));
 const during = await evaluate(`(() => {
   const card = document.querySelector('[data-dashboard-customization-viewport="mobile"] [data-dashboard-card-id="work-days"]');
@@ -92,6 +107,17 @@ const after = await evaluate(`(() => {
     selected: card.getAttribute('data-dashboard-card-selected'),
   } : null;
 })()`);
-console.log(JSON.stringify({ before, during, after, resized: before.width !== after?.width || before.height !== after?.height }, null, 2));
+console.log(
+  JSON.stringify(
+    {
+      before,
+      during,
+      after,
+      resized: before.width !== after?.width || before.height !== after?.height,
+    },
+    null,
+    2,
+  ),
+);
 await command("Emulation.clearDeviceMetricsOverride");
 socket.close();
