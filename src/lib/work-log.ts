@@ -8,6 +8,7 @@ export type GPSPoint = {
   lng: string | null;
   text: string;
   addressName?: string;
+  accuracy?: number | null;
 };
 
 export type ActiveCheckIn = {

@@ -5,6 +5,11 @@
 [build.environment]
   NITRO_PRESET = "netlify"
 
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Permissions-Policy = "geolocation=(self)"
+
 [[redirects]]
   from = "/*"
   to = "/.netlify/functions/server"

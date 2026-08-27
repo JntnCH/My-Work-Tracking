@@ -23,6 +23,11 @@ import {
   toLocalInput,
 } from "@/lib/work-log";
 import { CategoryDialog } from "./CategoryDialog";
+import {
+  describeGeolocationFailure,
+  isEmbeddedContext,
+  requestCurrentPosition,
+} from "@/lib/geolocation";
 
 type Props = {
   active: ActiveCheckIn | null;
@@ -47,9 +52,12 @@ type Props = {
 const EMPTY_GPS: GPSPoint = { lat: null, lng: null, text: "ยังไม่ได้ดึงพิกัด", addressName: "" };
 
 async function reverseGeocode(lat: number, lng: number) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5_000);
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=th`,
+      { signal: controller.signal },
     );
     if (!res.ok) return "";
     const data = (await res.json()) as { address?: Record<string, string> };
@@ -64,6 +72,8 @@ async function reverseGeocode(lat: number, lng: number) {
       .join(", ");
   } catch {
     return "";
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -123,50 +133,38 @@ export function CheckInPanel({
     return () => clearInterval(id);
   }, [active]);
 
-  const fetchGPS = useCallback((): Promise<GPSPoint | null> => {
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
-      setGps({ ...EMPTY_GPS, text: "อุปกรณ์ไม่รองรับ GPS" });
-      return Promise.resolve(null);
-    }
-    if (typeof window !== "undefined" && !window.isSecureContext) {
-      setGps({ ...EMPTY_GPS, text: "ต้องเปิดผ่าน https จึงจะขอพิกัดได้" });
-      return Promise.resolve(null);
-    }
-
+  const fetchGPS = useCallback(async (): Promise<GPSPoint | null> => {
     setGpsLoading(true);
-    return new Promise((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          const lat = pos.coords.latitude.toFixed(6);
-          const lng = pos.coords.longitude.toFixed(6);
-          const addressName = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
-          const nextGPS = { lat, lng, text: `Lat: ${lat}, Lng: ${lng}`, addressName };
-          setGps(nextGPS);
-          setGpsLoading(false);
-          resolve(nextGPS);
-        },
-        (err) => {
-          const embedded = typeof window !== "undefined" && window.self !== window.top;
-          let text = "ไม่สามารถเข้าถึงพิกัดได้";
-          if (err.code === err.PERMISSION_DENIED) {
-            text = embedded
-              ? "ถูกบล็อกในหน้าตัวอย่าง — เปิดเว็บในแท็บใหม่ของ Safari แล้วลองอีกครั้ง"
-              : "ปฏิเสธสิทธิ์ — เปิด ตั้งค่า > Safari > ตำแหน่งที่ตั้ง เป็น “ถาม” แล้วโหลดหน้าใหม่";
-          } else if (err.code === err.POSITION_UNAVAILABLE) {
-            text = "หาสัญญาณตำแหน่งไม่ได้ — เปิด Location Services แล้วลองใหม่";
-          } else if (err.code === err.TIMEOUT) {
-            text = "หมดเวลาในการขอพิกัด — แตะไอคอนเป้าเพื่อลองอีกครั้ง";
-          }
-          setGps({ ...EMPTY_GPS, text });
-          setGpsLoading(false);
-          resolve(null);
-        },
-        { enableHighAccuracy: true, timeout: 20000, maximumAge: 30000 },
-      );
-    });
+    try {
+      const position = await requestCurrentPosition();
+      const lat = position.latitude.toFixed(6);
+      const lng = position.longitude.toFixed(6);
+      const nextGPS: GPSPoint = {
+        lat,
+        lng,
+        text: `Lat: ${lat}, Lng: ${lng}`,
+        addressName: "",
+        accuracy: position.accuracy,
+      };
+      setGps(nextGPS);
+
+      // GPS is usable immediately; reverse geocoding is best-effort and must not block check-in.
+      void reverseGeocode(position.latitude, position.longitude).then((addressName) => {
+        if (!addressName) return;
+        setGps((current) =>
+          current.lat === lat && current.lng === lng ? { ...current, addressName } : current,
+        );
+      });
+      return nextGPS;
+    } catch (error) {
+      setGps({ ...EMPTY_GPS, text: describeGeolocationFailure(error) });
+      return null;
+    } finally {
+      setGpsLoading(false);
+    }
   }, []);
 
-  // iOS Safari blocks silent location prompts; only auto-fetch when already granted.
+  // Safari may not expose a reliable Permissions API state; never use it as the only gate.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -175,9 +173,11 @@ export function CheckInPanel({
           name: "geolocation" as PermissionName,
         });
         if (!cancelled && status?.state === "granted") void fetchGPS();
-        else if (!cancelled) setGps({ ...EMPTY_GPS, text: "แตะไอคอนเป้าเพื่อขอตำแหน่งปัจจุบัน" });
+        else if (!cancelled)
+          setGps({ ...EMPTY_GPS, text: "แตะปุ่มค้นหาตำแหน่ง หรือกด Check-in เพื่อขอพิกัด" });
       } catch {
-        if (!cancelled) setGps({ ...EMPTY_GPS, text: "แตะไอคอนเป้าเพื่อขอตำแหน่งปัจจุบัน" });
+        if (!cancelled)
+          setGps({ ...EMPTY_GPS, text: "แตะปุ่มค้นหาตำแหน่ง หรือกด Check-in เพื่อขอพิกัด" });
       }
     })();
     return () => {
@@ -228,7 +228,9 @@ export function CheckInPanel({
     setTaskInput("");
   };
 
-  const doCheckIn = () => {
+  const doCheckIn = async () => {
+    if (active || gpsLoading) return;
+
     const rawDailyRate = dailyRateInput.trim();
     const dailyRate = Number(rawDailyRate);
     if (!rawDailyRate || !Number.isFinite(dailyRate) || dailyRate < 0) {
@@ -241,10 +243,23 @@ export function CheckInPanel({
     const otherIncome = otherIncomeInput.trim() ? Number(otherIncomeInput) : 0;
     const otherDeductions = otherDeductionsInput.trim() ? Number(otherDeductionsInput) : 0;
 
+    let nextGPS = gps;
+    if (!nextGPS.lat || !nextGPS.lng) {
+      const fetchedGPS = await fetchGPS();
+      if (fetchedGPS) nextGPS = fetchedGPS;
+    }
+    if (!nextGPS.lat || !nextGPS.lng) {
+      toast.warning("บันทึก Check-in โดยไม่มีพิกัด GPS", {
+        description: isEmbeddedContext()
+          ? "เปิดเว็บในแท็บ Safari ใหม่เพื่อให้เข้าถึงตำแหน่งได้ หรือกรอกสถานที่เอง"
+          : "คุณยังกรอกสถานที่เองได้ และสามารถลองค้นหาตำแหน่งใหม่ภายหลัง",
+      });
+    }
+
     onCheckIn({
       workType,
-      locationName: locationName.trim() || gps.addressName || "ไม่ได้ระบุสถานที่",
-      gps,
+      locationName: locationName.trim() || nextGPS.addressName || "ไม่ได้ระบุสถานที่",
+      gps: nextGPS,
       photo,
       rates: {
         ...form,
@@ -442,6 +457,11 @@ export function CheckInPanel({
               </div>
               {gps.addressName ? (
                 <p className="mt-1 text-xs text-muted-foreground">{gps.addressName}</p>
+              ) : null}
+              {typeof gps.accuracy === "number" ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  ความแม่นยำประมาณ ±{Math.round(gps.accuracy)} เมตร
+                </p>
               ) : null}
             </div>
 
@@ -697,11 +717,11 @@ export function CheckInPanel({
         {/* Actions */}
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <button
-            onClick={doCheckIn}
-            disabled={!!active}
+            onClick={() => void doCheckIn()}
+            disabled={!!active || gpsLoading}
             className="flex items-center justify-center gap-2 rounded-xl bg-success py-4 text-lg font-bold text-success-foreground shadow-lg transition active:scale-95 disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
           >
-            <LogIn className="h-5 w-5" /> Check-in เริ่มงาน
+            <LogIn className="h-5 w-5" /> {gpsLoading ? "กำลังค้นหาพิกัด…" : "Check-in เริ่มงาน"}
           </button>
           <button
             onClick={() => void doCheckOut()}
