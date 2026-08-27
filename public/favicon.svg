@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Work Tracker</title>
+  <desc id="desc">นาฬิกาสำหรับบันทึกเวลาทำงานพร้อมเครื่องหมายยืนยัน</desc>
+  <defs>
+    <linearGradient id="bg" x1="24" y1="20" x2="232" y2="236" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#183b54"/>
+      <stop offset="1" stop-color="#245d86"/>
+    </linearGradient>
+    <linearGradient id="check" x1="166" y1="168" x2="220" y2="218" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#65d6a0"/>
+      <stop offset="1" stop-color="#2ca66f"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="url(#bg)"/>
+  <circle cx="116" cy="116" r="67" fill="none" stroke="#ffffff" stroke-width="17"/>
+  <path d="M116 77v42l28 19" fill="none" stroke="#ffffff" stroke-width="17" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="116" cy="116" r="9" fill="#ffffff"/>
+  <circle cx="190" cy="190" r="43" fill="url(#check)" stroke="#183b54" stroke-width="9"/>
+  <path d="m168 190 14 14 30-33" fill="none" stroke="#ffffff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
