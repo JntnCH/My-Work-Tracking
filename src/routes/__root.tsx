@@ -12,6 +12,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { initializeLineLiffOnPrimaryRedirect, isLineLiffPrimaryRedirect } from "@/lib/line-auth";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 import appCss from "../styles.css?url";
 import { EngineWorkingAnimation } from "@/components/ui/engine-working-animation";
@@ -133,6 +134,7 @@ function RootShell({ children }: { children: ReactNode }) {
       <body>
         {children}
         <Scripts />
+        <SpeedInsights />
       </body>
     </html>
   );
