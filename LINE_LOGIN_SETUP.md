@@ -10,9 +10,13 @@
 
 เพิ่มตัวแปร public ต่อไปนี้ใน Netlify ที่ **Site configuration → Environment variables** แล้ว trigger deploy ใหม่ โดยใช้ LIFF ID จริงจาก LINE Developers Console ช่องนี้ไม่ใช่ Channel Secret และสามารถถูกฝังใน browser build ได้ตามการออกแบบของ LIFF
 
-| Variable            | ค่า                                      |
-| ------------------- | ---------------------------------------- |
-| `VITE_LINE_LIFF_ID` | LIFF ID จริงของ LIFF App ที่สร้างไว้แล้ว |
+| Variable                        | ค่า                                                                     |
+| ------------------------------- | ----------------------------------------------------------------------- |
+| `VITE_SUPABASE_URL`             | Supabase project URL เดียวกับระบบ production                            |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase publishable key ของ project (หรือใช้ `VITE_SUPABASE_ANON_KEY`) |
+| `VITE_LINE_LIFF_ID`             | LIFF ID จริงของ LIFF App ที่สร้างไว้แล้ว                                |
+
+`VITE_SUPABASE_URL` และ `VITE_SUPABASE_PUBLISHABLE_KEY` (หรือ `VITE_SUPABASE_ANON_KEY`) จำเป็นต่อทุกช่องทาง เพราะหน้าเว็บเรียก Supabase Auth จาก browser โดยตรง หากสองค่านี้หายหรือยังเป็น placeholder ระบบจะไม่ redirect ไป provider จริงและจะแจ้งให้ตั้งค่าใหม่แทน ส่วน `VITE_LINE_LIFF_ID` จำเป็นเฉพาะ LINE LIFF path
 
 ห้ามเพิ่ม `LINE_CHANNEL_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` หรือ secret ใด ๆ ที่ขึ้นต้นด้วย `VITE_` ลงใน frontend หรือ repository โดยเด็ดขาด
 

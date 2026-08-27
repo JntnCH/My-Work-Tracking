@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { AlertCircle, ArrowLeft, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { isSupabaseConfigured, supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/auth/callback")({
   component: AuthCallbackPage,
@@ -28,6 +28,13 @@ function getCallbackErrorMessage(error: unknown) {
     return "ลิงก์เข้าสู่ระบบหมดอายุหรือถูกใช้ไปแล้ว กรุณากลับไปเริ่มเข้าสู่ระบบใหม่อีกครั้ง";
   }
 
+  if (
+    normalized.includes("environment") ||
+    (normalized.includes("supabase") && normalized.includes("configured"))
+  ) {
+    return "การ deploy นี้ยังไม่มี VITE_SUPABASE_URL และ VITE_SUPABASE_PUBLISHABLE_KEY (หรือ VITE_SUPABASE_ANON_KEY) ใน Netlify";
+  }
+
   if (normalized.includes("provider") || normalized.includes("github")) {
     return "ยังไม่ได้เปิดใช้งาน Provider นี้ใน Supabase หรือการตั้งค่า OAuth ไม่ถูกต้อง";
   }
@@ -44,6 +51,10 @@ function AuthCallbackPage() {
     let cancelled = false;
 
     async function completeOAuth() {
+      if (!isSupabaseConfigured()) {
+        throw new Error("Supabase environment is not configured for this deployment");
+      }
+
       const params = new URLSearchParams(window.location.search);
       const providerError = params.get("error_description") || params.get("error");
       const code = params.get("code");

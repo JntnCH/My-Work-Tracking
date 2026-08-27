@@ -29,7 +29,7 @@ import {
   useSession,
   type RecentGmailAccount,
 } from "@/hooks/use-session";
-import { supabase } from "@/integrations/supabase/client";
+import { isSupabaseConfigured, supabase } from "@/integrations/supabase/client";
 import {
   completeLineLiffLoginIfNeeded,
   getLineAuthErrorMessage,
@@ -93,6 +93,16 @@ function AuthRoute() {
   );
 }
 
+function ensureSupabaseAuthConfigured() {
+  if (isSupabaseConfigured()) return true;
+
+  toast.error("ระบบยังไม่ได้ตั้งค่าการเชื่อมต่อ Supabase", {
+    description:
+      "กรุณาตั้ง VITE_SUPABASE_URL และ VITE_SUPABASE_PUBLISHABLE_KEY (หรือ VITE_SUPABASE_ANON_KEY) ใน Netlify แล้ว trigger deploy ใหม่",
+  });
+  return false;
+}
+
 function AuthPage() {
   const { user, loading } = useSession();
   const navigate = useNavigate();
@@ -126,6 +136,7 @@ function AuthPage() {
 
     async function completeLiffCallback() {
       if (!isLineLiffCallback()) return;
+      if (!ensureSupabaseAuthConfigured()) return;
       setBusy(true);
       try {
         await completeLineLiffLoginIfNeeded();
@@ -199,6 +210,7 @@ function AuthPage() {
 
   async function signInGoogle(loginHint?: string) {
     if (busy) return;
+    if (!ensureSupabaseAuthConfigured()) return;
     setBusy(true);
     try {
       const redirectOrigin = typeof window !== "undefined" ? window.location.origin : "";
@@ -231,6 +243,7 @@ function AuthPage() {
 
   async function signInGithub() {
     if (busy) return;
+    if (!ensureSupabaseAuthConfigured()) return;
     setBusy(true);
     try {
       const redirectOrigin = typeof window !== "undefined" ? window.location.origin : "";
@@ -253,6 +266,7 @@ function AuthPage() {
 
   async function signInLine() {
     if (busy) return;
+    if (!ensureSupabaseAuthConfigured()) return;
     setBusy(true);
     try {
       const result = await startLineLogin();
@@ -291,6 +305,7 @@ function AuthPage() {
   async function sendPhoneOtp() {
     const normalizedPhone = getValidatedPhone();
     if (!normalizedPhone || busy) return;
+    if (!ensureSupabaseAuthConfigured()) return;
 
     setBusy(true);
     try {
@@ -320,6 +335,7 @@ function AuthPage() {
       toast.error("กรุณากรอกรหัส OTP 6 หลัก");
       return;
     }
+    if (!ensureSupabaseAuthConfigured()) return;
 
     setBusy(true);
     try {
@@ -345,6 +361,7 @@ function AuthPage() {
       toast.error("กรุณากรอกอีเมลก่อนขอรีเซ็ตรหัสผ่าน");
       return;
     }
+    if (!ensureSupabaseAuthConfigured()) return;
     setBusy(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -375,6 +392,7 @@ function AuthPage() {
       toast.error("กรุณากรอกอีเมลและรหัสผ่าน");
       return;
     }
+    if (!ensureSupabaseAuthConfigured()) return;
     setBusy(true);
     try {
       if (mode === "signup") {
