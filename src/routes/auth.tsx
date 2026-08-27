@@ -122,6 +122,7 @@ function AuthPage() {
   const [gmailAddress, setGmailAddress] = useState("");
   const [gmailName, setGmailName] = useState("");
   const [recentAccounts, setRecentAccounts] = useState<RecentGmailAccount[]>([]);
+  const supabaseConfigured = isSupabaseConfigured();
 
   useEffect(() => {
     setRecentAccounts(getRecentGmailAccounts());
@@ -446,548 +447,695 @@ function AuthPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-8">
-      <div className="surface-card w-full max-w-md space-y-6 p-7 text-center shadow-lg border border-border">
-        <div className="mx-auto w-fit rounded-2xl bg-primary/10 p-3.5 text-primary">
-          <Clock3 className="h-8 w-8" />
-        </div>
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-center gap-1.5 text-xs font-semibold text-primary">
-            <Sparkles className="h-3.5 w-3.5" />
-            <span>Google Workspace Ready</span>
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Work Tracker</h1>
-          <p className="text-xs text-muted-foreground">
-            ระบบบันทึกเวลาทำงาน GPS ค่าแรง OT ซิงก์ Google Sheets &amp; Airtable
-          </p>
-        </div>
+    <main className="relative min-h-screen overflow-hidden bg-background px-4 py-5 text-foreground sm:px-6 lg:px-8">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        <div className="absolute -left-24 top-8 h-72 w-72 rounded-full bg-primary/8 blur-3xl" />
+        <div className="absolute -right-24 bottom-0 h-96 w-96 rounded-full bg-success/8 blur-3xl" />
+        <div className="absolute inset-x-0 top-0 h-px bg-primary/20" />
+      </div>
 
-        <div className="grid grid-cols-4 gap-1 rounded-xl bg-muted p-1 text-[11px] font-semibold">
-          <button
-            type="button"
-            onClick={() => selectMode("google")}
-            className={`rounded-lg py-1.5 transition ${
-              mode === "google"
-                ? "bg-card text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Google
-          </button>
-          <button
-            type="button"
-            onClick={() => selectMode("phone")}
-            className={`rounded-lg py-1.5 transition ${
-              mode === "phone"
-                ? "bg-card text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            โทรศัพท์
-          </button>
-          <button
-            type="button"
-            onClick={() => selectMode("email")}
-            className={`rounded-lg py-1.5 transition ${
-              mode === "email"
-                ? "bg-card text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            อีเมล
-          </button>
-          <button
-            type="button"
-            onClick={() => selectMode("signup")}
-            className={`rounded-lg py-1.5 transition ${
-              mode === "signup"
-                ? "bg-card text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            สมัคร
-          </button>
-        </div>
+      <div className="relative mx-auto grid w-full max-w-6xl gap-5 lg:min-h-[calc(100vh-2.5rem)] lg:grid-cols-[0.84fr_1.16fr]">
+        <section className="relative hidden overflow-hidden rounded-[2rem] gradient-header p-8 text-primary-foreground shadow-2xl lg:flex lg:flex-col lg:justify-between xl:p-10">
+          <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full border-[30px] border-white/10" />
+          <div className="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full border-[30px] border-white/10" />
+          <div className="pointer-events-none absolute right-16 top-24 h-2 w-2 rounded-full bg-white/60 shadow-[0_0_0_8px_rgba(255,255,255,0.08)]" />
+          <div className="pointer-events-none absolute bottom-36 left-20 h-1.5 w-1.5 rounded-full bg-white/50" />
 
-        {mode === "google" ? (
-          <div className="space-y-4 pt-1 text-left">
-            {/* Google Official Button Style */}
-            <button
-              type="button"
-              onClick={() => void signInGoogle()}
-              disabled={busy}
-              aria-label="Sign in with Google"
-              className="flex w-full items-center justify-center gap-3 rounded-xl border border-border bg-card py-3 px-4 text-sm font-semibold text-foreground shadow-sm transition hover:bg-accent/70 hover:border-primary/40 active:scale-[0.99] disabled:opacity-60 cursor-pointer"
-            >
-              {busy ? (
-                <>
-                  <EngineWorkingAnimation size="sm" label="กำลังเชื่อมต่อ Google" />
-                  <span>กำลังเชื่อมต่อ Google OAuth...</span>
-                </>
-              ) : (
-                <>
-                  <GoogleIcon className="h-5 w-5 shrink-0" />
-                  <span>เข้าสู่ระบบด้วย Google (Sign in with Google)</span>
-                </>
-              )}
-            </button>
-
-            {/* Recent Gmail Accounts (if any) */}
-            {recentAccounts.length > 0 && (
-              <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-2">
-                <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
-                  <span className="flex items-center gap-1.5">
-                    <Clock3 className="h-3.5 w-3.5 text-primary" />
-                    บัญชี Gmail ล่าสุดบนเครื่องนี้
-                  </span>
-                  <span className="text-[10px] text-muted-foreground/80">
-                    คลิกเพื่อเริ่ม Google OAuth
-                  </span>
-                </div>
-                <div className="space-y-1.5">
-                  {recentAccounts.map((acc) => (
-                    <div
-                      key={acc.email}
-                      onClick={() => handleDirectGmailLogin(acc.email, acc.name)}
-                      className="group flex items-center justify-between gap-2.5 rounded-lg border border-border/80 bg-card p-2 text-xs transition hover:border-primary/50 hover:bg-accent/50 cursor-pointer shadow-2xs"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs">
-                          {acc.name?.[0]?.toUpperCase() || acc.email[0]?.toUpperCase() || "G"}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="truncate font-semibold text-foreground leading-tight">
-                            {acc.name}
-                          </p>
-                          <p className="truncate text-[11px] text-muted-foreground font-mono">
-                            {acc.email}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary group-hover:underline">
-                          เข้าใช้งาน
-                          <ArrowRight className="h-3 w-3" />
-                        </span>
-                        <button
-                          type="button"
-                          onClick={(e) => handleRemoveRecent(e, acc.email)}
-                          title="ลบบัญชีนี้ออกจากประวัติ"
-                          aria-label="ลบบัญชีนี้ออกจากประวัติ"
-                          className="ml-1 rounded p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+          <div className="relative space-y-10">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20 backdrop-blur-sm">
+                <Clock3 className="h-6 w-6" aria-hidden="true" />
               </div>
-            )}
-
-            {/* Direct Gmail Login Form */}
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleDirectGmailLogin();
-              }}
-              className="rounded-2xl border border-primary/20 bg-primary/5 p-3.5 space-y-3 shadow-xs"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
-                  <Zap className="h-3.5 w-3.5" />
-                  <span>เชื่อมต่อบัญชี Google ผ่าน Supabase</span>
-                </div>
-                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
-                  OAuth
-                </span>
-              </div>
-
-              <div className="space-y-2">
-                <div>
-                  <label className="text-[11px] font-semibold text-muted-foreground block mb-1">
-                    อีเมล Gmail ของคุณ
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      inputMode="email"
-                      autoComplete="email"
-                      placeholder="เช่น yourname หรือ yourname@gmail.com"
-                      value={gmailAddress}
-                      onChange={(e) => setGmailAddress(e.target.value)}
-                      className="w-full rounded-xl border border-input bg-background pl-3 pr-24 py-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    />
-                    {!gmailAddress.includes("@") && gmailAddress.trim().length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setGmailAddress((prev) => `${prev.trim()}@gmail.com`)}
-                        className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-lg bg-secondary px-2 py-0.5 text-[10px] font-semibold text-primary hover:bg-primary/10 transition"
-                      >
-                        + @gmail.com
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-semibold text-muted-foreground block mb-1">
-                    ชื่อผู้ใช้งาน (ทางเลือก)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="เช่น คุณสมชาย (ถ้าไม่ใส่จะใช้ชื่อจากอีเมล)"
-                    value={gmailName}
-                    onChange={(e) => setGmailName(e.target.value)}
-                    className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                  />
-                </div>
-              </div>
-
-              {/* Quick Preset Email Chip */}
-              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                <span className="text-[10px] text-muted-foreground">เข้าสู่ระบบด่วน:</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setGmailAddress("jayautobot.dev@gmail.com");
-                    setGmailName("Jay Autobot");
-                    handleDirectGmailLogin("jayautobot.dev@gmail.com", "Jay Autobot");
-                  }}
-                  className="rounded-lg border border-primary/30 bg-card px-2 py-1 text-[10px] font-semibold text-primary hover:bg-primary hover:text-primary-foreground transition shadow-2xs cursor-pointer"
-                >
-                  ⚡ jayautobot.dev@gmail.com
-                </button>
-              </div>
-
-              <button
-                type="submit"
-                disabled={busy || !gmailAddress.trim()}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-xs font-bold text-primary-foreground shadow transition hover:bg-primary/90 active:scale-[0.99] disabled:opacity-50 cursor-pointer"
-              >
-                <GoogleIcon className="h-4 w-4 shrink-0" />
-                <span>ดำเนินการต่อด้วย Google OAuth</span>
-              </button>
-            </form>
-
-            <div className="relative py-1">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-border" />
-              </div>
-              <div className="relative flex justify-center text-[10px] uppercase font-semibold text-muted-foreground">
-                <span className="bg-card px-2">หรือช่องทางอื่น</span>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-white/65">
+                  Work Tracker
+                </p>
+                <p className="mt-0.5 text-sm font-semibold text-white/90">
+                  Personal operations hub
+                </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => void signInGithub()}
-                disabled={busy}
-                className="flex items-center justify-center gap-2 rounded-xl border border-border bg-secondary/50 py-2.5 px-3 text-xs font-semibold text-foreground transition hover:bg-secondary active:scale-[0.99] disabled:opacity-60 cursor-pointer"
-              >
-                <Github className="h-3.5 w-3.5 shrink-0" />
-                <span>GitHub</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => void signInLine()}
-                disabled={busy}
-                aria-label="เข้าสู่ระบบด้วย LINE LIFF"
-                className="flex items-center justify-center gap-2 rounded-xl border border-[#06C755]/40 bg-[#06C755]/10 py-2.5 px-3 text-xs font-bold text-foreground transition hover:bg-[#06C755]/20 active:scale-[0.99] disabled:opacity-60 cursor-pointer"
-              >
-                <MessageCircle className="h-3.5 w-3.5 text-[#06C755] shrink-0" />
-                <span>LINE LIFF</span>
-              </button>
-            </div>
-
-            <div className="text-left pt-1">
-              <button
-                type="button"
-                onClick={() => setShowConfigHelp((prev) => !prev)}
-                className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-primary transition cursor-pointer"
-              >
-                <HelpCircle className="h-3.5 w-3.5" />
-                <span>คำแนะนำการตั้งค่า OAuth ใน Supabase</span>
-              </button>
-
-              {showConfigHelp && (
-                <div className="mt-2.5 space-y-2 rounded-xl border border-primary/20 bg-info-soft/40 p-3 text-[11px] text-muted-foreground animate-in fade-in-50 duration-200">
-                  <p className="font-semibold text-foreground">
-                    ขั้นตอนเปิดใช้งาน Google/GitHub/LINE Login ใน Supabase Dashboard:
-                  </p>
-                  <ol className="list-decimal pl-4 space-y-1 leading-relaxed">
-                    <li>
-                      ไปที่ Supabase &gt; Authentication &gt; Providers แล้วเปิด Google, GitHub หรือ
-                      Custom OIDC (LINE)
-                    </li>
-                    <li>เปิดใช้งาน Provider และใส่ Client ID/Client Secret ใน Supabase เท่านั้น</li>
-                    <li>
-                      สำหรับ LINE ให้ใช้ provider name `line`, เปิด OIDC และไม่ใส่ Channel Secret ใน
-                      frontend
-                    </li>
-                    <li>
-                      เพิ่ม URL ของเว็บไซต์และ <code>/auth/callback</code> ใน Supabase Redirect URLs
-                    </li>
-                    <li>
-                      สำหรับ GitHub ให้ใช้ Supabase Callback URL ที่หน้า Provider แสดงใน GitHub
-                      OAuth App
-                    </li>
-                  </ol>
-                  <div className="pt-1.5 flex items-center justify-between gap-2">
-                    <span className="truncate font-mono text-[10px] bg-card px-2 py-1 rounded border border-border">
-                      {typeof window !== "undefined"
-                        ? `${window.location.origin}/auth/callback`
-                        : ""}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={copyRedirectUrl}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-semibold bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 shrink-0 cursor-pointer"
-                    >
-                      {copiedUrl ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                      <span>{copiedUrl ? "คัดลอกแล้ว" : "คัดลอก URL"}</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        ) : mode === "phone" ? (
-          <form
-            onSubmit={(event) => void verifyPhoneOtp(event)}
-            className="space-y-3 pt-1 text-left"
-          >
-            <div className="rounded-xl border border-primary/20 bg-info-soft/60 p-3 text-xs text-muted-foreground">
-              {!phoneOtpSent
-                ? "กรอกเบอร์โทรศัพท์เพื่อรับรหัส OTP ทาง SMS"
-                : "กรอกรหัส OTP 6 หลักที่ส่งไปยังโทรศัพท์ของคุณ"}
-            </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground" htmlFor="phone-number">
-                เบอร์โทรศัพท์
-              </label>
-              <input
-                id="phone-number"
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
-                required
-                placeholder="081-234-5678 หรือ +66812345678"
-                value={phone}
-                onChange={(event) => setPhone(event.target.value)}
-                disabled={phoneOtpSent || busy}
-                className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              />
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                ระบบจะปรับเบอร์ไทยเป็นรูปแบบสากลให้อัตโนมัติ
+            <div className="max-w-md space-y-5">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-white/80 backdrop-blur-sm">
+                <Sparkles className="h-3.5 w-3.5 text-yellow-200" aria-hidden="true" />
+                <span>ทำงานเป็นระบบขึ้นทุกวัน</span>
+              </div>
+              <h1 className="text-4xl font-bold leading-[1.12] tracking-tight xl:text-5xl">
+                จบวันงาน
+                <br />
+                ได้ในภาพเดียว
+              </h1>
+              <p className="max-w-sm text-sm leading-7 text-white/70">
+                เช็กอิน บันทึกเวลา คำนวณ OT และซิงก์ข้อมูลสำคัญไว้ใน workspace เดียว
+                เพื่อให้คุณโฟกัสกับงานที่ต้องทำจริง ๆ
               </p>
             </div>
-            {phoneOtpSent ? (
-              <>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground" htmlFor="phone-otp">
-                    รหัส OTP
-                  </label>
-                  <input
-                    id="phone-otp"
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    required
-                    maxLength={6}
-                    pattern="[0-9]{6}"
-                    placeholder="กรอกรหัส 6 หลัก"
-                    value={phoneOtp}
-                    onChange={(event) =>
-                      setPhoneOtp(event.target.value.replace(/\D/g, "").slice(0, 6))
-                    }
-                    className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-center text-lg tracking-[0.35em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                  />
+
+            <div className="grid max-w-md grid-cols-3 gap-2.5">
+              <div className="rounded-2xl border border-white/10 bg-white/10 p-3 backdrop-blur-sm">
+                <p className="text-lg font-bold">GPS</p>
+                <p className="mt-1 text-[10px] text-white/60">Check-in</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/10 p-3 backdrop-blur-sm">
+                <p className="text-lg font-bold">OT</p>
+                <p className="mt-1 text-[10px] text-white/60">คำนวณง่าย</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/10 p-3 backdrop-blur-sm">
+                <p className="text-lg font-bold">Cloud</p>
+                <p className="mt-1 text-[10px] text-white/60">ซิงก์ข้อมูล</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="relative flex items-center justify-between gap-4 border-t border-white/15 pt-5 text-[11px] text-white/55">
+            <span>ปลอดภัยสำหรับพื้นที่ทำงานส่วนตัว</span>
+            <span className="inline-flex items-center gap-1.5">
+              <Check className="h-3.5 w-3.5 text-emerald-200" aria-hidden="true" />
+              Ready
+            </span>
+          </div>
+        </section>
+
+        <section className="surface-card relative flex min-h-[calc(100vh-2.5rem)] flex-col overflow-hidden rounded-[2rem] border-border/80 bg-card/95 p-5 shadow-xl backdrop-blur sm:p-8 lg:p-10">
+          <div
+            className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-primary/60 to-success"
+            aria-hidden="true"
+          />
+
+          <div className="mb-8 flex items-center gap-3 lg:hidden">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/15">
+              <Clock3 className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-primary">
+                Work Tracker
+              </p>
+              <p className="text-xs text-muted-foreground">Personal operations hub</p>
+            </div>
+          </div>
+
+          <div className="flex-1">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+                  Welcome back
+                </p>
+                <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+                  เข้าสู่ระบบ
+                </h2>
+                <p className="max-w-md text-sm leading-6 text-muted-foreground">
+                  เข้าสู่ workspace ของคุณ เพื่อบันทึกงานและดูข้อมูลได้ต่อเนื่องจากทุกอุปกรณ์
+                </p>
+              </div>
+              <div className="hidden rounded-2xl bg-secondary/70 p-3 text-primary sm:block">
+                <LogIn className="h-5 w-5" aria-hidden="true" />
+              </div>
+            </div>
+
+            <div
+              className={`mt-6 flex items-start gap-3 rounded-2xl border p-3.5 text-xs ${
+                supabaseConfigured
+                  ? "border-success/20 bg-success-soft/60 text-success-foreground"
+                  : "border-warning/30 bg-warning-soft/70 text-warning-foreground"
+              }`}
+              role="status"
+            >
+              {supabaseConfigured ? (
+                <Check className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              ) : (
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              )}
+              <div className="min-w-0">
+                <p className="font-semibold">
+                  {supabaseConfigured ? "ระบบพร้อมเชื่อมต่อบัญชี" : "ยังไม่ได้เชื่อมต่อ Supabase"}
+                </p>
+                <p className="mt-0.5 leading-5 opacity-80">
+                  {supabaseConfigured
+                    ? "เลือกช่องทางที่ต้องการได้เลย ข้อมูล session จะถูกจัดการอย่างปลอดภัย"
+                    : "ตั้ง VITE_SUPABASE_URL และ VITE_SUPABASE_PUBLISHABLE_KEY ใน Netlify แล้ว deploy ใหม่"}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-7 space-y-5">
+              <div
+                className="grid grid-cols-4 gap-1 rounded-2xl bg-muted/80 p-1.5"
+                role="tablist"
+                aria-label="ช่องทางเข้าสู่ระบบ"
+              >
+                {(
+                  [
+                    ["google", "Google"],
+                    ["phone", "โทรศัพท์"],
+                    ["email", "อีเมล"],
+                    ["signup", "สมัคร"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    role="tab"
+                    aria-selected={mode === value}
+                    onClick={() => selectMode(value)}
+                    className={`rounded-xl px-2 py-2.5 text-xs font-semibold transition-all duration-200 active:scale-[0.98] ${
+                      mode === value
+                        ? "bg-card text-foreground shadow-sm ring-1 ring-border/70"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {mode === "google" ? (
+                <div className="space-y-4">
+                  <button
+                    type="button"
+                    onClick={() => void signInGoogle()}
+                    disabled={busy}
+                    aria-label="Sign in with Google"
+                    className="group flex min-h-14 w-full items-center justify-center gap-3 rounded-2xl border border-border bg-card px-4 text-sm font-semibold text-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/35 hover:bg-accent/60 hover:shadow-md active:translate-y-0 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-60"
+                  >
+                    {busy ? (
+                      <>
+                        <EngineWorkingAnimation size="sm" label="กำลังเชื่อมต่อ Google" />
+                        <span>กำลังเชื่อมต่อ Google...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-border/60">
+                          <GoogleIcon className="h-5 w-5 shrink-0" />
+                        </span>
+                        <span>ดำเนินการต่อด้วย Google</span>
+                        <ArrowRight
+                          className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+                          aria-hidden="true"
+                        />
+                      </>
+                    )}
+                  </button>
+
+                  {recentAccounts.length > 0 ? (
+                    <div className="rounded-2xl border border-border/80 bg-muted/30 p-3.5">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <span className="flex items-center gap-2 text-xs font-semibold text-foreground">
+                          <Clock3 className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+                          บัญชีล่าสุดบนเครื่องนี้
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">Google OAuth</span>
+                      </div>
+                      <div className="space-y-2">
+                        {recentAccounts.map((acc) => (
+                          <div
+                            key={acc.email}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => handleDirectGmailLogin(acc.email, acc.name)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                void handleDirectGmailLogin(acc.email, acc.name);
+                              }
+                            }}
+                            className="group flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-border/70 bg-card p-2.5 text-xs transition hover:border-primary/40 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                          >
+                            <div className="flex min-w-0 items-center gap-2.5">
+                              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                                {acc.name?.[0]?.toUpperCase() || acc.email[0]?.toUpperCase() || "G"}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="truncate font-semibold text-foreground">{acc.name}</p>
+                                <p className="truncate font-mono text-[10px] text-muted-foreground">
+                                  {acc.email}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-1">
+                              <span className="hidden items-center gap-1 font-semibold text-primary sm:inline-flex">
+                                เข้าใช้
+                                <ArrowRight className="h-3 w-3" aria-hidden="true" />
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(event) => handleRemoveRecent(event, acc.email)}
+                                title="ลบบัญชีนี้ออกจากประวัติ"
+                                aria-label="ลบบัญชีนี้ออกจากประวัติ"
+                                className="rounded-lg p-1.5 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <details className="group rounded-2xl border border-border/80 bg-secondary/25">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 text-xs font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+                      <span className="flex items-center gap-2">
+                        <Zap className="h-4 w-4 text-primary" aria-hidden="true" />
+                        ใช้บัญชี Gmail ที่ต้องการ
+                      </span>
+                      <ArrowRight
+                        className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-90"
+                        aria-hidden="true"
+                      />
+                    </summary>
+                    <form
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        void handleDirectGmailLogin();
+                      }}
+                      className="space-y-3 border-t border-border/70 p-4"
+                    >
+                      <p className="text-[11px] leading-5 text-muted-foreground">
+                        ใช้อีเมลเป็นเพียงตัวช่วยเลือกบัญชี ตัวตนและ session จะยืนยันผ่าน Google
+                        OAuth เท่านั้น
+                      </p>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <label
+                            className="text-[11px] font-semibold text-muted-foreground"
+                            htmlFor="gmail-address"
+                          >
+                            อีเมล Gmail
+                          </label>
+                          <input
+                            id="gmail-address"
+                            type="text"
+                            inputMode="email"
+                            autoComplete="email"
+                            placeholder="yourname@gmail.com"
+                            value={gmailAddress}
+                            onChange={(event) => setGmailAddress(event.target.value)}
+                            className="mt-1.5 w-full rounded-xl border border-input bg-background px-3 py-2.5 text-xs outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                          />
+                        </div>
+                        <div>
+                          <label
+                            className="text-[11px] font-semibold text-muted-foreground"
+                            htmlFor="gmail-name"
+                          >
+                            ชื่อที่แสดง <span className="font-normal opacity-70">(ถ้ามี)</span>
+                          </label>
+                          <input
+                            id="gmail-name"
+                            type="text"
+                            placeholder="เช่น สมชาย ใจดี"
+                            value={gmailName}
+                            onChange={(event) => setGmailName(event.target.value)}
+                            className="mt-1.5 w-full rounded-xl border border-input bg-background px-3 py-2.5 text-xs outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setGmailAddress("jayautobot.dev@gmail.com");
+                            setGmailName("Jay Autobot");
+                            void handleDirectGmailLogin("jayautobot.dev@gmail.com", "Jay Autobot");
+                          }}
+                          className="rounded-lg border border-primary/25 bg-primary/5 px-2.5 py-1.5 text-[10px] font-semibold text-primary transition hover:bg-primary hover:text-primary-foreground"
+                        >
+                          ใช้บัญชีที่บันทึกไว้
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={busy || !gmailAddress.trim()}
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground transition hover:bg-primary/90 active:scale-[0.98] disabled:opacity-50"
+                        >
+                          ดำเนินการต่อ
+                          <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                        </button>
+                      </div>
+                    </form>
+                  </details>
+
+                  <div className="flex items-center gap-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/70">
+                    <div className="h-px flex-1 bg-border" />
+                    <span>หรือใช้บัญชีอื่น</span>
+                    <div className="h-px flex-1 bg-border" />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => void signInGithub()}
+                      disabled={busy}
+                      className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-border bg-card px-3 text-xs font-semibold text-foreground transition-all duration-200 hover:-translate-y-0.5 hover:border-foreground/25 hover:bg-accent active:translate-y-0 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-60"
+                    >
+                      <Github className="h-4 w-4" aria-hidden="true" />
+                      GitHub
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void signInLine()}
+                      disabled={busy}
+                      aria-label="เข้าสู่ระบบด้วย LINE LIFF"
+                      className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-[#06C755]/35 bg-[#06C755]/8 px-3 text-xs font-bold text-foreground transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#06C755]/15 active:translate-y-0 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-60"
+                    >
+                      <MessageCircle className="h-4 w-4 text-[#06C755]" aria-hidden="true" />
+                      LINE LIFF
+                    </button>
+                  </div>
+
+                  <div className="rounded-2xl border border-border/70 bg-muted/25 p-3.5">
+                    <button
+                      type="button"
+                      onClick={() => setShowConfigHelp((prev) => !prev)}
+                      className="flex w-full items-center justify-between gap-3 text-left text-xs font-semibold text-foreground transition hover:text-primary"
+                      aria-expanded={showConfigHelp}
+                    >
+                      <span className="flex items-center gap-2">
+                        <HelpCircle className="h-4 w-4 text-primary" aria-hidden="true" />
+                        ตั้งค่า OAuth ไม่สำเร็จใช่ไหม?
+                      </span>
+                      <ArrowRight
+                        className={`h-4 w-4 text-muted-foreground transition-transform ${showConfigHelp ? "rotate-90" : ""}`}
+                        aria-hidden="true"
+                      />
+                    </button>
+
+                    {showConfigHelp ? (
+                      <div className="mt-3 space-y-3 border-t border-border/70 pt-3 text-[11px] leading-5 text-muted-foreground">
+                        <p>เปิด Provider ใน Supabase และเพิ่ม callback URL นี้ใน Redirect URLs:</p>
+                        <div className="flex items-center gap-2 rounded-xl bg-card p-2">
+                          <code className="min-w-0 flex-1 truncate font-mono text-[10px] text-foreground">
+                            {typeof window !== "undefined"
+                              ? `${window.location.origin}/auth/callback`
+                              : ""}
+                          </code>
+                          <button
+                            type="button"
+                            onClick={copyRedirectUrl}
+                            className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-primary px-2.5 py-1.5 text-[10px] font-semibold text-primary-foreground transition hover:bg-primary/90"
+                          >
+                            {copiedUrl ? (
+                              <Check className="h-3 w-3" />
+                            ) : (
+                              <Copy className="h-3 w-3" />
+                            )}
+                            {copiedUrl ? "คัดลอกแล้ว" : "คัดลอก"}
+                          </button>
+                        </div>
+                        <ol className="list-decimal space-y-1 pl-4">
+                          <li>ตั้ง `VITE_SUPABASE_URL` และ publishable/anon key ใน Netlify</li>
+                          <li>เปิด Google หรือ GitHub ใน Supabase Authentication → Providers</li>
+                          <li>สำหรับ LINE ใช้ LIFF Endpoint URL เดียวกับ production domain</li>
+                        </ol>
+                        <a
+                          href="https://supabase.com/dashboard/project/_/auth/providers"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 font-semibold text-primary hover:underline"
+                        >
+                          เปิด Supabase Provider settings
+                          <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                        </a>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
-                <button
-                  type="submit"
-                  disabled={busy}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground shadow transition hover:bg-primary/90 disabled:opacity-60"
-                >
-                  {busy ? (
+              ) : mode === "phone" ? (
+                <form onSubmit={(event) => void verifyPhoneOtp(event)} className="space-y-4">
+                  <div className="flex items-start gap-3 rounded-2xl border border-primary/15 bg-info-soft/60 p-4 text-xs text-muted-foreground">
+                    <Phone className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                    <p className="leading-5">
+                      {!phoneOtpSent
+                        ? "กรอกเบอร์โทรศัพท์เพื่อรับรหัส OTP ทาง SMS"
+                        : "กรอกรหัส OTP 6 หลักที่ส่งไปยังโทรศัพท์ของคุณ"}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-foreground" htmlFor="phone-number">
+                      เบอร์โทรศัพท์
+                    </label>
+                    <input
+                      id="phone-number"
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      required
+                      placeholder="081-234-5678 หรือ +66812345678"
+                      value={phone}
+                      onChange={(event) => setPhone(event.target.value)}
+                      disabled={phoneOtpSent || busy}
+                      className="mt-2 w-full rounded-xl border border-input bg-background px-3.5 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+                    />
+                    <p className="mt-1.5 text-[11px] text-muted-foreground">
+                      ระบบจะแปลงเบอร์ไทยเป็นรูปแบบสากลให้อัตโนมัติ
+                    </p>
+                  </div>
+                  {phoneOtpSent ? (
                     <>
-                      <EngineWorkingAnimation size="sm" label="กำลังตรวจสอบ" />
-                      กำลังตรวจสอบ...
+                      <div>
+                        <label
+                          className="text-xs font-semibold text-foreground"
+                          htmlFor="phone-otp"
+                        >
+                          รหัส OTP
+                        </label>
+                        <input
+                          id="phone-otp"
+                          type="text"
+                          inputMode="numeric"
+                          autoComplete="one-time-code"
+                          required
+                          maxLength={6}
+                          pattern="[0-9]{6}"
+                          placeholder="กรอกรหัส 6 หลัก"
+                          value={phoneOtp}
+                          onChange={(event) =>
+                            setPhoneOtp(event.target.value.replace(/\D/g, "").slice(0, 6))
+                          }
+                          className="mt-2 w-full rounded-xl border border-input bg-background px-3.5 py-3 text-center text-xl tracking-[0.45em] outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={busy}
+                        className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 active:scale-[0.99] disabled:opacity-60"
+                      >
+                        {busy ? (
+                          <>
+                            <EngineWorkingAnimation size="sm" label="กำลังตรวจสอบ" />
+                            กำลังตรวจสอบ...
+                          </>
+                        ) : (
+                          <>
+                            <Phone className="h-4 w-4" aria-hidden="true" />
+                            ยืนยันและเข้าสู่ระบบ
+                          </>
+                        )}
+                      </button>
+                      <div className="flex items-center justify-between gap-3 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPhoneOtpSent(false);
+                            setPhoneOtp("");
+                          }}
+                          className="font-semibold text-primary hover:underline"
+                        >
+                          เปลี่ยนเบอร์โทร
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void sendPhoneOtp()}
+                          disabled={busy}
+                          className="font-semibold text-primary hover:underline disabled:opacity-60"
+                        >
+                          ส่ง OTP อีกครั้ง
+                        </button>
+                      </div>
                     </>
                   ) : (
-                    <>
-                      <Phone className="h-4 w-4" />
-                      ยืนยันและเข้าสู่ระบบ
-                    </>
+                    <button
+                      type="button"
+                      onClick={() => void sendPhoneOtp()}
+                      disabled={busy}
+                      className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 active:scale-[0.99] disabled:opacity-60"
+                    >
+                      {busy ? (
+                        <>
+                          <EngineWorkingAnimation size="sm" label="กำลังส่งรหัส" />
+                          กำลังส่งรหัส...
+                        </>
+                      ) : (
+                        <>
+                          <Phone className="h-4 w-4" aria-hidden="true" />
+                          ส่งรหัส OTP
+                        </>
+                      )}
+                    </button>
                   )}
-                </button>
-                <div className="flex items-center justify-between gap-3 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPhoneOtpSent(false);
-                      setPhoneOtp("");
-                    }}
-                    className="font-semibold text-primary hover:underline"
-                  >
-                    เปลี่ยนเบอร์โทร
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void sendPhoneOtp()}
-                    disabled={busy}
-                    className="font-semibold text-primary hover:underline disabled:opacity-60"
-                  >
-                    ส่ง OTP อีกครั้ง
-                  </button>
-                </div>
-              </>
-            ) : (
-              <button
-                type="button"
-                onClick={() => void sendPhoneOtp()}
-                disabled={busy}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground shadow transition hover:bg-primary/90 disabled:opacity-60"
-              >
-                {busy ? (
-                  <>
-                    <EngineWorkingAnimation size="sm" label="กำลังส่งรหัส" />
-                    กำลังส่งรหัส...
-                  </>
-                ) : (
-                  <>
-                    <Phone className="h-4 w-4" />
-                    ส่งรหัส OTP
-                  </>
-                )}
-              </button>
-            )}
-          </form>
-        ) : (
-          <form
-            onSubmit={(event) => void handleEmailAuth(event)}
-            className="space-y-3 pt-1 text-left"
-          >
-            {resetMode ? (
-              <div className="rounded-xl border border-primary/20 bg-info-soft/60 p-3 text-xs text-muted-foreground">
-                กรอกอีเมลเพื่อรับลิงก์ตั้งรหัสผ่านใหม่
-              </div>
-            ) : null}
-            {!resetMode && mode === "signup" ? (
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">ชื่อผู้ใช้งาน</label>
-                <input
-                  type="text"
-                  placeholder="เช่น สมชาย ใจดี"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                />
-              </div>
-            ) : null}
-            <div>
-              <label className="text-xs font-medium text-muted-foreground">อีเมล</label>
-              <input
-                type="email"
-                required
-                placeholder="name@example.com"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              />
-            </div>
-            {!resetMode ? (
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">รหัสผ่าน</label>
-                <input
-                  type="password"
-                  required
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                />
-              </div>
-            ) : null}
-            {!resetMode && mode === "email" ? (
-              <button
-                type="button"
-                onClick={() => setResetMode(true)}
-                className="text-left text-xs font-semibold text-primary hover:underline"
-              >
-                ลืมรหัสผ่าน?
-              </button>
-            ) : null}
-            {resetMode ? (
-              <button
-                type="button"
-                onClick={() => setResetMode(false)}
-                className="text-left text-xs font-semibold text-primary hover:underline"
-              >
-                กลับไปเข้าสู่ระบบ
-              </button>
-            ) : null}
-            <button
-              type="submit"
-              disabled={busy}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground shadow transition hover:bg-primary/90 disabled:opacity-60"
-            >
-              {busy ? (
-                <>
-                  <EngineWorkingAnimation
-                    size="sm"
-                    label={
-                      resetMode
-                        ? "กำลังส่งลิงก์"
-                        : mode === "signup"
-                          ? "กำลังสมัคร"
-                          : "กำลังเข้าสู่ระบบ"
-                    }
-                  />
-                  {resetMode
-                    ? "กำลังส่งลิงก์..."
-                    : mode === "signup"
-                      ? "กำลังสมัคร..."
-                      : "กำลังเข้าสู่ระบบ..."}
-                </>
-              ) : resetMode ? (
-                <>
-                  <Mail className="h-4 w-4" />
-                  ส่งลิงก์รีเซ็ตรหัสผ่าน
-                </>
-              ) : mode === "signup" ? (
-                <>
-                  <UserPlus className="h-4 w-4" />
-                  ลงทะเบียนใหม่
-                </>
+                </form>
               ) : (
-                <>
-                  <Mail className="h-4 w-4" />
-                  เข้าสู่ระบบด้วยอีเมล
-                </>
+                <form onSubmit={(event) => void handleEmailAuth(event)} className="space-y-4">
+                  {resetMode ? (
+                    <div className="flex items-start gap-3 rounded-2xl border border-primary/15 bg-info-soft/60 p-4 text-xs text-muted-foreground">
+                      <Mail className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                      <p className="leading-5">กรอกอีเมลเพื่อรับลิงก์ตั้งรหัสผ่านใหม่</p>
+                    </div>
+                  ) : null}
+                  {!resetMode && mode === "signup" ? (
+                    <div>
+                      <label
+                        className="text-xs font-semibold text-foreground"
+                        htmlFor="signup-name"
+                      >
+                        ชื่อผู้ใช้งาน
+                      </label>
+                      <div className="relative mt-2">
+                        <User
+                          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                          aria-hidden="true"
+                        />
+                        <input
+                          id="signup-name"
+                          type="text"
+                          placeholder="เช่น สมชาย ใจดี"
+                          value={name}
+                          onChange={(event) => setName(event.target.value)}
+                          className="w-full rounded-xl border border-input bg-background py-3 pl-10 pr-3.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+                  <div>
+                    <label className="text-xs font-semibold text-foreground" htmlFor="auth-email">
+                      อีเมล
+                    </label>
+                    <div className="relative mt-2">
+                      <Mail
+                        className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                        aria-hidden="true"
+                      />
+                      <input
+                        id="auth-email"
+                        type="email"
+                        required
+                        autoComplete="email"
+                        placeholder="name@example.com"
+                        value={email}
+                        onChange={(event) => setEmail(event.target.value)}
+                        className="w-full rounded-xl border border-input bg-background py-3 pl-10 pr-3.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                      />
+                    </div>
+                  </div>
+                  {!resetMode ? (
+                    <div>
+                      <label
+                        className="text-xs font-semibold text-foreground"
+                        htmlFor="auth-password"
+                      >
+                        รหัสผ่าน
+                      </label>
+                      <div className="relative mt-2">
+                        <LogIn
+                          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                          aria-hidden="true"
+                        />
+                        <input
+                          id="auth-password"
+                          type="password"
+                          required
+                          autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                          placeholder="อย่างน้อย 6 ตัวอักษร"
+                          value={password}
+                          onChange={(event) => setPassword(event.target.value)}
+                          className="w-full rounded-xl border border-input bg-background py-3 pl-10 pr-3.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+                  {!resetMode && mode === "email" ? (
+                    <button
+                      type="button"
+                      onClick={() => setResetMode(true)}
+                      className="text-left text-xs font-semibold text-primary hover:underline"
+                    >
+                      ลืมรหัสผ่าน?
+                    </button>
+                  ) : null}
+                  {resetMode ? (
+                    <button
+                      type="button"
+                      onClick={() => setResetMode(false)}
+                      className="text-left text-xs font-semibold text-primary hover:underline"
+                    >
+                      กลับไปเข้าสู่ระบบ
+                    </button>
+                  ) : null}
+                  <button
+                    type="submit"
+                    disabled={busy}
+                    className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 active:scale-[0.99] disabled:opacity-60"
+                  >
+                    {busy ? (
+                      <>
+                        <EngineWorkingAnimation
+                          size="sm"
+                          label={
+                            resetMode
+                              ? "กำลังส่งลิงก์"
+                              : mode === "signup"
+                                ? "กำลังสมัคร"
+                                : "กำลังเข้าสู่ระบบ"
+                          }
+                        />
+                        {resetMode
+                          ? "กำลังส่งลิงก์..."
+                          : mode === "signup"
+                            ? "กำลังสมัคร..."
+                            : "กำลังเข้าสู่ระบบ..."}
+                      </>
+                    ) : resetMode ? (
+                      <>
+                        <Mail className="h-4 w-4" aria-hidden="true" />
+                        ส่งลิงก์รีเซ็ตรหัสผ่าน
+                      </>
+                    ) : mode === "signup" ? (
+                      <>
+                        <UserPlus className="h-4 w-4" aria-hidden="true" />
+                        ลงทะเบียนใหม่
+                      </>
+                    ) : (
+                      <>
+                        <Mail className="h-4 w-4" aria-hidden="true" />
+                        เข้าสู่ระบบด้วยอีเมล
+                      </>
+                    )}
+                  </button>
+                </form>
               )}
+            </div>
+          </div>
+
+          <div className="mt-8 border-t border-border/80 pt-5">
+            <button
+              type="button"
+              onClick={handleGuestLogin}
+              className="group flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-border bg-secondary/55 px-4 text-xs font-semibold text-foreground transition-all duration-200 hover:-translate-y-0.5 hover:bg-secondary active:translate-y-0 active:scale-[0.99]"
+            >
+              <UserCheck className="h-4 w-4 text-primary" aria-hidden="true" />
+              <span>ทดลองใช้งานแบบ Guest Mode</span>
+              <ArrowRight
+                className="h-3.5 w-3.5 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+                aria-hidden="true"
+              />
             </button>
-          </form>
-        )}
-
-        <div className="border-t border-border pt-4 space-y-2">
-          <button
-            type="button"
-            onClick={handleGuestLogin}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-secondary py-2.5 text-xs font-semibold text-foreground transition hover:bg-secondary/80"
-          >
-            <UserCheck className="h-3.5 w-3.5 text-primary" />
-            ทดลองใช้งานโดยไม่ลงทะเบียน (Guest Mode)
-          </button>
-        </div>
-
-        <p className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
-          <ScanFace className="h-3.5 w-3.5" /> รองรับปลดล็อกด้วย Face ID / Touch ID
-          บนอุปกรณ์ที่รองรับ
-        </p>
+            <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-[11px] text-muted-foreground">
+              <ScanFace className="h-3.5 w-3.5" aria-hidden="true" />
+              รองรับ Face ID / Touch ID บนอุปกรณ์ที่รองรับ
+            </p>
+          </div>
+        </section>
       </div>
-    </div>
+    </main>
   );
 }
