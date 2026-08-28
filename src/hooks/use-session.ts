@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import type { Session, User } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import type { User } from "@supabase/supabase-js";
+import { onAuthStateChanged, type User as FirebaseUser } from "firebase/auth";
+import { getFirebaseAuth, isFirebaseConfigured } from "@/integrations/firebase/client";
 
 const GUEST_STORAGE_KEY = "work_tracker_guest_user";
 const AUTH_CHANGE_EVENT = "work_tracker_auth_change";
@@ -116,81 +117,96 @@ export function clearGuestUser() {
 
 const SESSION_CHECK_TIMEOUT_MS = 2500;
 
+function mapFirebaseUser(firebaseUser: FirebaseUser): User {
+  const providerId = firebaseUser.providerData[0]?.providerId ?? "firebase";
+  const createdAt = firebaseUser.metadata.creationTime ?? new Date().toISOString();
+  const avatarUrl = firebaseUser.photoURL ?? undefined;
+  const displayName = firebaseUser.displayName || firebaseUser.email?.split("@")[0] || "ผู้ใช้";
+
+  return {
+    id: firebaseUser.uid,
+    aud: "authenticated",
+    role: "authenticated",
+    email: firebaseUser.email,
+    phone: firebaseUser.phoneNumber,
+    created_at: createdAt,
+    app_metadata: {
+      provider: providerId,
+      providers: [providerId],
+    },
+    user_metadata: {
+      full_name: displayName,
+      name: displayName,
+      avatar_url: avatarUrl,
+      picture: avatarUrl,
+    },
+  } as User;
+}
+
 export function useSession() {
-  const [session, setSession] = useState<Session | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [guestUser, setGuestUserState] = useState<User | null>(() => getGuestUser());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
-
-    const syncUserState = () => {
-      const local = getGuestUser();
-      setGuestUserState(local);
-    };
+    const syncUserState = () => setGuestUserState(getGuestUser());
 
     window.addEventListener(AUTH_CHANGE_EVENT, syncUserState);
     window.addEventListener("storage", syncUserState);
-
     syncUserState();
+
+    const auth = getFirebaseAuth();
+    if (!auth || !isFirebaseConfigured()) {
+      setLoading(false);
+      return () => {
+        window.removeEventListener(AUTH_CHANGE_EVENT, syncUserState);
+        window.removeEventListener("storage", syncUserState);
+      };
+    }
 
     const timeout = setTimeout(() => {
       if (mounted) setLoading(false);
     }, SESSION_CHECK_TIMEOUT_MS);
 
-    try {
-      supabase.auth
-        .getSession()
-        .then(({ data }) => {
-          if (!mounted) return;
-          clearTimeout(timeout);
-          setSession(data.session);
-          setLoading(false);
-        })
-        .catch((err) => {
-          console.warn("[useSession] getSession error:", err);
-          if (mounted) {
-            clearTimeout(timeout);
-            setLoading(false);
-          }
-        });
-    } catch (err) {
-      console.warn("[useSession] Supabase client access error:", err);
-      if (mounted) {
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      (nextFirebaseUser) => {
+        if (!mounted) return;
         clearTimeout(timeout);
+        setFirebaseUser(nextFirebaseUser ? mapFirebaseUser(nextFirebaseUser) : null);
         setLoading(false);
-      }
-    }
-
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
-      clearTimeout(timeout);
-      setSession(next);
-      setLoading(false);
-    });
+      },
+      (error) => {
+        console.warn("[useSession] Firebase auth state error:", error);
+        if (mounted) {
+          clearTimeout(timeout);
+          setLoading(false);
+        }
+      },
+    );
 
     return () => {
       mounted = false;
       clearTimeout(timeout);
+      unsubscribe();
       window.removeEventListener(AUTH_CHANGE_EVENT, syncUserState);
       window.removeEventListener("storage", syncUserState);
-      sub?.subscription?.unsubscribe?.();
     };
   }, []);
 
   useEffect(() => {
-    if (!session?.user || !guestUser || isLocalGuestUser(guestUser)) return;
-    migrateLocalUserData(guestUser.id, session.user.id);
-  }, [guestUser, session?.user]);
+    if (!firebaseUser || !guestUser || isLocalGuestUser(guestUser)) return;
+    migrateLocalUserData(guestUser.id, firebaseUser.id);
+  }, [firebaseUser, guestUser]);
 
-  // Only the explicit Guest Mode is local-only. Legacy "direct Gmail"/"email" pseudo-users
-  // are intentionally ignored so the user can sign in with a real Supabase session.
   const localGuest = isLocalGuestUser(guestUser) ? guestUser : null;
-  const user: User | null = session?.user ?? localGuest;
+  const user: User | null = firebaseUser ?? localGuest;
   return {
-    session,
+    session: null,
     user,
     loading,
-    isGuest: !session?.user && !!localGuest,
+    isGuest: !firebaseUser && !!localGuest,
   };
 }
 

@@ -1,88 +1,58 @@
-# LINE Login Setup สำหรับ Work Tracker
+# Authentication Setup สำหรับ Work Tracker
 
-## สิ่งที่โค้ดรองรับ
+## สถาปัตยกรรมปัจจุบัน
 
-ระบบรองรับสองทางเลือกในปุ่ม **เข้าสู่ระบบด้วย LINE LIFF** โดยจะเลือกอัตโนมัติตาม environment ของการ deploy หากมี `VITE_LINE_LIFF_ID` ระบบจะ initialize LIFF และใช้ `liff.login()` พร้อม `liff.getIDToken()` จากนั้นส่ง raw ID token ให้ Supabase Auth ผ่าน `signInWithIdToken({ provider: "custom:line" })` ซึ่งให้ Supabase Auth ตรวจสอบ token กับ Custom OIDC provider ก่อนสร้าง session หากไม่มี LIFF ID ระบบจะใช้ Supabase Custom OIDC browser flow ผ่าน `signInWithOAuth({ provider: "custom:line" })` แทน ทั้งสองทางกลับเข้าสู่ Supabase Auth session เดียวกันและไม่สร้าง local user แบบใหม่
+ระบบใช้ **Firebase Authentication เป็น source of truth สำหรับตัวตนและ session** โดยรองรับ Google, GitHub, Email/Password, Phone OTP และ LINE ผ่าน OIDC provider `oidc.line` ส่วน Supabase ยังคงใช้สำหรับฐานข้อมูลและ Storage โดย Supabase client จะส่ง Firebase ID token ผ่าน `accessToken` เพื่อให้ RLS ของ Supabase ตรวจสอบตัวตนจาก Firebase ได้
 
-ลำดับการทำงานของ LIFF path คือ `liff.init()` → `liff.login()` หากยังไม่ login → LINE redirect กลับมายัง `/auth?line_login=1` → `liff.init()` อีกครั้ง → `liff.getIDToken()` → `supabase.auth.signInWithIdToken()` → Supabase session เดิมของแอป การยืนยันตัวตนเกิดขึ้นที่ Supabase/LINE ไม่ใช่จากข้อมูล profile ที่ browser ถอดหรือส่งเอง
+> ห้ามใช้ Supabase Auth และ Firebase Auth เป็น session หลักพร้อมกัน เพราะจะทำให้ผู้ใช้มี identity และ lifecycle คนละชุด
 
-## ค่าที่ต้องตั้งใน Netlify
+## Environment variables ใน Netlify
 
-เพิ่มตัวแปร public ต่อไปนี้ใน Netlify ที่ **Site configuration → Environment variables** แล้ว trigger deploy ใหม่ โดยใช้ LIFF ID จริงจาก LINE Developers Console ช่องนี้ไม่ใช่ Channel Secret และสามารถถูกฝังใน browser build ได้ตามการออกแบบของ LIFF
+เพิ่มค่าต่อไปนี้ใน **Netlify → Site configuration → Environment variables** โดยตั้ง scope เป็น production/all deploy contexts แล้ว trigger **Clear cache and deploy site** หลังแก้ค่า
 
-| Variable                        | ค่า                                                                     |
-| ------------------------------- | ----------------------------------------------------------------------- |
-| `VITE_SUPABASE_URL`             | Supabase project URL เดียวกับระบบ production                            |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase publishable key ของ project (หรือใช้ `VITE_SUPABASE_ANON_KEY`) |
-| `VITE_LINE_LIFF_ID`             | LIFF ID จริงของ LIFF App ที่สร้างไว้แล้ว                                |
+| Variable                                                      | ใช้สำหรับ                                                         |
+| ------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `VITE_FIREBASE_API_KEY`                                       | Firebase Web app config                                           |
+| `VITE_FIREBASE_AUTH_DOMAIN`                                   | Firebase Auth redirect domain เช่น `<project-id>.firebaseapp.com` |
+| `VITE_FIREBASE_PROJECT_ID`                                    | Firebase project เดียวกับ Authentication                          |
+| `VITE_FIREBASE_STORAGE_BUCKET`                                | Firebase Web app config                                           |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID`                           | Firebase Web app config                                           |
+| `VITE_FIREBASE_APP_ID`                                        | Firebase Web app config                                           |
+| `VITE_FIREBASE_MEASUREMENT_ID`                                | ไม่บังคับ ใช้เมื่อเปิด Analytics                                  |
+| `VITE_SUPABASE_URL`                                           | Supabase Database/Storage URL                                     |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` หรือ `VITE_SUPABASE_ANON_KEY` | Supabase public key สำหรับ Database/Storage                       |
 
-`VITE_SUPABASE_URL` และ `VITE_SUPABASE_PUBLISHABLE_KEY` (หรือ `VITE_SUPABASE_ANON_KEY`) จำเป็นต่อทุกช่องทาง เพราะหน้าเว็บเรียก Supabase Auth จาก browser โดยตรง หากสองค่านี้หายหรือยังเป็น placeholder ระบบจะไม่ redirect ไป provider จริงและจะแจ้งให้ตั้งค่าใหม่แทน ส่วน `VITE_LINE_LIFF_ID` จำเป็นเฉพาะ LINE LIFF path
+ค่า Firebase Web config เป็น public configuration และถูกฝังใน browser bundle ได้ แต่ **ห้าม** ใส่ Firebase service-account JSON, private key, Supabase service-role key หรือ secret อื่นใดในตัวแปรที่ขึ้นต้นด้วย `VITE_`
 
-ห้ามเพิ่ม `LINE_CHANNEL_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` หรือ secret ใด ๆ ที่ขึ้นต้นด้วย `VITE_` ลงใน frontend หรือ repository โดยเด็ดขาด
+## Firebase Authentication providers
 
-## ค่าที่ต้องตั้งใน LINE Developers Console
+ไปที่ **Firebase Console → Authentication → Sign-in method** แล้วเปิด provider ที่ต้องการ ได้แก่ Google, GitHub, Email/Password และ Phone หากใช้ LINE ให้เพิ่ม **OpenID Connect** provider ด้วย provider ID `oidc.line` และตั้งค่า issuer/client credentials ตามค่าที่ Firebase Console กำหนดสำหรับ LINE Login channel ของคุณ
 
-ใช้ Channel เดียวกับ LIFF App ที่มีอยู่แล้ว และตรวจว่า OpenID Connect เปิดใช้งานพร้อม scope `openid` และ `profile` หากต้องการ email ต้องขอสิทธิ์ email ตามขั้นตอนของ LINE ก่อน เพราะ scope email ไม่ได้พร้อมใช้โดยอัตโนมัติสำหรับทุก Channel
+สำหรับ Google ให้เพิ่มโดเมน Netlify จริงใน **Authentication → Settings → Authorized domains** เช่น `my-work-tracking.netlify.app` ห้ามใส่ protocol หรือ path ในช่อง domain หากเห็น `auth/unauthorized-domain` ให้ตรวจจุดนี้ก่อน
 
-สำหรับการใช้ LIFF ให้ตั้ง **Endpoint URL เป็นโดเมนเดียวกับเว็บที่ผู้ใช้เปิดปุ่ม login** เช่น `https://<ชื่อ-site>.netlify.app/` หรือ custom domain จริงของ Netlify และห้ามสลับระหว่าง Render, Netlify preview URL และ production URL เพราะ LIFF กำหนดให้ `redirectUri` ต้องอยู่ที่ Endpoint URL หรือ path ที่อยู่ด้านล่างของ Endpoint URL [2] เส้นทางที่ระบบใช้รับผลกลับคือ `/auth?line_login=1` และโค้ดจะเรียก `liff.init()` ก่อนแก้ query/hash ของ LIFF เสมอ
+สำหรับ GitHub ต้องสร้าง OAuth App และตั้ง callback URL ตาม Firebase Console ที่แสดงให้ provider นั้นโดยเฉพาะ จากนั้นใส่ Client ID และ Client Secret ใน Firebase Dashboard เท่านั้น
 
-## ค่าที่ต้องตั้งใน Supabase Custom OIDC Provider
+สำหรับ Phone ให้เปิด Phone provider และตั้งค่า reCAPTCHA/โควตา SMS ตามขั้นตอนของ Firebase โดยหน้าเว็บจะสร้าง invisible reCAPTCHA ใน element `recaptcha-container` ก่อนส่ง OTP
 
-ไปที่ **Authentication → Sign In/Providers → Custom Providers** แล้วสร้าง provider ชื่อ `line` ซึ่งจะถูกเรียกจากโค้ดเป็น `custom:line` ค่า discovery ที่ตรวจสอบจาก LINE public metadata คือ issuer `https://access.line.me`, authorization endpoint `https://access.line.me/oauth2/v2.1/authorize`, token endpoint `https://api.line.me/oauth2/v2.1/token`, JWKS `https://api.line.me/oauth2/v2.1/certs` และ userinfo `https://api.line.me/oauth2/v2.1/userinfo` ส่วน Client ID ให้ใช้ Channel ID จาก LINE Developers Console และ Client Secret ให้ใส่ใน Supabase Dashboard เท่านั้น
+## Supabase third-party auth integration
 
-| Supabase/LINE setting  | ค่า                                                     |
-| ---------------------- | ------------------------------------------------------- |
-| Provider name          | `line`                                                  |
-| Issuer                 | `https://access.line.me`                                |
-| Authorization endpoint | `https://access.line.me/oauth2/v2.1/authorize`          |
-| Token endpoint         | `https://api.line.me/oauth2/v2.1/token`                 |
-| JWKS URL               | `https://api.line.me/oauth2/v2.1/certs`                 |
-| Userinfo URL           | `https://api.line.me/oauth2/v2.1/userinfo`              |
-| Client ID              | LINE Channel ID                                         |
-| Client Secret          | LINE Channel Secret; ใส่ใน Supabase เท่านั้น            |
-| Scopes                 | `openid profile` และเพิ่ม `email` เมื่อได้รับสิทธิ์แล้ว |
+ใน Supabase Dashboard ให้เพิ่ม Firebase เป็น **Third-party Auth integration** โดยใช้ Firebase Project ID เดียวกับ `VITE_FIREBASE_PROJECT_ID` จากนั้นตรวจว่า RLS policies ของตารางใช้ `auth.uid()` และกำหนด custom claim `role: authenticated` ให้ Firebase users ตามแนวทางของ Supabase Third-party Auth หากไม่ทำขั้นตอนนี้ ผู้ใช้จะ login Firebase สำเร็จแต่ query ฐานข้อมูลอาจได้ `401` หรือถูก RLS ปฏิเสธ
 
-ตรวจชื่อฟิลด์ที่ Dashboard แสดงอีกครั้งก่อนกด Save เนื่องจาก Supabase อาจจัดกลุ่ม endpoint หรือใช้ discovery URL แทนการกรอก endpoint แยกกันในบางหน้าจอ
+ระบบไม่เรียก `supabase.auth.signInWithOAuth`, `signInWithPassword`, `verifyOtp` หรือ `exchangeCodeForSession` อีกต่อไป ตัวตนและการออกจากระบบใช้ Firebase SDK ทั้งหมด ส่วน Supabase client มีหน้าที่เรียก Data API/Storage โดยแนบ Firebase ID token อัตโนมัติ
 
-## Redirect URLs
+## การทดสอบบน Netlify
 
-สำหรับ Netlify ให้แทน `<NETLIFY_SITE_URL>` ด้วย URL production จริงของ site แล้วเพิ่มค่าเหล่านี้ใน **Supabase → Authentication → URL Configuration → Redirect URLs**
+เปิด production URL แล้วไปที่ `/auth` ตรวจว่า status banner แสดง **ระบบ Firebase พร้อมเชื่อมต่อบัญชี** จากนั้นทดสอบ Google บนอุปกรณ์มือถือและ desktop, Email/Password, Phone OTP, GitHub และ LINE OIDC ทีละ provider หลัง login สำเร็จให้ refresh หน้า, เปิดข้อมูลเดิม, ทดสอบ logout และ login ซ้ำ
 
-```text
-<NETLIFY_SITE_URL>/auth/callback
-<NETLIFY_SITE_URL>/auth
-```
+หาก status banner ยังเป็นสีเหลือง ให้ตรวจชื่อและ scope ของ Firebase `VITE_*` variables แล้ว deploy ใหม่ เพราะค่าถูกฝังใน build-time หาก Google แสดง `auth/unauthorized-domain` ให้เพิ่ม Netlify hostname ใน Firebase Authorized domains หาก LINE แสดง provider error ให้ตรวจ provider ID `oidc.line`, issuer และ callback URL ใน Firebase Console
 
-ตัวอย่างเช่น `https://my-work-tracking.netlify.app/auth/callback` และ `https://my-work-tracking.netlify.app/auth` ส่วน LIFF Endpoint URL ต้องเป็น origin เดียวกันกับ `<NETLIFY_SITE_URL>` และควรใช้ production URL ไม่ใช่ Deploy Preview URL หากไม่ได้เพิ่ม preview host นั้นไว้ใน LINE Developers Console สำหรับ local development ให้เพิ่ม origin local ที่ใช้งานจริงของ Vite พร้อม `/auth/callback` และ `/auth` เป็นรายการแยกต่างหาก อย่าใช้ wildcard กว้างเกินจำเป็น
+## Security checklist
 
-ถ้าเห็น `400 Bad Request` จาก `access.line.me` ให้ตรวจตามลำดับนี้: เปิดเว็บจาก URL เดียวกับ Endpoint URL, ตรวจว่า `VITE_LINE_LIFF_ID` ใน Netlify เป็น LIFF ID ของ channel เดียวกับ Endpoint URL, ตรวจว่า Endpoint URL ครอบคลุม `/auth`, และ trigger deploy ใหม่หลังแก้ environment variable ค่า 400 ในช่วงก่อน consent มักเกิดจาก `redirect_uri` ไม่อยู่ใต้ Endpoint URL หรือใช้ LIFF ID/channel ผิดชุด
+ระบบไม่เก็บ Firebase ID token ใน localStorage หรือ URL, ไม่ใช้ email/display name เป็น primary key และไม่ยืนยันตัวตนจาก profile ที่ browser ถอดเอง ผู้ใช้ที่เป็น Guest จะยังเป็น local-only user และจะไม่ถูกส่งไป Firebase จนกว่าจะเลือก provider จริง
 
-## ขั้นตอนทดสอบบนโทรศัพท์
+### References
 
-เปิด `<NETLIFY_SITE_URL>/auth` จาก browser หรือเปิด LIFF URL ในแอป LINE แล้วกด **เข้าสู่ระบบด้วย LINE LIFF** ควรเห็นหน้าอนุญาตของ LINE หรือถูกเข้าสู่ระบบอัตโนมัติตาม session ของ LINE หลังอนุญาต ระบบต้องกลับมายัง Work Tracker, แสดงชื่อผู้ใช้จาก Supabase session และโหลดข้อมูลของ `auth.uid()` เดิมโดยไม่สร้างบัญชีซ้ำ
-
-ทดสอบกรณีผู้ใช้กดยกเลิก, provider ยังไม่เปิด, LIFF ID ผิด, ไม่มี `openid` scope, เปิด `/auth?line_login=1` โดยไม่มี session LINE และกลับมาเปิดหน้าเว็บใหม่ด้วย หากเกิดข้อผิดพลาด ระบบต้องแสดงข้อความที่อ่านได้และไม่แสดง ID token, Channel Secret หรือ service-role key ในหน้าจอและ console
-
-## วิธีตรวจสอบหลัง deploy
-
-ตรวจให้ครบทั้ง browser ปกติและ LINE mobile app: เปิด `/auth`, กด **LINE LIFF**, อนุญาตการเข้าสู่ระบบ, ตรวจว่ากลับมายังหน้า `/` และ refresh แล้ว session ยังอยู่ จากนั้นทดสอบ logout และ login ซ้ำอีกครั้ง หาก `VITE_LINE_LIFF_ID` ไม่ได้ตั้งใจให้ว่าง ต้องไม่เห็น fallback OIDC โดยไม่ตั้งค่า provider ให้ครบ
-
-## หมายเหตุด้านความปลอดภัย
-
-LINE ระบุว่าข้อมูลผู้ใช้ที่ส่งไป server ควรใช้ raw ID token จาก `liff.getIDToken()` แล้วตรวจสอบ token ฝั่ง server/identity provider ไม่ควรส่งข้อมูล profile ที่ client ถอดเองไปเชื่อถือเป็นตัวตนหลัก ระบบนี้จึงใช้ Supabase Auth เป็น source of truth และใช้ `auth.uid()` เป็นตัวระบุข้อมูล ไม่ใช้ LINE display name หรือ email เป็น primary key
-
-โค้ดจะไม่เก็บ ID token ใน localStorage, sessionStorage, URL หรือฐานข้อมูล และจะแปลง error ของ LIFF/Supabase เป็นข้อความปลอดภัยก่อนแสดงใน toast เพื่อไม่ให้ token หรือข้อมูลภายในหลุดไปยังผู้ใช้ ตรวจสอบด้วยว่าไม่มี channel secret หรือ service-role key ที่ขึ้นต้นด้วย `VITE_` และอย่าส่ง primary redirect URL ที่ยังมี credential query parameters ไปยัง analytics ก่อน `liff.init()` เสร็จ
-
-## References
-
-[1]: https://developers.line.biz/en/docs/line-login/integrate-line-login/ LINE Developers — Integrating LINE Login with your web app.
-
-[2]: https://developers.line.biz/en/reference/liff/ LINE Developers — LIFF API reference.
-
-[3]: https://developers.line.biz/en/docs/liff/using-user-profile/ LINE Developers — Using user data in LIFF apps and servers.
-
-[4]: https://access.line.me/.well-known/openid-configuration LINE public OpenID Connect discovery metadata.
-
-[5]: https://supabase.com/docs/reference/javascript/auth-signinwithidtoken Supabase JavaScript — `signInWithIdToken`.
-
-[6]: https://supabase.com/docs/guides/auth/custom-oauth-providers Supabase — Custom OAuth/OIDC Providers.
+[1]: https://firebase.google.com/docs/auth/web/google-signin Firebase — Authenticate Using Google with JavaScript
+[2]: https://firebase.google.com/docs/auth/web/start Firebase — Get Started with Firebase Authentication on Websites
+[3]: https://supabase.com/docs/guides/auth/third-party/firebase-auth Supabase — Use Firebase Auth with your Supabase project
+[4]: https://firebase.google.com/docs/auth/admin/verify-id-tokens Firebase — Verify ID tokens using the Admin SDK

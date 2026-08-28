@@ -7,16 +7,8 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
-import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-import {
-  getLineAuthErrorMessage,
-  initializeLineLiffOnPrimaryRedirect,
-  isLineLiffPrimaryRedirect,
-} from "@/lib/line-auth";
-
 import appCss from "../styles.css?url";
 import { EngineWorkingAnimation } from "@/components/ui/engine-working-animation";
 
@@ -144,60 +136,6 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  const router = useRouter();
-  const [isLiffPrimaryRedirectPending, setIsLiffPrimaryRedirectPending] = useState(() =>
-    isLineLiffPrimaryRedirect(),
-  );
-
-  useEffect(() => {
-    if (!isLiffPrimaryRedirectPending) return;
-
-    let cancelled = false;
-    void initializeLineLiffOnPrimaryRedirect()
-      .catch((error) => {
-        if (cancelled) return;
-
-        toast.error("เชื่อมต่อ LINE ไม่สำเร็จ", {
-          description: getLineAuthErrorMessage(error),
-        });
-        window.history.replaceState({}, document.title, window.location.pathname);
-      })
-      .finally(() => {
-        if (!cancelled) setIsLiffPrimaryRedirectPending(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isLiffPrimaryRedirectPending]);
-
-  useEffect(() => {
-    try {
-      const { data } = supabase.auth.onAuthStateChange((event) => {
-        if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
-        router.invalidate();
-        if (event !== "SIGNED_OUT") queryClient.invalidateQueries();
-      });
-      return () => data?.subscription?.unsubscribe?.();
-    } catch (err) {
-      console.warn("[Root] onAuthStateChange error:", err);
-      return undefined;
-    }
-  }, [queryClient, router]);
-
-  if (isLiffPrimaryRedirectPending) {
-    return (
-      <QueryClientProvider client={queryClient}>
-        <div className="flex min-h-screen items-center justify-center bg-background px-4 text-center">
-          <div className="space-y-2">
-            <p className="text-lg font-semibold text-foreground">กำลังเชื่อมต่อ LINE...</p>
-            <p className="text-sm text-muted-foreground">กรุณารอสักครู่</p>
-          </div>
-        </div>
-        <Toaster position="top-center" richColors />
-      </QueryClientProvider>
-    );
-  }
 
   return (
     <QueryClientProvider client={queryClient}>

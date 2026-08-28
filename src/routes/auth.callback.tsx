@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { AlertCircle, ArrowLeft, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { isSupabaseConfigured, supabase } from "@/integrations/supabase/client";
+import { completeGoogleRedirect } from "@/integrations/firebase/auth";
+import { getFirebaseAuth, isFirebaseConfigured } from "@/integrations/firebase/client";
 
 export const Route = createFileRoute("/auth/callback")({
   component: AuthCallbackPage,
@@ -17,26 +18,23 @@ function getCallbackErrorMessage(error: unknown) {
     normalized.includes("cancel") ||
     normalized.includes("access_denied")
   ) {
-    return "คุณยกเลิกการเข้าสู่ระบบแล้ว หากต้องการใช้งานต่อ กรุณากลับไปกด Continue with GitHub ใหม่อีกครั้ง";
+    return "คุณยกเลิกการเข้าสู่ระบบแล้ว กรุณากลับไปเริ่มใหม่อีกครั้ง";
   }
 
-  if (
-    normalized.includes("expired") ||
-    normalized.includes("invalid") ||
-    normalized.includes("code")
-  ) {
-    return "ลิงก์เข้าสู่ระบบหมดอายุหรือถูกใช้ไปแล้ว กรุณากลับไปเริ่มเข้าสู่ระบบใหม่อีกครั้ง";
+  if (normalized.includes("unauthorized-domain")) {
+    return "โดเมนนี้ยังไม่ได้อยู่ใน Firebase Authentication → Settings → Authorized domains";
   }
 
-  if (
-    normalized.includes("environment") ||
-    (normalized.includes("supabase") && normalized.includes("configured"))
-  ) {
-    return "การ deploy นี้ยังไม่มี VITE_SUPABASE_URL และ VITE_SUPABASE_PUBLISHABLE_KEY (หรือ VITE_SUPABASE_ANON_KEY) ใน Netlify";
+  if (normalized.includes("popup-blocked")) {
+    return "เบราว์เซอร์บล็อกหน้าต่างเข้าสู่ระบบ กรุณาอนุญาต pop-up หรือเปิดจากอุปกรณ์ที่รองรับการ redirect";
   }
 
-  if (normalized.includes("provider") || normalized.includes("github")) {
-    return "ยังไม่ได้เปิดใช้งาน Provider นี้ใน Supabase หรือการตั้งค่า OAuth ไม่ถูกต้อง";
+  if (normalized.includes("provider") || normalized.includes("operation-not-allowed")) {
+    return "ยังไม่ได้เปิดใช้งาน Provider นี้ใน Firebase Authentication หรือการตั้งค่า OAuth ไม่ถูกต้อง";
+  }
+
+  if (normalized.includes("environment") || normalized.includes("firebase")) {
+    return "การ deploy นี้ยังไม่มี Firebase environment variables ครบถ้วนใน Netlify";
   }
 
   return "ไม่สามารถยืนยันการเข้าสู่ระบบได้ กรุณาลองใหม่อีกครั้ง";
@@ -51,37 +49,18 @@ function AuthCallbackPage() {
     let cancelled = false;
 
     async function completeOAuth() {
-      if (!isSupabaseConfigured()) {
-        throw new Error("Supabase environment is not configured for this deployment");
+      if (!isFirebaseConfigured()) {
+        throw new Error("Firebase environment is not configured for this deployment");
       }
 
       const params = new URLSearchParams(window.location.search);
       const providerError = params.get("error_description") || params.get("error");
-      const code = params.get("code");
+      if (providerError) throw new Error(providerError.replace(/\+/g, " "));
 
-      if (providerError) {
-        throw new Error(providerError.replace(/\+/g, " "));
-      }
-
-      if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (error) {
-          // The browser client may have completed the PKCE exchange during its
-          // automatic URL detection. Verify the resulting session before
-          // treating the callback as a failure, which also keeps identity
-          // linking from being broken by a second exchange attempt.
-          const { data } = await supabase.auth.getSession();
-          if (!data.session?.user) throw error;
-        }
-      }
-
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError || !user) {
-        throw userError ?? new Error("No authenticated user found after OAuth callback");
+      const redirectResult = await completeGoogleRedirect();
+      const currentUser = redirectResult?.user ?? getFirebaseAuth()?.currentUser;
+      if (!currentUser) {
+        throw new Error("No authenticated Firebase user found after OAuth callback");
       }
 
       if (cancelled) return;
@@ -91,7 +70,7 @@ function AuthCallbackPage() {
 
     void completeOAuth().catch((error: unknown) => {
       if (cancelled) return;
-      console.error("[AuthCallback] OAuth callback failed", error);
+      console.error("[AuthCallback] Firebase callback failed", error);
       setErrorMessage(getCallbackErrorMessage(error));
       setStatus("error");
     });

@@ -12,7 +12,7 @@ import { useWorkTracker } from "@/hooks/use-work-tracker";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import type { DashboardViewport } from "@/lib/dashboard-layout";
 import { clearGuestUser, displayName, useSession } from "@/hooks/use-session";
-import { supabase } from "@/integrations/supabase/client";
+import { signOutFirebase } from "@/integrations/firebase/auth";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
@@ -131,7 +131,7 @@ function Index() {
     }
   }, [loading, userId, navigate]);
 
-  async function signOut(scope: "local" | "global" = "local") {
+  async function signOut() {
     if (settingsDirtyRef.current) {
       const confirmed = window.confirm(
         "หน้านี้มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก ต้องการออกจากระบบหรือไม่?",
@@ -143,7 +143,7 @@ function Index() {
     queryClient.clear();
     clearGuestUser();
     try {
-      await supabase.auth.signOut({ scope });
+      await signOutFirebase();
     } catch (e) {
       console.warn("SignOut notice:", e);
     }

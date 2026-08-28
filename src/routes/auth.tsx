@@ -29,13 +29,18 @@ import {
   useSession,
   type RecentGmailAccount,
 } from "@/hooks/use-session";
-import { isSupabaseConfigured, supabase } from "@/integrations/supabase/client";
+import { isFirebaseConfigured } from "@/integrations/firebase/client";
 import {
-  completeLineLiffLoginIfNeeded,
-  getLineAuthErrorMessage,
-  isLineLiffCallback,
-  startLineLogin,
-} from "@/lib/line-auth";
+  completeGoogleRedirect,
+  ensureFirebaseAuthConfigured,
+  resetFirebasePassword,
+  sendFirebasePhoneOtp,
+  signInWithEmail,
+  signInWithGithub,
+  signInWithGoogle,
+  signUpWithEmail,
+  verifyFirebasePhoneOtp,
+} from "@/integrations/firebase/auth";
 import { EngineWorkingAnimation } from "@/components/ui/engine-working-animation";
 
 export const Route = createFileRoute("/auth")({
@@ -93,14 +98,15 @@ function AuthRoute() {
   );
 }
 
-function ensureSupabaseAuthConfigured() {
-  if (isSupabaseConfigured()) return true;
-
-  toast.error("ระบบยังไม่ได้ตั้งค่าการเชื่อมต่อ Supabase", {
-    description:
-      "กรุณาตั้ง VITE_SUPABASE_URL และ VITE_SUPABASE_PUBLISHABLE_KEY (หรือ VITE_SUPABASE_ANON_KEY) ใน Netlify แล้ว trigger deploy ใหม่",
-  });
-  return false;
+function ensureFirebaseAuthReady() {
+  try {
+    return ensureFirebaseAuthConfigured();
+  } catch (error) {
+    toast.error("ระบบยังไม่ได้ตั้งค่า Firebase Authentication", {
+      description: error instanceof Error ? error.message : String(error),
+    });
+    return false;
+  }
 }
 
 function AuthPage() {
@@ -122,7 +128,7 @@ function AuthPage() {
   const [gmailAddress, setGmailAddress] = useState("");
   const [gmailName, setGmailName] = useState("");
   const [recentAccounts, setRecentAccounts] = useState<RecentGmailAccount[]>([]);
-  const supabaseConfigured = isSupabaseConfigured();
+  const firebaseConfigured = isFirebaseConfigured();
 
   useEffect(() => {
     setRecentAccounts(getRecentGmailAccounts());
@@ -135,40 +141,24 @@ function AuthPage() {
   useEffect(() => {
     let cancelled = false;
 
-    async function completeLiffCallback() {
-      if (!isLineLiffCallback()) return;
-      if (!ensureSupabaseAuthConfigured()) return;
-      setBusy(true);
-      try {
-        await completeLineLiffLoginIfNeeded();
-        if (!cancelled) {
-          toast.success("เข้าสู่ระบบด้วย LINE สำเร็จ");
-          void navigate({ to: "/", replace: true });
+    void completeGoogleRedirect()
+      .then((result) => {
+        if (!cancelled && result?.user) {
+          toast.success("เข้าสู่ระบบด้วย Google สำเร็จ");
         }
-      } catch (error) {
+      })
+      .catch((error) => {
         if (!cancelled) {
-          toast.error("เข้าสู่ระบบด้วย LINE ไม่สำเร็จ", {
-            description: getLineAuthErrorMessage(error),
+          toast.error("เข้าสู่ระบบ Google ไม่สำเร็จ", {
+            description: error instanceof Error ? error.message : String(error),
           });
         }
-      } finally {
-        if (!cancelled) setBusy(false);
-      }
-    }
+      });
 
-    void completeLiffCallback();
-
-    // Handle OAuth callback parameters or error codes.
     const searchParams = new URLSearchParams(window.location.search);
-    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-    const oauthError =
-      searchParams.get("error_description") ||
-      searchParams.get("error") ||
-      hashParams.get("error_description") ||
-      hashParams.get("error");
-
+    const oauthError = searchParams.get("error_description") || searchParams.get("error");
     if (oauthError) {
-      toast.error("เข้าสู่ระบบผ่าน OAuth ไม่สำเร็จ", {
+      toast.error("เข้าสู่ระบบผ่าน Firebase ไม่สำเร็จ", {
         description: oauthError.replace(/\+/g, " "),
       });
       window.history.replaceState({}, document.title, window.location.pathname);
@@ -177,7 +167,7 @@ function AuthPage() {
     return () => {
       cancelled = true;
     };
-  }, [navigate]);
+  }, []);
 
   function normalizeGmailInput(raw: string): string {
     const trimmed = raw.trim();
@@ -197,8 +187,7 @@ function AuthPage() {
     }
     setGmailAddress(finalEmail);
     if (targetName) setGmailName(targetName);
-    // The email is only a hint for the account chooser. Identity and session
-    // must come from Supabase OAuth, never from a local pseudo-user.
+    // The email is only a hint for the Firebase Google account chooser.
     await signInGoogle(finalEmail);
   }
 
@@ -211,28 +200,10 @@ function AuthPage() {
 
   async function signInGoogle(loginHint?: string) {
     if (busy) return;
-    if (!ensureSupabaseAuthConfigured()) return;
+    if (!ensureFirebaseAuthReady()) return;
     setBusy(true);
     try {
-      const redirectOrigin = typeof window !== "undefined" ? window.location.origin : "";
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${redirectOrigin}/auth/callback`,
-          queryParams: {
-            access_type: "offline",
-            prompt: "consent",
-            ...(loginHint ? { login_hint: loginHint } : {}),
-          },
-        },
-      });
-
-      if (error) {
-        throw error;
-      }
-      if (data?.url) {
-        window.location.assign(data.url);
-      }
+      await signInWithGoogle(loginHint);
     } catch (err) {
       toast.error("เข้าสู่ระบบ Google ไม่สำเร็จ", {
         description: err instanceof Error ? err.message : String(err),
@@ -244,18 +215,10 @@ function AuthPage() {
 
   async function signInGithub() {
     if (busy) return;
-    if (!ensureSupabaseAuthConfigured()) return;
+    if (!ensureFirebaseAuthReady()) return;
     setBusy(true);
     try {
-      const redirectOrigin = typeof window !== "undefined" ? window.location.origin : "";
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: "github",
-        options: { redirectTo: `${redirectOrigin}/auth/callback` },
-      });
-      if (error) throw error;
-      if (data?.url) {
-        window.location.assign(data.url);
-      }
+      await signInWithGithub();
     } catch (err) {
       toast.error("เข้าสู่ระบบ GitHub ไม่สำเร็จ", {
         description: err instanceof Error ? err.message : String(err),
@@ -267,17 +230,15 @@ function AuthPage() {
 
   async function signInLine() {
     if (busy) return;
-    if (!ensureSupabaseAuthConfigured()) return;
+    if (!ensureFirebaseAuthReady()) return;
     setBusy(true);
     try {
-      const result = await startLineLogin();
-      if (!result.redirected) {
-        toast.success("เข้าสู่ระบบด้วย LINE สำเร็จ");
-        void navigate({ to: "/", replace: true });
-      }
+      toast.info("LINE จะเปิดผ่าน Firebase OIDC");
+      const { signInWithFirebaseLine } = await import("@/integrations/firebase/auth");
+      await signInWithFirebaseLine();
     } catch (err) {
-      toast.error("เข้าสู่ระบบด้วย LINE ไม่สำเร็จ", {
-        description: getLineAuthErrorMessage(err),
+      toast.error("เข้าสู่ระบบ LINE ไม่สำเร็จ", {
+        description: err instanceof Error ? err.message : String(err),
       });
     } finally {
       setBusy(false);
@@ -306,12 +267,11 @@ function AuthPage() {
   async function sendPhoneOtp() {
     const normalizedPhone = getValidatedPhone();
     if (!normalizedPhone || busy) return;
-    if (!ensureSupabaseAuthConfigured()) return;
+    if (!ensureFirebaseAuthReady()) return;
 
     setBusy(true);
     try {
-      const { error } = await supabase.auth.signInWithOtp({ phone: normalizedPhone });
-      if (error) throw error;
+      await sendFirebasePhoneOtp(normalizedPhone);
       setPhone(normalizedPhone);
       setPhoneOtp("");
       setPhoneOtpSent(true);
@@ -336,16 +296,11 @@ function AuthPage() {
       toast.error("กรุณากรอกรหัส OTP 6 หลัก");
       return;
     }
-    if (!ensureSupabaseAuthConfigured()) return;
+    if (!ensureFirebaseAuthReady()) return;
 
     setBusy(true);
     try {
-      const { error } = await supabase.auth.verifyOtp({
-        phone: normalizedPhone,
-        token: phoneOtp,
-        type: "sms",
-      });
-      if (error) throw error;
+      await verifyFirebasePhoneOtp(phoneOtp);
       toast.success("เข้าสู่ระบบสำเร็จ");
       void navigate({ to: "/", replace: true });
     } catch (err) {
@@ -362,13 +317,10 @@ function AuthPage() {
       toast.error("กรุณากรอกอีเมลก่อนขอรีเซ็ตรหัสผ่าน");
       return;
     }
-    if (!ensureSupabaseAuthConfigured()) return;
+    if (!ensureFirebaseAuthReady()) return;
     setBusy(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth?reset=1`,
-      });
-      if (error) throw error;
+      await resetFirebasePassword(email);
       toast.success("ส่งลิงก์รีเซ็ตรหัสผ่านแล้ว", {
         description: "กรุณาตรวจสอบกล่องจดหมายและโฟลเดอร์ Spam",
       });
@@ -393,26 +345,15 @@ function AuthPage() {
       toast.error("กรุณากรอกอีเมลและรหัสผ่าน");
       return;
     }
-    if (!ensureSupabaseAuthConfigured()) return;
+    if (!ensureFirebaseAuthReady()) return;
     setBusy(true);
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { full_name: name || email.split("@")[0] },
-          },
-        });
-        if (error) throw error;
+        await signUpWithEmail(email, password, name);
         toast.success("สมัครสมาชิกสำเร็จ! ระบบกำลังเข้าสู่ระบบให้อัตโนมัติ");
         void navigate({ to: "/", replace: true });
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
+        await signInWithEmail(email, password);
         toast.success("เข้าสู่ระบบสำเร็จ");
         void navigate({ to: "/", replace: true });
       }
@@ -448,6 +389,7 @@ function AuthPage() {
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-background px-4 py-5 text-foreground sm:px-6 lg:px-8">
+      <div id="recaptcha-container" className="hidden" aria-hidden="true" />
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
         <div className="absolute -left-24 top-8 h-72 w-72 rounded-full bg-primary/8 blur-3xl" />
         <div className="absolute -right-24 bottom-0 h-96 w-96 rounded-full bg-success/8 blur-3xl" />
@@ -555,25 +497,27 @@ function AuthPage() {
 
             <div
               className={`mt-6 flex items-start gap-3 rounded-2xl border p-3.5 text-xs ${
-                supabaseConfigured
+                firebaseConfigured
                   ? "border-success/20 bg-success-soft/60 text-success-foreground"
                   : "border-warning/30 bg-warning-soft/70 text-warning-foreground"
               }`}
               role="status"
             >
-              {supabaseConfigured ? (
+              {firebaseConfigured ? (
                 <Check className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
               ) : (
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
               )}
               <div className="min-w-0">
                 <p className="font-semibold">
-                  {supabaseConfigured ? "ระบบพร้อมเชื่อมต่อบัญชี" : "ยังไม่ได้เชื่อมต่อ Supabase"}
+                  {firebaseConfigured
+                    ? "ระบบ Firebase พร้อมเชื่อมต่อบัญชี"
+                    : "ยังไม่ได้เชื่อมต่อ Firebase"}
                 </p>
                 <p className="mt-0.5 leading-5 opacity-80">
-                  {supabaseConfigured
+                  {firebaseConfigured
                     ? "เลือกช่องทางที่ต้องการได้เลย ข้อมูล session จะถูกจัดการอย่างปลอดภัย"
-                    : "ตั้ง VITE_SUPABASE_URL และ VITE_SUPABASE_PUBLISHABLE_KEY ใน Netlify แล้ว deploy ใหม่"}
+                    : "ตั้งค่า VITE_FIREBASE_* ใน Netlify แล้ว deploy ใหม่"}
                 </p>
               </div>
             </div>
@@ -843,17 +787,19 @@ function AuthPage() {
                           </button>
                         </div>
                         <ol className="list-decimal space-y-1 pl-4">
-                          <li>ตั้ง `VITE_SUPABASE_URL` และ publishable/anon key ใน Netlify</li>
-                          <li>เปิด Google หรือ GitHub ใน Supabase Authentication → Providers</li>
-                          <li>สำหรับ LINE ใช้ LIFF Endpoint URL เดียวกับ production domain</li>
+                          <li>ตั้งค่า `VITE_FIREBASE_*` ใน Netlify</li>
+                          <li>เปิด Google, GitHub และ Email/Phone ใน Firebase Authentication</li>
+                          <li>
+                            สำหรับ LINE ตั้ง OIDC provider `oidc.line` ใน Firebase Authentication
+                          </li>
                         </ol>
                         <a
-                          href="https://supabase.com/dashboard/project/_/auth/providers"
+                          href="https://console.firebase.google.com/project/_/authentication/providers"
                           target="_blank"
                           rel="noreferrer"
                           className="inline-flex items-center gap-1.5 font-semibold text-primary hover:underline"
                         >
-                          เปิด Supabase Provider settings
+                          เปิด Firebase Authentication settings
                           <ExternalLink className="h-3 w-3" aria-hidden="true" />
                         </a>
                       </div>
