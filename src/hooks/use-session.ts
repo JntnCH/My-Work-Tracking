@@ -87,7 +87,7 @@ export function removeRecentGmailAccount(email: string) {
 }
 
 export function isLocalGuestUser(user: User | null): boolean {
-  return user?.app_metadata?.provider === "guest";
+  return Boolean(user && user.id && user.aud === "authenticated");
 }
 
 export function isFirebaseUser(user: User | null): boolean {
@@ -131,35 +131,53 @@ export function getGuestUser(): User | null {
   }
 }
 
+export function setLocalUser(
+  name: string = "ผู้ใช้ทั่วไป (Guest)",
+  email: string = "guest@worktracker.local",
+  provider: string = "guest",
+  avatarUrl?: string,
+  phone?: string,
+): User {
+  const cleanId = `usr_${email.replace(/[^a-zA-Z0-9]/g, "_") || Math.random().toString(36).slice(2, 10)}`;
+  const localUser: Partial<User> = {
+    id: cleanId,
+    email: email,
+    phone: phone,
+    app_metadata: { provider, providers: [provider] },
+    user_metadata: {
+      full_name: name || email.split("@")[0] || "ผู้ใช้งาน",
+      name: name || email.split("@")[0] || "ผู้ใช้งาน",
+      avatar_url: avatarUrl,
+      picture: avatarUrl,
+      email: email,
+    },
+    aud: "authenticated",
+    role: "authenticated",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(localUser));
+  if (email && (email.includes("@gmail.com") || provider === "google")) {
+    saveRecentGmailAccount({
+      email,
+      name: name || email.split("@")[0] || "ผู้ใช้ Google",
+      avatarUrl,
+      lastLoginAt: new Date().toISOString(),
+    });
+  }
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(AUTH_CHANGE_EVENT));
+  }
+  return localUser as User;
+}
+
 export function setGuestUser(
   name: string = "ผู้ใช้ทั่วไป (Guest)",
   email: string = "guest@worktracker.local",
   provider: string = "guest",
   avatarUrl?: string,
 ): User {
-  const existing = getGuestUser();
-  if (existing && existing.email === email && existing.app_metadata?.provider === provider) {
-    return existing;
-  }
-  const cleanId = `usr_${Math.random().toString(36).slice(2, 10)}`;
-  const guest: Partial<User> = {
-    id: cleanId,
-    email: email,
-    app_metadata: { provider },
-    user_metadata: {
-      full_name: name,
-      name,
-      avatar_url: avatarUrl,
-      picture: avatarUrl,
-    },
-    aud: "authenticated",
-    created_at: new Date().toISOString(),
-  };
-  localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(guest));
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new Event(AUTH_CHANGE_EVENT));
-  }
-  return guest as User;
+  return setLocalUser(name, email, provider, avatarUrl);
 }
 
 export function clearGuestUser() {
