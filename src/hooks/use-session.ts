@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
-import { subscribeToFirebaseAuthState, signOutFirebase } from "@/lib/firebase";
+import { isSupabaseConfigured, supabase } from "@/integrations/supabase/client";
+import {
+  subscribeToFirebaseAuthState,
+  signOutFirebase,
+  isFirebaseConfigured,
+} from "@/lib/firebase";
 import type { User as FirebaseUser } from "firebase/auth";
 
 const GUEST_STORAGE_KEY = "work_tracker_guest_user";
@@ -193,7 +197,12 @@ export function useSession() {
   const [session, setSession] = useState<Session | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [guestUser, setGuestUserState] = useState<User | null>(() => getGuestUser());
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    // If local user exists, or no cloud auth is configured, do not block with loading
+    if (typeof window !== "undefined" && getGuestUser()) return false;
+    if (!isSupabaseConfigured() && !isFirebaseConfigured()) return false;
+    return true;
+  });
 
   useEffect(() => {
     let mounted = true;
