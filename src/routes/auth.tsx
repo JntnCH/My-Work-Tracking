@@ -32,7 +32,7 @@ import {
   useSession,
   type RecentGmailAccount,
 } from "@/hooks/use-session";
-import { supabase } from "@/integrations/supabase/client";
+import { isSupabaseConfigured, supabase } from "@/integrations/supabase/client";
 import {
   completeLineLiffLoginIfNeeded,
   getLineAuthErrorMessage,
@@ -118,6 +118,7 @@ function AuthPage() {
   const [showConfigHelp, setShowConfigHelp] = useState(false);
   const [showFirebaseDialog, setShowFirebaseDialog] = useState(false);
   const [firebaseConfigured, setFirebaseConfigured] = useState(() => isFirebaseConfigured());
+  const [supabaseConfigured] = useState(() => isSupabaseConfigured());
   const [copiedUrl, setCopiedUrl] = useState(false);
 
   // Gmail-specific state
