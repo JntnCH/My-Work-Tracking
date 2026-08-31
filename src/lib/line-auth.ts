@@ -2,7 +2,9 @@ import liff from "@line/liff";
 import { supabase } from "@/integrations/supabase/client";
 
 const LINE_PROVIDER = "custom:line" as const;
-const LIFF_ID = String(import.meta.env["VITE_LINE_LIFF_ID"] ?? "").trim();
+function getLiffId() {
+  return String(import.meta.env["VITE_LINE_LIFF_ID"] ?? "").trim();
+}
 const LINE_RETURN_PARAM = "line_login";
 const LINE_RETURN_VALUE = "1";
 
@@ -85,12 +87,13 @@ export function isLineLiffPrimaryRedirect() {
 }
 
 async function initializeLiff() {
-  if (!LIFF_ID) {
+  const liffId = getLiffId();
+  if (!liffId) {
     throw new Error("ยังไม่ได้ตั้งค่า VITE_LINE_LIFF_ID สำหรับ LINE LIFF");
   }
 
   if (!liffInitialization) {
-    liffInitialization = liff.init({ liffId: LIFF_ID }).catch((error: unknown) => {
+    liffInitialization = liff.init({ liffId }).catch((error: unknown) => {
       // Permit a retry after a transient SDK/network/configuration failure.
       liffInitialization = null;
       throw error;
@@ -138,12 +141,12 @@ function removeLineCallbackParams() {
 }
 
 export async function initializeLineLiffOnPrimaryRedirect() {
-  if (!LIFF_ID || !isLineLiffPrimaryRedirect()) return;
+  if (!getLiffId() || !isLineLiffPrimaryRedirect()) return;
   await initializeLiff();
 }
 
 export async function startLineLogin(): Promise<LineAuthResult> {
-  if (!LIFF_ID) {
+  if (!getLiffId()) {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: LINE_PROVIDER,
       options: {
@@ -166,7 +169,7 @@ export async function startLineLogin(): Promise<LineAuthResult> {
 }
 
 export async function completeLineLiffLoginIfNeeded(): Promise<LineAuthResult> {
-  if (!LIFF_ID || !isLineLiffCallback()) return { redirected: false };
+  if (!getLiffId() || !isLineLiffCallback()) return { redirected: false };
 
   await initializeLiff();
   if (!liff.isLoggedIn()) {

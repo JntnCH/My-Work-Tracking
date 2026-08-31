@@ -91,7 +91,11 @@ export function removeRecentGmailAccount(email: string) {
 }
 
 export function isLocalGuestUser(user: User | null): boolean {
-  return Boolean(user && user.id && user.aud === "authenticated");
+  if (!user) return false;
+  const provider = user.app_metadata?.provider;
+  if (provider === "guest") return true;
+  if (user.email === "guest@worktracker.local" || user.email?.startsWith("guest_")) return true;
+  return false;
 }
 
 export function isFirebaseUser(user: User | null): boolean {
@@ -283,20 +287,23 @@ export function useSession() {
 
   const activeRealUser = session?.user ?? firebaseUser;
 
-  useEffect(() => {
-    if (!activeRealUser || !guestUser || isLocalGuestUser(guestUser)) return;
-    migrateLocalUserData(guestUser.id, activeRealUser.id);
-  }, [guestUser, activeRealUser]);
+  const localUser = guestUser;
+  const user: User | null = activeRealUser ?? localUser;
+  const isGuest = Boolean(user && isLocalGuestUser(user));
 
-  const localGuest = isLocalGuestUser(guestUser) ? guestUser : null;
-  const user: User | null = activeRealUser ?? localGuest;
+  useEffect(() => {
+    if (!activeRealUser || !localUser) return;
+    if (activeRealUser.id !== localUser.id) {
+      migrateLocalUserData(localUser.id, activeRealUser.id);
+    }
+  }, [localUser, activeRealUser]);
 
   return {
     session,
     firebaseUser,
     user,
     loading,
-    isGuest: !activeRealUser && !!localGuest,
+    isGuest,
     isFirebase: Boolean(firebaseUser && !session?.user),
   };
 }

@@ -57,11 +57,12 @@ export const STORAGE_KEYS = {
 } as const;
 
 export const DEFAULT_CATEGORIES = [
-  "งานติดตั้ง",
-  "งานซ่อมบำรุง",
-  "งานสำรวจหน้างาน",
-  "งานเอกสาร / ออฟฟิศ",
-  "งานอื่นๆ",
+  "ร้านก๋วยเตี๋ยว (จ่ามุน)",
+  "ACOM",
+  "SHOPEE (คลังเก่า)",
+  "คลังคูเน่",
+  "M SENKO",
+  "คลังอีฟแอนด์บอย",
 ];
 
 export const OT_OPTIONS = [

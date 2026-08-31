@@ -27,6 +27,7 @@ import {
 describe("LINE LIFF authentication", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv("VITE_LINE_LIFF_ID", "");
     vi.stubGlobal("window", {
       location: {
         origin: "https://tracker.example",
@@ -38,6 +39,7 @@ describe("LINE LIFF authentication", () => {
 
   afterAll(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
   it("uses the Supabase custom provider identifier", () => {
