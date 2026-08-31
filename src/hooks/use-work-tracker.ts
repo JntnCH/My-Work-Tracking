@@ -470,7 +470,7 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
         warning_color: DEFAULT_COLORS_LIGHT.warningColor,
         destructive_color: DEFAULT_COLORS_LIGHT.destructiveColor,
         chart_colors: DEFAULT_COLORS_LIGHT.chartColors,
-        preset_name: "google-blue",
+        preset_name: "neon-ai",
         border_radius: "normal",
         button_style: "filled",
         density: "normal",

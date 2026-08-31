@@ -154,6 +154,8 @@ export function CheckInPanel({
         setGps((current) =>
           current.lat === lat && current.lng === lng ? { ...current, addressName } : current,
         );
+        // Do not overwrite text the user entered while reverse geocoding was in flight.
+        setLocationName((current) => (current.trim() ? current : addressName));
       });
       return nextGPS;
     } catch (error) {
@@ -378,7 +380,7 @@ export function CheckInPanel({
       ) : null}
 
       {/* Main form */}
-      <div className="surface-card space-y-6 p-5">
+      <div className="surface-card neon-form-card space-y-6 p-5 sm:p-6">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <div className="mb-1 flex items-center justify-between">
@@ -431,9 +433,9 @@ export function CheckInPanel({
               disabled={!!active}
               onChange={(e) => handleLocationChange(e.target.value)}
               placeholder="พิมพ์สถานที่ หรือ วางลิงก์ Google Maps"
-              className="w-full rounded-lg border border-input bg-secondary p-2.5 text-sm disabled:opacity-60"
+              className="neon-input w-full rounded-lg border border-input bg-secondary p-2.5 text-sm disabled:opacity-60"
             />
-            <div className="mt-2 rounded-xl border border-border bg-secondary/60 p-3">
+            <div className="neon-location-card mt-2 rounded-xl border border-border bg-secondary/60 p-3">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-muted-foreground">
                   <LocateFixed className="h-4 w-4 shrink-0 text-primary" /> ตำแหน่งปัจจุบัน
@@ -443,7 +445,7 @@ export function CheckInPanel({
                   disabled={gpsLoading}
                   title="ค้นหาตำแหน่งปัจจุบัน"
                   aria-label="ค้นหาตำแหน่งปัจจุบัน"
-                  className="flex shrink-0 items-center gap-1.5 rounded-lg bg-accent px-2.5 py-1.5 text-xs font-medium text-primary transition active:scale-95 disabled:opacity-60"
+                  className="neon-secondary-button flex shrink-0 items-center gap-1.5 rounded-lg bg-accent px-2.5 py-1.5 text-xs font-medium text-primary transition active:scale-95 disabled:opacity-60"
                 >
                   <Crosshair className={`h-4 w-4 ${gpsLoading ? "animate-spin" : ""}`} />
                   {gpsLoading ? "กำลังค้นหา…" : "ค้นหาตำแหน่ง"}
@@ -455,9 +457,6 @@ export function CheckInPanel({
               >
                 {gps.text}
               </div>
-              {gps.addressName ? (
-                <p className="mt-1 text-xs text-muted-foreground">{gps.addressName}</p>
-              ) : null}
               {typeof gps.accuracy === "number" ? (
                 <p className="mt-1 text-xs text-muted-foreground">
                   ความแม่นยำประมาณ ±{Math.round(gps.accuracy)} เมตร
@@ -472,7 +471,7 @@ export function CheckInPanel({
                   <button
                     key={loc}
                     onClick={() => setLocationName(loc)}
-                    className="rounded border border-border bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-primary"
+                    className="neon-chip rounded border border-border bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-primary"
                   >
                     {loc}
                   </button>
@@ -484,7 +483,7 @@ export function CheckInPanel({
 
         {/* Jobs done during the running shift */}
         {active ? (
-          <div className="space-y-3 rounded-xl border border-border bg-secondary/60 p-4">
+          <div className="neon-inset-card space-y-3 rounded-xl border border-border bg-secondary/60 p-4">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
                 งานที่ทำเสร็จในกะที่กำลังทำอยู่
@@ -549,7 +548,7 @@ export function CheckInPanel({
         ) : null}
 
         {/* Rates */}
-        <div className="space-y-4 rounded-xl border border-border bg-secondary/60 p-4">
+        <div className="neon-inset-card space-y-4 rounded-xl border border-border bg-secondary/60 p-4">
           <h3 className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
             การคำนวณค่าแรง &amp; OT &amp; รายรับ-รายหัก
           </h3>
@@ -682,7 +681,7 @@ export function CheckInPanel({
 
         {/* Evidence */}
         <div className="grid grid-cols-1 gap-4">
-          <div className="rounded-xl border-2 border-dashed border-border p-4 text-center">
+          <div className="neon-dropzone rounded-xl border-2 border-dashed border-border p-4 text-center">
             <input
               ref={fileRef}
               id="imageInput"
@@ -719,14 +718,14 @@ export function CheckInPanel({
           <button
             onClick={() => void doCheckIn()}
             disabled={!!active || gpsLoading}
-            className="flex items-center justify-center gap-2 rounded-xl bg-success py-4 text-lg font-bold text-success-foreground shadow-lg transition active:scale-95 disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
+            className="neon-checkin-button flex items-center justify-center gap-2 rounded-xl bg-success py-4 text-lg font-bold text-success-foreground shadow-lg transition active:scale-95 disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
           >
             <LogIn className="h-5 w-5" /> {gpsLoading ? "กำลังค้นหาพิกัด…" : "Check-in เริ่มงาน"}
           </button>
           <button
             onClick={() => void doCheckOut()}
             disabled={!active || gpsLoading}
-            className="flex items-center justify-center gap-2 rounded-xl bg-destructive py-4 text-lg font-bold text-destructive-foreground shadow-lg transition active:scale-95 disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
+            className="neon-checkout-button flex items-center justify-center gap-2 rounded-xl bg-destructive py-4 text-lg font-bold text-destructive-foreground shadow-lg transition active:scale-95 disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
           >
             <LogOut className="h-5 w-5" /> {gpsLoading ? "กำลังบันทึกพิกัด…" : "Check-out จบงาน"}
           </button>
