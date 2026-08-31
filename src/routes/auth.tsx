@@ -37,16 +37,25 @@ import {
   completeLineLiffLoginIfNeeded,
   getLineAuthErrorMessage,
   isLineLiffCallback,
+  isLineLiffConfigured,
   startLineLogin,
 } from "@/lib/line-auth";
 import { EngineWorkingAnimation } from "@/components/ui/engine-working-animation";
 import {
   isFirebaseConfigured,
   signInWithGoogleFirebase,
+  signInWithEmailFirebase,
+  signUpWithEmailFirebase,
+  sendPasswordResetFirebase,
+  signInAnonymouslyFirebase,
+  createRecaptchaVerifier,
+  sendPhoneOtpFirebase,
   checkFirebaseRedirectResult,
   getFirebaseConfig,
 } from "@/lib/firebase";
+import type { ConfirmationResult } from "firebase/auth";
 import { FirebaseConfigDialog } from "@/components/work/FirebaseConfigDialog";
+import { LineLiffConfigDialog } from "@/components/work/LineLiffConfigDialog";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -117,9 +126,13 @@ function AuthPage() {
   const [resetMode, setResetMode] = useState(false);
   const [showConfigHelp, setShowConfigHelp] = useState(false);
   const [showFirebaseDialog, setShowFirebaseDialog] = useState(false);
+  const [showLineLiffDialog, setShowLineLiffDialog] = useState(false);
   const [firebaseConfigured, setFirebaseConfigured] = useState(() => isFirebaseConfigured());
+  const [lineConfigured, setLineConfigured] = useState(() => isLineLiffConfigured());
   const [supabaseConfigured] = useState(() => isSupabaseConfigured());
   const [copiedUrl, setCopiedUrl] = useState(false);
+
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
 
   // Gmail-specific state
   const [gmailAddress, setGmailAddress] = useState("jayautobot.dev@gmail.com");
@@ -341,22 +354,20 @@ function AuthPage() {
 
   async function signInLine() {
     if (busy) return;
+    if (!isLineLiffConfigured() && !isSupabaseConfigured()) {
+      toast.error("ยังไม่ได้ตั้งค่า LINE LIFF ID", {
+        description: "กรุณาระบุ LINE LIFF ID เพื่อเปิดใช้งานการเข้าสู่ระบบด้วย LINE",
+      });
+      setShowLineLiffDialog(true);
+      return;
+    }
     setBusy(true);
     try {
-      if (isLineLiffConfigured()) {
-        const result = await startLineLogin();
-        if (!result.redirected) {
-          toast.success("เข้าสู่ระบบด้วย LINE สำเร็จ");
-          void navigate({ to: "/", replace: true });
-          return;
-        }
-      } else if (isSupabaseConfigured()) {
-        const result = await startLineLogin();
-        if (result.redirected) return;
-      } else {
-        toast.error("ยังไม่ได้ตั้งค่า LINE Login / LIFF ID", {
-          description: "กรุณาระบุ VITE_LINE_LIFF_ID หรือตั้งค่า OIDC Provider ใน Supabase",
-        });
+      const result = await startLineLogin();
+      if (!result.redirected) {
+        toast.success("เข้าสู่ระบบด้วย LINE สำเร็จ");
+        void navigate({ to: "/", replace: true });
+        return;
       }
     } catch (err) {
       toast.error("เข้าสู่ระบบด้วย LINE ไม่สำเร็จ", {
@@ -390,30 +401,39 @@ function AuthPage() {
     const normalizedPhone = getValidatedPhone();
     if (!normalizedPhone || busy) return;
 
-    if (!isSupabaseConfigured()) {
-      toast.error("ยังไม่ได้ตั้งค่าระบบ SMS ใน Supabase", {
-        description:
-          "โปรดเชื่อมต่อ Supabase SMS Gateway (Twilio/MessageBird) หรือเข้าสู่ระบบด้วย Google/อีเมล",
-      });
-      return;
-    }
-
     setBusy(true);
     try {
-      const { error } = await supabase.auth.signInWithOtp({ phone: normalizedPhone });
-      if (error) {
-        throw error;
+      if (isFirebaseConfigured()) {
+        const verifier = createRecaptchaVerifier("recaptcha-container", { size: "invisible" });
+        const confirmation = await sendPhoneOtpFirebase(normalizedPhone, verifier);
+        setConfirmationResult(confirmation);
+        setPhone(normalizedPhone);
+        setPhoneOtp("");
+        setPhoneOtpSent(true);
+        toast.success("ส่งรหัส OTP ทาง SMS แล้ว", {
+          description: `ส่งไปยังหมายเลข ${normalizedPhone} กรุณากรอกรหัส 6 หลัก`,
+        });
+        return;
       }
-      setPhone(normalizedPhone);
-      setPhoneOtp("");
-      setPhoneOtpSent(true);
-      toast.success("ส่งรหัส OTP เรียบร้อยแล้ว", {
-        description: "กรุณาตรวจสอบ SMS และกรอกรหัส 6 หลัก",
+
+      if (isSupabaseConfigured()) {
+        const { error } = await supabase.auth.signInWithOtp({ phone: normalizedPhone });
+        if (error) throw error;
+        setPhone(normalizedPhone);
+        setPhoneOtp("");
+        setPhoneOtpSent(true);
+        toast.success("ส่งรหัส OTP เรียบร้อยแล้ว", {
+          description: "กรุณาตรวจสอบ SMS และกรอกรหัส 6 หลัก",
+        });
+        return;
+      }
+
+      toast.error("ยังไม่ได้ตั้งค่า Firebase Auth", {
+        description: "กรุณาตั้งค่า Firebase เพื่อใช้งานระบบยืนยันเบอร์โทรศัพท์",
       });
     } catch (err) {
       toast.error("ส่งรหัส OTP ไม่สำเร็จ", {
-        description:
-          err instanceof Error ? err.message : "โปรดตรวจสอบการตั้งค่า SMS Provider ใน Supabase",
+        description: err instanceof Error ? err.message : "กรุณาตรวจสอบเบอร์โทรศัพท์และลองใหม่",
       });
     } finally {
       setBusy(false);
@@ -430,26 +450,31 @@ function AuthPage() {
       return;
     }
 
-    if (!isSupabaseConfigured()) {
-      toast.error("ยังไม่ได้เชื่อมต่อระบบตรวจสอบ OTP");
-      return;
-    }
-
     setBusy(true);
     try {
-      const { error, data } = await supabase.auth.verifyOtp({
-        phone: normalizedPhone,
-        token: phoneOtp,
-        type: "sms",
-      });
-      if (error) {
-        throw error;
+      if (confirmationResult) {
+        const cred = await confirmationResult.confirm(phoneOtp);
+        if (cred.user) {
+          toast.success("ยืนยันตัวตนสำเร็จ เข้าสู่ระบบเรียบร้อย");
+          void navigate({ to: "/", replace: true });
+          return;
+        }
       }
-      if (data?.session || data?.user) {
-        toast.success("ยืนยันตัวตนสำเร็จ เข้าสู่ระบบเรียบร้อย");
-        void navigate({ to: "/", replace: true });
-        return;
+
+      if (isSupabaseConfigured()) {
+        const { error, data } = await supabase.auth.verifyOtp({
+          phone: normalizedPhone,
+          token: phoneOtp,
+          type: "sms",
+        });
+        if (error) throw error;
+        if (data?.session || data?.user) {
+          toast.success("ยืนยันตัวตนสำเร็จ เข้าสู่ระบบเรียบร้อย");
+          void navigate({ to: "/", replace: true });
+          return;
+        }
       }
+
       toast.success("เข้าสู่ระบบสำเร็จ");
       void navigate({ to: "/", replace: true });
     } catch (err) {
@@ -466,24 +491,31 @@ function AuthPage() {
       toast.error("กรุณากรอกอีเมลก่อนขอรีเซ็ตรหัสผ่าน");
       return;
     }
-    if (!isSupabaseConfigured()) {
-      toast.error("ยังไม่ได้ตั้งค่าระบบอีเมลใน Supabase", {
-        description: "กรุณาตรวจสอบการตั้งค่า Supabase Authentication",
-      });
-      return;
-    }
+
     setBusy(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth?reset=1`,
-      });
-      if (error) {
-        throw error;
+      if (isFirebaseConfigured()) {
+        await sendPasswordResetFirebase(email);
+        toast.success("ส่งลิงก์รีเซ็ตรหัสผ่านแล้ว", {
+          description: "กรุณาตรวจสอบกล่องจดหมายในอีเมลของคุณ เพื่อตั้งรหัสผ่านใหม่",
+        });
+        setResetMode(false);
+        return;
       }
-      toast.success("ส่งลิงก์รีเซ็ตรหัสผ่านแล้ว", {
-        description: "กรุณาตรวจสอบกล่องจดหมายและโฟลเดอร์ Spam ในอีเมลของคุณ",
-      });
-      setResetMode(false);
+
+      if (isSupabaseConfigured()) {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/auth?reset=1`,
+        });
+        if (error) throw error;
+        toast.success("ส่งลิงก์รีเซ็ตรหัสผ่านแล้ว", {
+          description: "กรุณาตรวจสอบกล่องจดหมายและโฟลเดอร์ Spam ในอีเมลของคุณ",
+        });
+        setResetMode(false);
+        return;
+      }
+
+      toast.error("ยังไม่ได้ตั้งค่า Firebase Auth สำหรับอีเมล");
     } catch (err) {
       toast.error("ส่งลิงก์รีเซ็ตรหัสผ่านไม่สำเร็จ", {
         description: err instanceof Error ? err.message : String(err),
@@ -505,67 +537,64 @@ function AuthPage() {
       return;
     }
 
-    if (!isSupabaseConfigured()) {
-      toast.error("ยังไม่ได้ตั้งค่า Supabase Authentication สำหรับอีเมล", {
-        description: "กรุณาเข้าใช้งานผ่าน Google Auth หรือใช้โหมดทดลอง (Guest Mode)",
-      });
-      return;
-    }
-
     setBusy(true);
     try {
-      if (mode === "signup") {
-        const { error, data } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { full_name: name || email.split("@")[0] },
-          },
-        });
-        if (error) {
-          throw error;
-        }
-        if (data.session) {
-          toast.success("สมัครสมาชิกและเข้าสู่ระบบสำเร็จ!");
+      if (isFirebaseConfigured()) {
+        if (mode === "signup") {
+          const cred = await signUpWithEmailFirebase(email, password, name);
+          toast.success(`สมัครสมาชิกสำเร็จ: ${cred.user.displayName || cred.user.email || ""}`);
           void navigate({ to: "/", replace: true });
           return;
-        }
-        if (data.user && !data.session) {
-          toast.success("สมัครสมาชิกสำเร็จ!", {
-            description: "ระบบได้ส่งอีเมลยืนยันไปยังอีเมลของคุณ กรุณากดยืนยันก่อนเข้าสู่ระบบ",
-            duration: 6000,
-          });
-          setMode("email");
-          return;
-        }
-      } else {
-        const { error, data } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) {
-          throw error;
-        }
-        if (data.session || data.user) {
-          toast.success("เข้าสู่ระบบสำเร็จ");
+        } else {
+          const cred = await signInWithEmailFirebase(email, password);
+          toast.success(`เข้าสู่ระบบสำเร็จ: ${cred.user.displayName || cred.user.email || ""}`);
           void navigate({ to: "/", replace: true });
           return;
         }
       }
+
+      if (isSupabaseConfigured()) {
+        if (mode === "signup") {
+          const { error, data } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              data: { full_name: name || email.split("@")[0] },
+            },
+          });
+          if (error) throw error;
+          if (data.session) {
+            toast.success("สมัครสมาชิกและเข้าสู่ระบบสำเร็จ!");
+            void navigate({ to: "/", replace: true });
+            return;
+          }
+          if (data.user && !data.session) {
+            toast.success("สมัครสมาชิกสำเร็จ!", {
+              description: "ระบบได้ส่งอีเมลยืนยันไปยังอีเมลของคุณ กรุณากดยืนยันก่อนเข้าสู่ระบบ",
+              duration: 6000,
+            });
+            setMode("email");
+            return;
+          }
+        } else {
+          const { error, data } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+          if (error) throw error;
+          if (data.session || data.user) {
+            toast.success("เข้าสู่ระบบสำเร็จ");
+            void navigate({ to: "/", replace: true });
+            return;
+          }
+        }
+      }
+
+      toast.error("ยังไม่ได้ตั้งค่า Firebase Auth");
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      let thaiMsg = msg;
-      if (msg.includes("Invalid login credentials")) {
-        thaiMsg = "อีเมลหรือรหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง";
-      } else if (msg.includes("Email not confirmed")) {
-        thaiMsg = "ยังไม่ได้ยืนยันอีเมล กรุณาตรวจสอบกล่องจดหมายของคุณ";
-      } else if (msg.includes("User already registered")) {
-        thaiMsg = "อีเมลนี้ลงทะเบียนไว้แล้ว กรุณาเลือกเข้าสู่ระบบ";
-      } else if (msg.includes("Password should be at least")) {
-        thaiMsg = "รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร";
-      }
       toast.error(mode === "signup" ? "สมัครสมาชิกไม่สำเร็จ" : "เข้าสู่ระบบไม่สำเร็จ", {
-        description: thaiMsg,
+        description: msg,
       });
     } finally {
       setBusy(false);
@@ -579,10 +608,23 @@ function AuthPage() {
     setPhoneOtp("");
   }
 
-  function handleGuestLogin() {
+  async function handleGuestLogin() {
+    setBusy(true);
+    try {
+      if (isFirebaseConfigured()) {
+        await signInAnonymouslyFirebase();
+        toast.success("เข้าสู่ระบบในโหมดทดลองใช้งาน (Guest Mode)");
+        void navigate({ to: "/", replace: true });
+        return;
+      }
+    } catch (err) {
+      console.warn("[Auth] Firebase anonymous login fallback to local guest:", err);
+    }
+
     setGuestUser("ผู้ใช้ทั่วไป (Guest Mode)", "guest@worktracker.local", "guest");
     toast.success("ยินดีต้อนรับสู่โหมดทดลองใช้งาน");
     void navigate({ to: "/", replace: true });
+    setBusy(false);
   }
 
   function copyRedirectUrl() {
@@ -752,6 +794,32 @@ function AuthPage() {
               >
                 <MessageCircle className="h-3.5 w-3.5 text-[#06C755] shrink-0" />
                 <span>LINE Official Login</span>
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between px-1 text-[11px]">
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <span
+                  className={`h-2 w-2 rounded-full ${
+                    lineConfigured ? "bg-[#06C755] animate-pulse" : "bg-muted-foreground/40"
+                  }`}
+                />
+                <span>
+                  LINE LIFF:{" "}
+                  {lineConfigured ? (
+                    <strong className="text-[#06C755]">พร้อมใช้งาน</strong>
+                  ) : (
+                    <span className="text-muted-foreground">ยังไม่ได้ตั้งค่า</span>
+                  )}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowLineLiffDialog(true)}
+                className="inline-flex items-center gap-1 font-semibold text-[#06C755] hover:underline cursor-pointer"
+              >
+                <Settings className="h-3 w-3" />
+                <span>ตั้งค่า LINE LIFF</span>
               </button>
             </div>
           </div>
@@ -990,12 +1058,21 @@ function AuthPage() {
           <ScanFace className="h-3.5 w-3.5" /> รองรับปลดล็อกด้วย Face ID / Touch ID
           บนอุปกรณ์ที่รองรับ
         </p>
+
+        {/* Hidden reCAPTCHA container for Firebase Phone Auth */}
+        <div id="recaptcha-container" className="hidden"></div>
       </div>
 
       <FirebaseConfigDialog
         open={showFirebaseDialog}
         onOpenChange={setShowFirebaseDialog}
         onConfigSaved={() => setFirebaseConfigured(isFirebaseConfigured())}
+      />
+
+      <LineLiffConfigDialog
+        open={showLineLiffDialog}
+        onOpenChange={setShowLineLiffDialog}
+        onConfigSaved={() => setLineConfigured(isLineLiffConfigured())}
       />
     </div>
   );

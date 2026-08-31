@@ -24,9 +24,13 @@ import {
   isFirebaseConfigured,
   getFirebaseConfig,
   testFirebaseConnection,
-  getFirebaseAuth,
+  getFirebaseAuthInstance,
+  updateFirebasePassword,
 } from "@/lib/firebase";
+import { isFirebaseUser } from "@/hooks/use-session";
+import { getLiffId, isLineLiffConfigured } from "@/lib/line-auth";
 import { FirebaseConfigDialog } from "./FirebaseConfigDialog";
+import { LineLiffConfigDialog } from "./LineLiffConfigDialog";
 
 type Props = {
   user: User | null;
@@ -84,7 +88,9 @@ export function AuthenticationSettings({ user, isGuest = false, onSignOut }: Pro
   const [savingPassword, setSavingPassword] = useState(false);
   const [signingOut, setSigningOut] = useState<"local" | "global" | null>(null);
   const [showFirebaseModal, setShowFirebaseModal] = useState(false);
+  const [showLineLiffModal, setShowLineLiffModal] = useState(false);
   const [firebaseConfigured, setFirebaseConfigured] = useState(() => isFirebaseConfigured());
+  const [lineLiffConfigured, setLineLiffConfigured] = useState(() => isLineLiffConfigured());
   const [testingFirebase, setTestingFirebase] = useState(false);
 
   const loadIdentities = useCallback(async () => {
@@ -175,8 +181,8 @@ export function AuthenticationSettings({ user, isGuest = false, onSignOut }: Pro
 
   async function updatePassword(event: React.FormEvent) {
     event.preventDefault();
-    if (password.length < 8) {
-      toast.error("รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร");
+    if (password.length < 6) {
+      toast.error("รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร");
       return;
     }
     if (password !== confirmPassword) {
@@ -185,8 +191,12 @@ export function AuthenticationSettings({ user, isGuest = false, onSignOut }: Pro
     }
     setSavingPassword(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password });
-      if (error) throw error;
+      if (getFirebaseAuthInstance()?.currentUser || isFirebaseUser(user)) {
+        await updateFirebasePassword(password);
+      } else {
+        const { error } = await supabase.auth.updateUser({ password });
+        if (error) throw error;
+      }
       setPassword("");
       setConfirmPassword("");
       toast.success("เปลี่ยนรหัสผ่านเรียบร้อยแล้ว");
@@ -458,6 +468,54 @@ export function AuthenticationSettings({ user, isGuest = false, onSignOut }: Pro
         )}
       </section>
 
+      {/* LINE LIFF Authentication Settings Section */}
+      <section className="rounded-2xl border border-[#06C755]/30 bg-card p-4 shadow-sm space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#06C755]/10 text-[#06C755]">
+              <MessageCircle className="h-4 w-4" />
+            </div>
+            <div>
+              <h4 className="font-bold text-sm flex items-center gap-2">
+                LINE Official Login (LIFF)
+                {lineLiffConfigured ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                    <CheckCircle2 className="h-3 w-3" /> ตั้งค่าแล้ว
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                    ยังไม่ได้ตั้งค่า
+                  </span>
+                )}
+              </h4>
+              <p className="text-xs text-muted-foreground">
+                เชื่อมต่อ LINE Developers Console เพื่อล็อกอินผ่าน LINE SDK โดยตรง
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowLineLiffModal(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-[#06C755]/40 bg-[#06C755]/10 px-3 py-2 text-xs font-bold text-foreground hover:bg-[#06C755]/20 transition cursor-pointer"
+          >
+            <Settings className="h-3.5 w-3.5 text-[#06C755]" />
+            <span>ตั้งค่า LINE LIFF</span>
+          </button>
+        </div>
+
+        {lineLiffConfigured && (
+          <div className="rounded-xl border border-border/80 bg-muted/20 p-3 text-xs flex items-center justify-between gap-3">
+            <div className="space-y-0.5 min-w-0">
+              <span className="text-[11px] font-medium text-muted-foreground">LINE LIFF ID:</span>
+              <p className="font-mono text-xs font-semibold truncate text-[#06C755]">
+                {getLiffId() || "N/A"}
+              </p>
+            </div>
+          </div>
+        )}
+      </section>
+
       {!isGuest && (
         <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
           <div className="flex items-center gap-2">
@@ -551,6 +609,12 @@ export function AuthenticationSettings({ user, isGuest = false, onSignOut }: Pro
         open={showFirebaseModal}
         onOpenChange={setShowFirebaseModal}
         onConfigSaved={() => setFirebaseConfigured(isFirebaseConfigured())}
+      />
+
+      <LineLiffConfigDialog
+        open={showLineLiffModal}
+        onOpenChange={setShowLineLiffModal}
+        onConfigSaved={() => setLineLiffConfigured(isLineLiffConfigured())}
       />
     </div>
   );

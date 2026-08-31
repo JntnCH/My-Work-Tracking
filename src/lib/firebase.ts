@@ -6,21 +6,22 @@ import {
   getRedirectResult,
   signOut as firebaseSignOut,
   GoogleAuthProvider,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  updateProfile,
+  updatePassword,
+  signInAnonymously,
+  signInWithPhoneNumber,
+  RecaptchaVerifier,
   onAuthStateChanged,
   type Auth,
   type User as FirebaseUser,
   type UserCredential,
+  type ConfirmationResult,
 } from "firebase/auth";
-import {
-  getFirestore,
-  collection,
-  doc,
-  setDoc,
-  getDocs,
-  query,
-  where,
-  type Firestore,
-} from "firebase/firestore";
+import { getFirestore, doc, setDoc, getDoc, type Firestore } from "firebase/firestore";
+import appletConfig from "../../firebase-applet-config.json";
 
 export type FirebaseConfig = {
   apiKey: string;
@@ -30,12 +31,13 @@ export type FirebaseConfig = {
   messagingSenderId?: string;
   appId?: string;
   measurementId?: string;
+  firestoreDatabaseId?: string;
 };
 
 const FIREBASE_CONFIG_STORAGE_KEY = "work_tracker_firebase_custom_config";
 
 /**
- * Get active Firebase configuration from environment or local overrides.
+ * Get active Firebase configuration from local overrides, applet config, or environment variables.
  */
 export function getFirebaseConfig(): FirebaseConfig | null {
   if (typeof window !== "undefined") {
@@ -52,6 +54,21 @@ export function getFirebaseConfig(): FirebaseConfig | null {
     }
   }
 
+  // 1. Built-in Provisioned Firebase Config from firebase-applet-config.json
+  if (appletConfig && appletConfig.apiKey && appletConfig.projectId) {
+    return {
+      apiKey: appletConfig.apiKey,
+      authDomain: appletConfig.authDomain || `${appletConfig.projectId}.firebaseapp.com`,
+      projectId: appletConfig.projectId,
+      storageBucket: appletConfig.storageBucket || `${appletConfig.projectId}.appspot.com`,
+      messagingSenderId: appletConfig.messagingSenderId || "",
+      appId: appletConfig.appId || "",
+      measurementId: appletConfig.measurementId || "",
+      firestoreDatabaseId: appletConfig.firestoreDatabaseId || "",
+    };
+  }
+
+  // 2. Environment Variables fallback
   const envApiKey = (import.meta.env["VITE_FIREBASE_API_KEY"] as string | undefined) || "";
   const envProjectId = (import.meta.env["VITE_FIREBASE_PROJECT_ID"] as string | undefined) || "";
   const envAuthDomain =
@@ -89,12 +106,17 @@ export function isFirebaseConfigured(): boolean {
 export function saveCustomFirebaseConfig(config: FirebaseConfig): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(FIREBASE_CONFIG_STORAGE_KEY, JSON.stringify(config));
-  // Re-initialize or reset app instance if needed
+  cachedApp = null;
+  cachedAuth = null;
+  cachedFirestore = null;
 }
 
 export function clearCustomFirebaseConfig(): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem(FIREBASE_CONFIG_STORAGE_KEY);
+  cachedApp = null;
+  cachedAuth = null;
+  cachedFirestore = null;
 }
 
 let cachedApp: FirebaseApp | null = null;
@@ -137,8 +159,45 @@ export function getFirebaseFirestoreInstance(): Firestore | null {
 }
 
 /**
- * Perform Google Sign-In via Firebase Auth.
- * Tries popup first; if popups are blocked or in mobile in-app browser, falls back to redirect.
+ * Sync user profile to Firestore
+ */
+export async function syncUserProfileToFirestore(
+  fbUser: FirebaseUser,
+  customData?: Record<string, unknown>,
+) {
+  try {
+    const db = getFirebaseFirestoreInstance();
+    if (!db) return;
+    const userRef = doc(db, "users", fbUser.uid);
+    const existing = await getDoc(userRef);
+
+    const baseData = {
+      id: fbUser.uid,
+      email: fbUser.email || "",
+      displayName: fbUser.displayName || fbUser.email?.split("@")[0] || "ผู้ใช้งาน",
+      photoURL: fbUser.photoURL || "",
+      phoneNumber: fbUser.phoneNumber || "",
+      isAnonymous: fbUser.isAnonymous,
+      role: existing.exists() ? existing.data()?.role || "user" : "user",
+      updatedAt: new Date().toISOString(),
+      ...(customData || {}),
+    };
+
+    if (!existing.exists()) {
+      await setDoc(userRef, {
+        ...baseData,
+        createdAt: new Date().toISOString(),
+      });
+    } else {
+      await setDoc(userRef, baseData, { merge: true });
+    }
+  } catch (err) {
+    console.warn("[Firebase] Failed to sync user profile to Firestore:", err);
+  }
+}
+
+/**
+ * 1. Perform Google Sign-In via Firebase Auth.
  */
 export async function signInWithGoogleFirebase(): Promise<UserCredential> {
   const auth = getFirebaseAuthInstance();
@@ -157,6 +216,9 @@ export async function signInWithGoogleFirebase(): Promise<UserCredential> {
 
   try {
     const result = await signInWithPopup(auth, provider);
+    if (result.user) {
+      void syncUserProfileToFirestore(result.user);
+    }
     return result;
   } catch (error: unknown) {
     const err = error as { code?: string; message?: string };
@@ -165,11 +227,177 @@ export async function signInWithGoogleFirebase(): Promise<UserCredential> {
       err?.code === "auth/popup-closed-by-user" ||
       err?.code === "auth/cancelled-popup-request"
     ) {
-      // If popup fails or is blocked, fallback to redirect
       await signInWithRedirect(auth, provider);
       throw new Error("REDIRECTING");
     }
-    throw error;
+    throw formatFirebaseError(error);
+  }
+}
+
+/**
+ * 2. Email & Password Sign Up via Firebase Auth
+ */
+export async function signUpWithEmailFirebase(
+  email: string,
+  password: string,
+  displayName?: string,
+): Promise<UserCredential> {
+  const auth = getFirebaseAuthInstance();
+  if (!auth) {
+    throw new Error("ระบบ Firebase Auth ยังไม่พร้อมใช้งาน");
+  }
+
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+    if (displayName && cred.user) {
+      await updateProfile(cred.user, { displayName });
+    }
+    if (cred.user) {
+      void syncUserProfileToFirestore(cred.user, {
+        displayName: displayName || email.split("@")[0],
+      });
+    }
+    return cred;
+  } catch (error) {
+    throw formatFirebaseError(error);
+  }
+}
+
+/**
+ * 3. Email & Password Sign In via Firebase Auth
+ */
+export async function signInWithEmailFirebase(
+  email: string,
+  password: string,
+): Promise<UserCredential> {
+  const auth = getFirebaseAuthInstance();
+  if (!auth) {
+    throw new Error("ระบบ Firebase Auth ยังไม่พร้อมใช้งาน");
+  }
+
+  try {
+    const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+    if (cred.user) {
+      void syncUserProfileToFirestore(cred.user);
+    }
+    return cred;
+  } catch (error) {
+    throw formatFirebaseError(error);
+  }
+}
+
+/**
+ * 4. Password Reset via Firebase Auth
+ */
+export async function sendPasswordResetFirebase(email: string): Promise<void> {
+  const auth = getFirebaseAuthInstance();
+  if (!auth) {
+    throw new Error("ระบบ Firebase Auth ยังไม่พร้อมใช้งาน");
+  }
+
+  try {
+    await sendPasswordResetEmail(auth, email.trim());
+  } catch (error) {
+    throw formatFirebaseError(error);
+  }
+}
+
+/**
+ * 5. Anonymous / Guest Sign In via Firebase Auth
+ */
+export async function signInAnonymouslyFirebase(): Promise<UserCredential> {
+  const auth = getFirebaseAuthInstance();
+  if (!auth) {
+    throw new Error("ระบบ Firebase Auth ยังไม่พร้อมใช้งาน");
+  }
+
+  try {
+    const cred = await signInAnonymously(auth);
+    if (cred.user) {
+      void syncUserProfileToFirestore(cred.user, {
+        displayName: "ผู้ใช้งานทั่วไป (Guest)",
+        role: "guest",
+      });
+    }
+    return cred;
+  } catch (error) {
+    throw formatFirebaseError(error);
+  }
+}
+
+/**
+ * 6. Phone Authentication (SMS OTP)
+ */
+export function createRecaptchaVerifier(
+  containerId: string | HTMLElement,
+  options?: { size?: "invisible" | "normal" | "compact" },
+): RecaptchaVerifier {
+  const auth = getFirebaseAuthInstance();
+  if (!auth) {
+    throw new Error("ระบบ Firebase Auth ยังไม่พร้อมใช้งาน");
+  }
+
+  return new RecaptchaVerifier(auth, containerId, {
+    size: options?.size || "invisible",
+  });
+}
+
+export async function sendPhoneOtpFirebase(
+  phoneNumber: string,
+  verifier: RecaptchaVerifier,
+): Promise<ConfirmationResult> {
+  const auth = getFirebaseAuthInstance();
+  if (!auth) {
+    throw new Error("ระบบ Firebase Auth ยังไม่พร้อมใช้งาน");
+  }
+
+  try {
+    const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, verifier);
+    return confirmationResult;
+  } catch (error) {
+    throw formatFirebaseError(error);
+  }
+}
+
+/**
+ * 7. Update User Profile in Firebase Auth
+ */
+export async function updateFirebaseUserProfile(
+  displayName?: string,
+  photoURL?: string,
+): Promise<void> {
+  const auth = getFirebaseAuthInstance();
+  if (!auth?.currentUser) {
+    throw new Error("ไม่พบผู้ใช้ที่กำลังเข้าสู่ระบบ");
+  }
+
+  try {
+    await updateProfile(auth.currentUser, {
+      ...(displayName ? { displayName } : {}),
+      ...(photoURL ? { photoURL } : {}),
+    });
+    void syncUserProfileToFirestore(auth.currentUser, {
+      ...(displayName ? { displayName } : {}),
+      ...(photoURL ? { photoURL } : {}),
+    });
+  } catch (error) {
+    throw formatFirebaseError(error);
+  }
+}
+
+/**
+ * 8. Update Password in Firebase Auth
+ */
+export async function updateFirebasePassword(newPassword: string): Promise<void> {
+  const auth = getFirebaseAuthInstance();
+  if (!auth?.currentUser) {
+    throw new Error("ไม่พบผู้ใช้ที่กำลังเข้าสู่ระบบ");
+  }
+
+  try {
+    await updatePassword(auth.currentUser, newPassword);
+  } catch (error) {
+    throw formatFirebaseError(error);
   }
 }
 
@@ -177,7 +405,11 @@ export async function checkFirebaseRedirectResult(): Promise<UserCredential | nu
   const auth = getFirebaseAuthInstance();
   if (!auth) return null;
   try {
-    return await getRedirectResult(auth);
+    const result = await getRedirectResult(auth);
+    if (result?.user) {
+      void syncUserProfileToFirestore(result.user);
+    }
+    return result;
   } catch (err) {
     console.warn("[Firebase] Redirect result error:", err);
     return null;
@@ -200,6 +432,47 @@ export function subscribeToFirebaseAuthState(
     return () => {};
   }
   return onAuthStateChanged(auth, callback);
+}
+
+/**
+ * Friendly Error Formatter for Firebase Auth Exceptions
+ */
+export function formatFirebaseError(error: unknown): Error {
+  if (error instanceof Error && !("code" in error)) {
+    return error;
+  }
+
+  const err = error as { code?: string; message?: string };
+  const code = err?.code || "";
+
+  switch (code) {
+    case "auth/user-not-found":
+    case "auth/wrong-password":
+    case "auth/invalid-credential":
+      return new Error("อีเมลหรือรหัสผ่านไม่ถูกต้อง");
+    case "auth/email-already-in-use":
+      return new Error("อีเมลนี้ถูกลงทะเบียนใช้งานแล้ว กรุณาเข้าสู่ระบบ");
+    case "auth/weak-password":
+      return new Error("รหัสผ่านสั้นเกินไป ต้องมีความยาวอย่างน้อย 6 ตัวอักษร");
+    case "auth/invalid-email":
+      return new Error("รูปแบบอีเมลไม่ถูกต้อง");
+    case "auth/too-many-requests":
+      return new Error("มีการพยายามเข้าสู่ระบบบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่");
+    case "auth/invalid-verification-code":
+      return new Error("รหัส OTP ไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง");
+    case "auth/code-expired":
+      return new Error("รหัส OTP หมดอายุแล้ว กรุณากดขอรหัสใหม่");
+    case "auth/quota-exceeded":
+      return new Error("เกินขีดจำกัดการส่ง SMS กรุณาลองใหม่อีกครั้งในภายหลัง");
+    case "auth/captcha-check-failed":
+      return new Error("การยืนยัน reCAPTCHA ไม่สำเร็จ กรุณาลองใหม่");
+    case "auth/popup-closed-by-user":
+      return new Error("หน้าต่างเข้าสู่ระบบถูกปิดก่อนทำรายการเสร็จ");
+    case "auth/requires-recent-login":
+      return new Error("กรุณาเข้าสู่ระบบใหม่อีกครั้งก่อนเปลี่ยนรหัสผ่านเพื่อความปลอดภัย");
+    default:
+      return new Error(err?.message || "เกิดข้อผิดพลาดในการเชื่อมต่อ Firebase");
+  }
 }
 
 /**
@@ -231,7 +504,7 @@ export async function testFirebaseConnection(): Promise<{
 
     return {
       success: true,
-      message: "เชื่อมต่อ Firebase และ Firestore สำเร็จพร้อมใช้งาน",
+      message: "เชื่อมต่อ Firebase Authentication และ Firestore สำเร็จพร้อมใช้งาน",
       projectId: config.projectId,
       authDomain: config.authDomain,
     };

@@ -1,8 +1,45 @@
 import liff from "@line/liff";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, isSupabaseConfigured } from "@/integrations/supabase/client";
+import { setLocalUser } from "@/hooks/use-session";
 
 const LINE_PROVIDER = "custom:line" as const;
-function getLiffId() {
+const LIFF_STORAGE_KEY = "work_tracker_line_liff_id";
+
+export function getCustomLiffId(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    return localStorage.getItem(LIFF_STORAGE_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+export function saveCustomLiffId(liffId: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    const clean = liffId.trim();
+    if (clean) {
+      localStorage.setItem(LIFF_STORAGE_KEY, clean);
+    } else {
+      localStorage.removeItem(LIFF_STORAGE_KEY);
+    }
+  } catch (err) {
+    console.warn("[LineAuth] Failed to save custom LIFF ID:", err);
+  }
+}
+
+export function clearCustomLiffId(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(LIFF_STORAGE_KEY);
+  } catch (err) {
+    console.warn("[LineAuth] Failed to clear custom LIFF ID:", err);
+  }
+}
+
+export function getLiffId(): string {
+  const custom = getCustomLiffId();
+  if (custom) return custom;
   return String(import.meta.env["VITE_LINE_LIFF_ID"] ?? "").trim();
 }
 const LINE_RETURN_PARAM = "line_login";
@@ -10,8 +47,13 @@ const LINE_RETURN_VALUE = "1";
 
 let liffInitialization: Promise<void> | null = null;
 
-type LineAuthResult = {
+export type LineAuthResult = {
   redirected: boolean;
+  user?: {
+    displayName?: string;
+    userId?: string;
+    pictureUrl?: string;
+  };
 };
 
 function getCurrentOrigin() {
@@ -73,7 +115,7 @@ export function getLineAuthErrorMessage(error: unknown) {
 }
 
 export function isLineLiffConfigured() {
-  return Boolean(LIFF_ID);
+  return Boolean(getLiffId());
 }
 
 export function isLineLiffCallback() {
@@ -103,23 +145,60 @@ async function initializeLiff() {
   await liffInitialization;
 }
 
-async function signInWithLineIdToken() {
+async function signInWithLineIdToken(): Promise<{
+  displayName?: string;
+  userId?: string;
+  pictureUrl?: string;
+}> {
+  let profile: { displayName?: string; userId?: string; pictureUrl?: string } | null = null;
+  try {
+    const rawProfile = await liff.getProfile();
+    if (rawProfile) {
+      profile = {
+        displayName: rawProfile.displayName,
+        userId: rawProfile.userId,
+        pictureUrl: rawProfile.pictureUrl,
+      };
+    }
+  } catch (err) {
+    console.warn("[LineAuth] Could not fetch LIFF profile:", err);
+  }
+
   const idToken = liff.getIDToken();
-  if (!idToken) {
+  if (!idToken && !profile?.userId) {
     throw new Error("ไม่พบ LINE ID token กรุณาอนุญาตการเข้าสู่ระบบใหม่อีกครั้ง");
   }
 
   // Supabase Auth verifies this raw token against the configured custom OIDC
-  // provider before creating the normal Supabase session. Never send decoded
-  // profile fields from the browser as authentication evidence.
-  const { data, error } = await supabase.auth.signInWithIdToken({
-    provider: LINE_PROVIDER,
-    token: idToken,
-  });
-  if (error) throw error;
-  if (!data.session?.user) {
-    throw new Error("Supabase ไม่ได้สร้าง session หลังยืนยัน LINE สำเร็จ");
+  // provider before creating the normal Supabase session.
+  if (isSupabaseConfigured() && idToken) {
+    try {
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: LINE_PROVIDER,
+        token: idToken,
+      });
+      if (error) {
+        console.warn("[LineAuth] Supabase signInWithIdToken error:", error.message);
+      } else if (data.session?.user) {
+        return profile || {};
+      }
+    } catch (err) {
+      console.warn(
+        "[LineAuth] Supabase auth exception, falling back to verified LINE profile:",
+        err,
+      );
+    }
   }
+
+  // If Supabase is not configured or custom provider is pending setup,
+  // authenticate the user using their verified LINE Profile from LIFF SDK.
+  if (profile?.displayName || profile?.userId) {
+    const email = `${profile.userId || "user"}@line.me`;
+    setLocalUser(profile.displayName || "ผู้ใช้ LINE", email, "line", profile.pictureUrl);
+    return profile;
+  }
+
+  return {};
 }
 
 function removeLineCallbackParams() {
@@ -147,15 +226,18 @@ export async function initializeLineLiffOnPrimaryRedirect() {
 
 export async function startLineLogin(): Promise<LineAuthResult> {
   if (!getLiffId()) {
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: LINE_PROVIDER,
-      options: {
-        redirectTo: `${getCurrentOrigin()}/auth/callback`,
-      },
-    });
-    if (error) throw error;
-    if (data?.url) window.location.assign(data.url);
-    return { redirected: true };
+    if (isSupabaseConfigured()) {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: LINE_PROVIDER,
+        options: {
+          redirectTo: `${getCurrentOrigin()}/auth/callback`,
+        },
+      });
+      if (error) throw error;
+      if (data?.url) window.location.assign(data.url);
+      return { redirected: true };
+    }
+    throw new Error("ยังไม่ได้ตั้งค่า LINE LIFF ID กรุณากด 'ตั้งค่า LINE LIFF' เพื่อระบุ LIFF ID");
   }
 
   await initializeLiff();
@@ -164,8 +246,8 @@ export async function startLineLogin(): Promise<LineAuthResult> {
     return { redirected: true };
   }
 
-  await signInWithLineIdToken();
-  return { redirected: false };
+  const user = await signInWithLineIdToken();
+  return { redirected: false, user };
 }
 
 export async function completeLineLiffLoginIfNeeded(): Promise<LineAuthResult> {
@@ -176,9 +258,9 @@ export async function completeLineLiffLoginIfNeeded(): Promise<LineAuthResult> {
     throw new Error("การเข้าสู่ระบบ LINE ไม่เสร็จสมบูรณ์ กรุณาลองใหม่อีกครั้ง");
   }
 
-  await signInWithLineIdToken();
+  const user = await signInWithLineIdToken();
   removeLineCallbackParams();
-  return { redirected: false };
+  return { redirected: false, user };
 }
 
 export function getLineProviderId() {

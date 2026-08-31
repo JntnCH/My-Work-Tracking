@@ -1,0 +1,31 @@
+{
+  "entities": {
+    "users": {
+      "fields": {
+        "id": { "type": "string", "description": "Unique user ID (Firebase auth uid)" },
+        "email": { "type": "string", "description": "User email address" },
+        "displayName": { "type": "string", "description": "User display name" },
+        "photoURL": { "type": "string", "description": "Profile photo URL" },
+        "role": { "type": "string", "description": "User role (admin, user, guest)" },
+        "createdAt": { "type": "string", "description": "ISO creation timestamp" },
+        "updatedAt": { "type": "string", "description": "ISO update timestamp" }
+      }
+    },
+    "work_records": {
+      "fields": {
+        "id": { "type": "string", "description": "Work record unique ID" },
+        "userId": { "type": "string", "description": "User UID who owns this entry" },
+        "workType": { "type": "string", "description": "Work type/company" },
+        "date": { "type": "string", "description": "Work date YYYY-MM-DD" },
+        "createdAt": { "type": "string", "description": "ISO creation timestamp" }
+      }
+    },
+    "settings": {
+      "fields": {
+        "userId": { "type": "string", "description": "User UID" },
+        "theme": { "type": "string", "description": "UI Theme" },
+        "updatedAt": { "type": "string", "description": "ISO update timestamp" }
+      }
+    }
+  }
+}

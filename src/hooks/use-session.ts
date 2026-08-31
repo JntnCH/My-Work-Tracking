@@ -100,24 +100,34 @@ export function isLocalGuestUser(user: User | null): boolean {
 
 export function isFirebaseUser(user: User | null): boolean {
   return (
-    user?.app_metadata?.provider === "firebase:google" ||
-    user?.app_metadata?.provider === "firebase"
+    user?.app_metadata?.provider?.startsWith("firebase") ||
+    user?.app_metadata?.provider === "google" ||
+    user?.app_metadata?.provider === "password" ||
+    user?.app_metadata?.provider === "phone"
   );
 }
 
 export function firebaseUserToAdapterUser(fbUser: FirebaseUser): User {
+  const providerId =
+    fbUser.providerData[0]?.providerId || (fbUser.isAnonymous ? "guest" : "firebase:email");
+  const fallbackName =
+    fbUser.displayName ||
+    fbUser.email?.split("@")[0] ||
+    (fbUser.phoneNumber ? `เบอร์โทร ${fbUser.phoneNumber}` : "ผู้ใช้งาน");
+
   return {
     id: fbUser.uid,
     app_metadata: {
-      provider: "firebase:google",
-      providers: ["google", "firebase"],
+      provider: fbUser.isAnonymous ? "guest" : `firebase:${providerId}`,
+      providers: fbUser.providerData.map((p) => p.providerId).concat(["firebase"]),
     },
     user_metadata: {
-      full_name: fbUser.displayName || fbUser.email?.split("@")[0] || "ผู้ใช้ Google",
-      name: fbUser.displayName || fbUser.email?.split("@")[0] || "ผู้ใช้ Google",
+      full_name: fallbackName,
+      name: fallbackName,
       avatar_url: fbUser.photoURL || undefined,
       picture: fbUser.photoURL || undefined,
       email: fbUser.email || undefined,
+      phone: fbUser.phoneNumber || undefined,
     },
     aud: "authenticated",
     created_at: fbUser.metadata?.creationTime || new Date().toISOString(),
