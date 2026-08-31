@@ -226,32 +226,41 @@ function AuthPage() {
 
   async function signInWithGoogleViaFirebase() {
     if (busy) return;
-    if (!isFirebaseConfigured()) {
-      const targetEmail = gmailAddress || "jayautobot.dev@gmail.com";
-      const targetName = gmailName || "Jay Autobot";
-      setLocalUser(targetName, targetEmail, "google");
-      toast.success(`เข้าสู่ระบบ Google สำเร็จ: ${targetName}`);
-      void navigate({ to: "/", replace: true });
+    if (!isFirebaseConfigured() && !isSupabaseConfigured()) {
+      toast.error("ยังไม่ได้ตั้งค่าระบบยืนยันตัวตน Google (Firebase / Supabase)", {
+        description:
+          "กรุณากด 'ตั้งค่า Firebase' หรือเข้าใช้งานผ่าน 'โหมดไม่ระบุตัวตน (Guest Mode)'",
+      });
+      setShowFirebaseDialog(true);
       return;
     }
+
     setBusy(true);
     try {
-      const res = await signInWithGoogleFirebase();
-      if (res?.user) {
-        toast.success(`เข้าสู่ระบบสำเร็จ: ${res.user.displayName || res.user.email || ""}`);
-        void navigate({ to: "/", replace: true });
+      if (isFirebaseConfigured()) {
+        const res = await signInWithGoogleFirebase();
+        if (res?.user) {
+          toast.success(`เข้าสู่ระบบสำเร็จ: ${res.user.displayName || res.user.email || ""}`);
+          void navigate({ to: "/", replace: true });
+          return;
+        }
+      } else if (isSupabaseConfigured()) {
+        await signInGoogle();
+        return;
       }
     } catch (err: unknown) {
-      const errorObj = err as { message?: string };
+      const errorObj = err as { message?: string; code?: string };
       if (errorObj?.message === "REDIRECTING") {
         return;
       }
-      console.warn("[Auth] Firebase Google Auth fallback:", err);
-      const targetEmail = gmailAddress || "jayautobot.dev@gmail.com";
-      const targetName = gmailName || "Jay Autobot";
-      setLocalUser(targetName, targetEmail, "google");
-      toast.success(`เข้าสู่ระบบ Google สำเร็จ: ${targetName}`);
-      void navigate({ to: "/", replace: true });
+      if (errorObj?.code === "auth/popup-closed-by-user") {
+        toast.info("ยกเลิกการเข้าสู่ระบบ Google");
+        return;
+      }
+      toast.error("เข้าสู่ระบบด้วย Google ไม่สำเร็จ", {
+        description:
+          errorObj?.message || "กรุณาตรวจสอบการตั้งค่า Google Auth ใน Firebase / Supabase",
+      });
     } finally {
       setBusy(false);
     }
@@ -259,44 +268,43 @@ function AuthPage() {
 
   async function signInGoogle(loginHint?: string) {
     if (busy) return;
+    if (!isSupabaseConfigured()) {
+      if (isFirebaseConfigured()) {
+        await signInWithGoogleViaFirebase();
+        return;
+      }
+      toast.error("ยังไม่ได้ตั้งค่า Supabase Google OAuth", {
+        description: "กรุณาตั้งค่า Google Provider ใน Supabase หรือใช้ Firebase Auth",
+      });
+      return;
+    }
+
     setBusy(true);
     try {
-      if (isSupabaseConfigured()) {
-        const redirectOrigin = typeof window !== "undefined" ? window.location.origin : "";
-        const { data, error } = await supabase.auth.signInWithOAuth({
-          provider: "google",
-          options: {
-            redirectTo: `${redirectOrigin}/auth/callback`,
-            queryParams: {
-              access_type: "offline",
-              prompt: "consent",
-              ...(loginHint ? { login_hint: loginHint } : {}),
-            },
+      const redirectOrigin = typeof window !== "undefined" ? window.location.origin : "";
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${redirectOrigin}/auth/callback`,
+          queryParams: {
+            access_type: "offline",
+            prompt: "consent",
+            ...(loginHint ? { login_hint: loginHint } : {}),
           },
-        });
+        },
+      });
 
-        if (error) {
-          throw error;
-        }
-        if (data?.url) {
-          window.location.assign(data.url);
-          return;
-        }
+      if (error) {
+        throw error;
       }
-
-      // Direct fallback if not configured
-      const targetEmail = loginHint || gmailAddress || "google_user@gmail.com";
-      const targetName = gmailName || targetEmail.split("@")[0] || "ผู้ใช้ Google";
-      setLocalUser(targetName, targetEmail, "google");
-      toast.success(`เข้าสู่ระบบสำเร็จ: ${targetName}`);
-      void navigate({ to: "/", replace: true });
+      if (data?.url) {
+        window.location.assign(data.url);
+        return;
+      }
     } catch (err) {
-      console.warn("[Auth] Supabase Google OAuth failed, using direct login:", err);
-      const targetEmail = loginHint || gmailAddress || "google_user@gmail.com";
-      const targetName = gmailName || targetEmail.split("@")[0] || "ผู้ใช้ Google";
-      setLocalUser(targetName, targetEmail, "google");
-      toast.success(`เข้าสู่ระบบสำเร็จ: ${targetName}`);
-      void navigate({ to: "/", replace: true });
+      toast.error("เข้าสู่ระบบ Supabase Google OAuth ไม่สำเร็จ", {
+        description: err instanceof Error ? err.message : String(err),
+      });
     } finally {
       setBusy(false);
     }
@@ -304,28 +312,28 @@ function AuthPage() {
 
   async function signInGithub() {
     if (busy) return;
+    if (!isSupabaseConfigured()) {
+      toast.error("ยังไม่ได้ตั้งค่า Supabase สำหรับ GitHub OAuth", {
+        description: "กรุณาเปิดใช้งาน GitHub Provider ใน Supabase Dashboard หรือใช้โหมดทดลอง",
+      });
+      return;
+    }
     setBusy(true);
     try {
-      if (isSupabaseConfigured()) {
-        const redirectOrigin = typeof window !== "undefined" ? window.location.origin : "";
-        const { data, error } = await supabase.auth.signInWithOAuth({
-          provider: "github",
-          options: { redirectTo: `${redirectOrigin}/auth/callback` },
-        });
-        if (error) throw error;
-        if (data?.url) {
-          window.location.assign(data.url);
-          return;
-        }
+      const redirectOrigin = typeof window !== "undefined" ? window.location.origin : "";
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "github",
+        options: { redirectTo: `${redirectOrigin}/auth/callback` },
+      });
+      if (error) throw error;
+      if (data?.url) {
+        window.location.assign(data.url);
+        return;
       }
-      setLocalUser("ผู้ใช้ GitHub", "github_user@worktracker.local", "github");
-      toast.success("เข้าสู่ระบบด้วย GitHub สำเร็จ");
-      void navigate({ to: "/", replace: true });
     } catch (err) {
-      console.warn("[GitHub] OAuth fallback to local:", err);
-      setLocalUser("ผู้ใช้ GitHub", "github_user@worktracker.local", "github");
-      toast.success("เข้าสู่ระบบด้วย GitHub สำเร็จ");
-      void navigate({ to: "/", replace: true });
+      toast.error("เข้าสู่ระบบด้วย GitHub ไม่สำเร็จ", {
+        description: err instanceof Error ? err.message : String(err),
+      });
     } finally {
       setBusy(false);
     }
@@ -342,16 +350,18 @@ function AuthPage() {
           void navigate({ to: "/", replace: true });
           return;
         }
+      } else if (isSupabaseConfigured()) {
+        const result = await startLineLogin();
+        if (result.redirected) return;
       } else {
-        setLocalUser("ผู้ใช้ LINE", "line_user@worktracker.local", "line");
-        toast.success("เข้าสู่ระบบด้วย LINE สำเร็จ");
-        void navigate({ to: "/", replace: true });
+        toast.error("ยังไม่ได้ตั้งค่า LINE Login / LIFF ID", {
+          description: "กรุณาระบุ VITE_LINE_LIFF_ID หรือตั้งค่า OIDC Provider ใน Supabase",
+        });
       }
     } catch (err) {
-      console.warn("[LINE] Fallback to local session:", err);
-      setLocalUser("ผู้ใช้ LINE", "line_user@worktracker.local", "line");
-      toast.success("เข้าสู่ระบบด้วย LINE สำเร็จ");
-      void navigate({ to: "/", replace: true });
+      toast.error("เข้าสู่ระบบด้วย LINE ไม่สำเร็จ", {
+        description: getLineAuthErrorMessage(err),
+      });
     } finally {
       setBusy(false);
     }
@@ -380,38 +390,30 @@ function AuthPage() {
     const normalizedPhone = getValidatedPhone();
     if (!normalizedPhone || busy) return;
 
+    if (!isSupabaseConfigured()) {
+      toast.error("ยังไม่ได้ตั้งค่าระบบ SMS ใน Supabase", {
+        description:
+          "โปรดเชื่อมต่อ Supabase SMS Gateway (Twilio/MessageBird) หรือเข้าสู่ระบบด้วย Google/อีเมล",
+      });
+      return;
+    }
+
     setBusy(true);
     try {
-      if (isSupabaseConfigured()) {
-        try {
-          const { error } = await supabase.auth.signInWithOtp({ phone: normalizedPhone });
-          if (!error) {
-            setPhone(normalizedPhone);
-            setPhoneOtp("");
-            setPhoneOtpSent(true);
-            toast.success("ส่งรหัส OTP แล้ว", {
-              description: "กรุณาตรวจสอบ SMS และกรอกรหัส 6 หลักภายในเวลาที่กำหนด",
-            });
-            return;
-          }
-        } catch (e) {
-          console.warn("[PhoneAuth] Supabase OTP error, using smart test OTP:", e);
-        }
+      const { error } = await supabase.auth.signInWithOtp({ phone: normalizedPhone });
+      if (error) {
+        throw error;
       }
-
-      // Smart test OTP fallback
-      const randomOtp = String(Math.floor(100000 + Math.random() * 900000));
-      setLocalGeneratedOtp(randomOtp);
       setPhone(normalizedPhone);
-      setPhoneOtp(randomOtp);
+      setPhoneOtp("");
       setPhoneOtpSent(true);
       toast.success("ส่งรหัส OTP เรียบร้อยแล้ว", {
-        description: `รหัส OTP ของคุณคือ: ${randomOtp}`,
-        duration: 8000,
+        description: "กรุณาตรวจสอบ SMS และกรอกรหัส 6 หลัก",
       });
     } catch (err) {
       toast.error("ส่งรหัส OTP ไม่สำเร็จ", {
-        description: err instanceof Error ? err.message : String(err),
+        description:
+          err instanceof Error ? err.message : "โปรดตรวจสอบการตั้งค่า SMS Provider ใน Supabase",
       });
     } finally {
       setBusy(false);
@@ -428,38 +430,31 @@ function AuthPage() {
       return;
     }
 
+    if (!isSupabaseConfigured()) {
+      toast.error("ยังไม่ได้เชื่อมต่อระบบตรวจสอบ OTP");
+      return;
+    }
+
     setBusy(true);
     try {
-      if (isSupabaseConfigured() && !localGeneratedOtp) {
-        try {
-          const { error } = await supabase.auth.verifyOtp({
-            phone: normalizedPhone,
-            token: phoneOtp,
-            type: "sms",
-          });
-          if (!error) {
-            toast.success("เข้าสู่ระบบสำเร็จ");
-            void navigate({ to: "/", replace: true });
-            return;
-          }
-        } catch (e) {
-          console.warn("[PhoneAuth] Supabase verify error:", e);
-        }
+      const { error, data } = await supabase.auth.verifyOtp({
+        phone: normalizedPhone,
+        token: phoneOtp,
+        type: "sms",
+      });
+      if (error) {
+        throw error;
       }
-
-      if (localGeneratedOtp && phoneOtp !== localGeneratedOtp && phoneOtp !== "123456") {
-        toast.error("รหัส OTP ไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง");
+      if (data?.session || data?.user) {
+        toast.success("ยืนยันตัวตนสำเร็จ เข้าสู่ระบบเรียบร้อย");
+        void navigate({ to: "/", replace: true });
         return;
       }
-
-      const formattedName = `ผู้ใช้ ${normalizedPhone}`;
-      const fakeEmail = `${normalizedPhone.replace(/\+/g, "")}@phone.local`;
-      setLocalUser(formattedName, fakeEmail, "phone", undefined, normalizedPhone);
-      toast.success(`เข้าสู่ระบบสำเร็จ (${normalizedPhone})`);
+      toast.success("เข้าสู่ระบบสำเร็จ");
       void navigate({ to: "/", replace: true });
     } catch (err) {
-      toast.error("ยืนยันรหัส OTP ไม่สำเร็จ", {
-        description: err instanceof Error ? err.message : String(err),
+      toast.error("รหัส OTP ไม่ถูกต้องหรือหมดอายุ", {
+        description: err instanceof Error ? err.message : "กรุณาตรวจสอบรหัส OTP อีกครั้ง",
       });
     } finally {
       setBusy(false);
@@ -471,21 +466,23 @@ function AuthPage() {
       toast.error("กรุณากรอกอีเมลก่อนขอรีเซ็ตรหัสผ่าน");
       return;
     }
+    if (!isSupabaseConfigured()) {
+      toast.error("ยังไม่ได้ตั้งค่าระบบอีเมลใน Supabase", {
+        description: "กรุณาตรวจสอบการตั้งค่า Supabase Authentication",
+      });
+      return;
+    }
     setBusy(true);
     try {
-      if (isSupabaseConfigured()) {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/auth?reset=1`,
-        });
-        if (!error) {
-          toast.success("ส่งลิงก์รีเซ็ตรหัสผ่านแล้ว", {
-            description: "กรุณาตรวจสอบกล่องจดหมายและโฟลเดอร์ Spam",
-          });
-          setResetMode(false);
-          return;
-        }
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth?reset=1`,
+      });
+      if (error) {
+        throw error;
       }
-      toast.success("รีเซ็ตรหัสผ่านสำเร็จ คุณสามารถตั้งรหัสผ่านใหม่ได้ทันที");
+      toast.success("ส่งลิงก์รีเซ็ตรหัสผ่านแล้ว", {
+        description: "กรุณาตรวจสอบกล่องจดหมายและโฟลเดอร์ Spam ในอีเมลของคุณ",
+      });
       setResetMode(false);
     } catch (err) {
       toast.error("ส่งลิงก์รีเซ็ตรหัสผ่านไม่สำเร็จ", {
@@ -507,46 +504,69 @@ function AuthPage() {
       toast.error("กรุณากรอกอีเมลและรหัสผ่าน");
       return;
     }
+
+    if (!isSupabaseConfigured()) {
+      toast.error("ยังไม่ได้ตั้งค่า Supabase Authentication สำหรับอีเมล", {
+        description: "กรุณาเข้าใช้งานผ่าน Google Auth หรือใช้โหมดทดลอง (Guest Mode)",
+      });
+      return;
+    }
+
     setBusy(true);
     try {
-      if (isSupabaseConfigured()) {
-        if (mode === "signup") {
-          const { error, data } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              data: { full_name: name || email.split("@")[0] },
-            },
+      if (mode === "signup") {
+        const { error, data } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { full_name: name || email.split("@")[0] },
+          },
+        });
+        if (error) {
+          throw error;
+        }
+        if (data.session) {
+          toast.success("สมัครสมาชิกและเข้าสู่ระบบสำเร็จ!");
+          void navigate({ to: "/", replace: true });
+          return;
+        }
+        if (data.user && !data.session) {
+          toast.success("สมัครสมาชิกสำเร็จ!", {
+            description: "ระบบได้ส่งอีเมลยืนยันไปยังอีเมลของคุณ กรุณากดยืนยันก่อนเข้าสู่ระบบ",
+            duration: 6000,
           });
-          if (!error && (data.session || data.user)) {
-            toast.success("สมัครสมาชิกสำเร็จ! กำลังเข้าสู่ระบบ...");
-            void navigate({ to: "/", replace: true });
-            return;
-          }
-        } else {
-          const { error, data } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-          });
-          if (!error && (data.session || data.user)) {
-            toast.success("เข้าสู่ระบบสำเร็จ");
-            void navigate({ to: "/", replace: true });
-            return;
-          }
+          setMode("email");
+          return;
+        }
+      } else {
+        const { error, data } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) {
+          throw error;
+        }
+        if (data.session || data.user) {
+          toast.success("เข้าสู่ระบบสำเร็จ");
+          void navigate({ to: "/", replace: true });
+          return;
         }
       }
-
-      // Local session fallback
-      const finalName = name || email.split("@")[0] || "ผู้ใช้งาน";
-      setLocalUser(finalName, email, "email");
-      toast.success(mode === "signup" ? "สมัครสมาชิกและเข้าสู่ระบบสำเร็จ!" : "เข้าสู่ระบบสำเร็จ!");
-      void navigate({ to: "/", replace: true });
     } catch (err) {
-      console.warn("[Auth] Email auth fallback:", err);
-      const finalName = name || email.split("@")[0] || "ผู้ใช้งาน";
-      setLocalUser(finalName, email, "email");
-      toast.success(`เข้าสู่ระบบสำเร็จ (${finalName})`);
-      void navigate({ to: "/", replace: true });
+      const msg = err instanceof Error ? err.message : String(err);
+      let thaiMsg = msg;
+      if (msg.includes("Invalid login credentials")) {
+        thaiMsg = "อีเมลหรือรหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง";
+      } else if (msg.includes("Email not confirmed")) {
+        thaiMsg = "ยังไม่ได้ยืนยันอีเมล กรุณาตรวจสอบกล่องจดหมายของคุณ";
+      } else if (msg.includes("User already registered")) {
+        thaiMsg = "อีเมลนี้ลงทะเบียนไว้แล้ว กรุณาเลือกเข้าสู่ระบบ";
+      } else if (msg.includes("Password should be at least")) {
+        thaiMsg = "รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร";
+      }
+      toast.error(mode === "signup" ? "สมัครสมาชิกไม่สำเร็จ" : "เข้าสู่ระบบไม่สำเร็จ", {
+        description: thaiMsg,
+      });
     } finally {
       setBusy(false);
     }
@@ -639,219 +659,76 @@ function AuthPage() {
 
         {mode === "google" ? (
           <div className="space-y-4 pt-1 text-left">
-            {/* Firebase Google Auth Primary Button */}
-            <div className="space-y-2">
+            {/* Primary Google Auth Button */}
+            <div className="space-y-3">
               <button
                 type="button"
                 onClick={() => void signInWithGoogleViaFirebase()}
                 disabled={busy}
-                aria-label="Sign in with Google via Firebase"
-                className="flex w-full items-center justify-center gap-3 rounded-xl border border-amber-500/30 bg-card py-3 px-4 text-sm font-bold text-foreground shadow-sm transition hover:bg-amber-500/5 hover:border-amber-500/60 active:scale-[0.99] disabled:opacity-60 cursor-pointer"
+                aria-label="Sign in with Google"
+                className="flex w-full items-center justify-center gap-3 rounded-xl border border-primary/30 bg-primary/5 py-3.5 px-4 text-sm font-bold text-foreground shadow-sm transition hover:bg-primary/10 hover:border-primary/60 active:scale-[0.99] disabled:opacity-60 cursor-pointer"
               >
                 {busy ? (
                   <>
-                    <EngineWorkingAnimation size="sm" label="กำลังเข้าสู่ระบบ Google" />
-                    <span>กำลังเข้าสู่ระบบ Google ผ่าน Firebase...</span>
+                    <EngineWorkingAnimation size="sm" label="กำลังเชื่อมต่อ Google" />
+                    <span>กำลังเข้าสู่ระบบ Google...</span>
                   </>
                 ) : (
                   <>
                     <GoogleIcon className="h-5 w-5 shrink-0" />
                     <span className="flex items-center gap-1.5">
-                      เข้าสู่ระบบด้วย Google (Firebase Auth)
+                      เข้าสู่ระบบด้วย Google Account จริง
                       <Flame className="h-4 w-4 text-amber-500" />
                     </span>
                   </>
                 )}
               </button>
 
-              <div className="flex items-center justify-between px-1 text-[11px]">
-                <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <span
-                    className={`h-2 w-2 rounded-full ${
-                      firebaseConfigured ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
-                    }`}
-                  />
-                  <span>
-                    Firebase:{" "}
-                    {firebaseConfigured ? (
-                      <strong className="text-emerald-600 dark:text-emerald-400">
-                        เชื่อมต่อแล้ว
-                      </strong>
-                    ) : (
-                      <span className="text-amber-600 dark:text-amber-400">
-                        ยังไม่ได้ใส่ Config
-                      </span>
-                    )}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowFirebaseDialog(true)}
-                  className="inline-flex items-center gap-1 font-semibold text-primary hover:underline cursor-pointer"
-                >
-                  <Settings className="h-3 w-3" />
-                  <span>ตั้งค่า Firebase</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Recent Gmail Accounts (if any) */}
-            {recentAccounts.length > 0 && (
-              <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-2">
-                <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
-                  <span className="flex items-center gap-1.5">
-                    <Clock3 className="h-3.5 w-3.5 text-primary" />
-                    บัญชี Google / Gmail ล่าสุดบนเครื่องนี้
-                  </span>
-                  <span className="text-[10px] text-muted-foreground/80">
-                    คลิกเพื่อเข้าใช้งานทันที
-                  </span>
-                </div>
-                <div className="space-y-1.5">
-                  {recentAccounts.map((acc) => (
-                    <div
-                      key={acc.email}
-                      onClick={() => handleDirectGmailLogin(acc.email, acc.name)}
-                      className="group flex items-center justify-between gap-2.5 rounded-lg border border-border/80 bg-card p-2 text-xs transition hover:border-primary/50 hover:bg-accent/50 cursor-pointer shadow-2xs"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs">
-                          {acc.name?.[0]?.toUpperCase() || acc.email[0]?.toUpperCase() || "G"}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="truncate font-semibold text-foreground leading-tight">
-                            {acc.name}
-                          </p>
-                          <p className="truncate text-[11px] text-muted-foreground font-mono">
-                            {acc.email}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary group-hover:underline">
-                          เข้าใช้งาน
-                          <ArrowRight className="h-3 w-3" />
-                        </span>
-                        <button
-                          type="button"
-                          onClick={(e) => handleRemoveRecent(e, acc.email)}
-                          title="ลบบัญชีนี้ออกจากประวัติ"
-                          aria-label="ลบบัญชีนี้ออกจากประวัติ"
-                          className="ml-1 rounded p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Direct Gmail Login Form */}
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleDirectGmailLogin();
-              }}
-              className="rounded-2xl border border-primary/20 bg-muted/20 p-3.5 space-y-3 shadow-xs"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
-                  <Zap className="h-3.5 w-3.5 text-primary" />
-                  <span>เข้าสู่ระบบด้วย Gmail / Google Account</span>
-                </div>
-                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                  แนะนำ • เข้าใช้งานทันที
-                </span>
-              </div>
-
-              <div className="space-y-2">
-                <div>
-                  <label className="text-[11px] font-semibold text-muted-foreground block mb-1">
-                    อีเมล Gmail ของคุณ
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      inputMode="email"
-                      autoComplete="email"
-                      placeholder="เช่น yourname หรือ yourname@gmail.com"
-                      value={gmailAddress}
-                      onChange={(e) => setGmailAddress(e.target.value)}
-                      className="w-full rounded-xl border border-input bg-background pl-3 pr-24 py-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              <div className="rounded-xl border border-border bg-muted/40 p-3 space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <span
+                      className={`h-2 w-2 rounded-full ${
+                        firebaseConfigured || supabaseConfigured
+                          ? "bg-emerald-500 animate-pulse"
+                          : "bg-amber-500"
+                      }`}
                     />
-                    {!gmailAddress.includes("@") && gmailAddress.trim().length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setGmailAddress((prev) => `${prev.trim()}@gmail.com`)}
-                        className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-lg bg-secondary px-2 py-0.5 text-[10px] font-semibold text-primary hover:bg-primary/10 transition"
-                      >
-                        + @gmail.com
-                      </button>
-                    )}
+                    <span>
+                      สถานะระบบยืนยันตัวตน:{" "}
+                      {firebaseConfigured || supabaseConfigured ? (
+                        <strong className="text-emerald-600 dark:text-emerald-400">
+                          พร้อมใช้งาน (Real Auth)
+                        </strong>
+                      ) : (
+                        <span className="text-amber-600 dark:text-amber-400">
+                          ยังไม่ได้เชื่อมต่อ Firebase / Supabase
+                        </span>
+                      )}
+                    </span>
                   </div>
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-semibold text-muted-foreground block mb-1">
-                    ชื่อผู้ใช้งาน (ทางเลือก)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="เช่น คุณสมชาย (ถ้าไม่ใส่จะใช้ชื่อจากอีเมล)"
-                    value={gmailName}
-                    onChange={(e) => setGmailName(e.target.value)}
-                    className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                  />
-                </div>
-              </div>
-
-              {/* Quick Preset Email Chip */}
-              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                <span className="text-[10px] text-muted-foreground">เข้าสู่ระบบด่วน:</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setGmailAddress("jayautobot.dev@gmail.com");
-                    setGmailName("Jay Autobot");
-                    handleDirectGmailLogin("jayautobot.dev@gmail.com", "Jay Autobot");
-                  }}
-                  className="rounded-lg border border-primary/30 bg-card px-2.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary hover:text-primary-foreground transition shadow-2xs cursor-pointer"
-                >
-                  ⚡ jayautobot.dev@gmail.com
-                </button>
-              </div>
-
-              <div className="space-y-1.5 pt-1">
-                <button
-                  type="submit"
-                  disabled={busy || !gmailAddress.trim()}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-xs font-bold text-primary-foreground shadow-xs transition hover:bg-primary/90 active:scale-[0.99] disabled:opacity-50 cursor-pointer"
-                >
-                  <GoogleIcon className="h-4 w-4 shrink-0" />
-                  <span>เข้าสู่ระบบด้วย Gmail ทันที</span>
-                </button>
-
-                {supabaseConfigured && (
                   <button
                     type="button"
-                    onClick={() => void signInGoogle(gmailAddress)}
-                    disabled={busy}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card py-2 text-[11px] font-semibold text-muted-foreground transition hover:bg-accent hover:text-foreground active:scale-[0.99] disabled:opacity-50 cursor-pointer"
+                    onClick={() => setShowFirebaseDialog(true)}
+                    className="inline-flex items-center gap-1 font-semibold text-primary hover:underline cursor-pointer"
                   >
-                    <span>หรือเข้าสู่ระบบผ่าน Supabase Google OAuth</span>
+                    <Settings className="h-3 w-3" />
+                    <span>ตั้งค่า Firebase</span>
                   </button>
-                )}
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  ระบบจะเปิดหน้าต่าง Google Sign-In อย่างเป็นทางการเพื่อยืนยันบัญชีจริงของคุณ
+                  ข้อมูลทั้งหมดจะเชื่อมโยงกับบัญชี Google โดยตรง
+                </p>
               </div>
-            </form>
+            </div>
 
             <div className="relative py-1">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-border" />
               </div>
               <div className="relative flex justify-center text-[10px] uppercase font-semibold text-muted-foreground">
-                <span className="bg-card px-2">หรือช่องทางอื่น</span>
+                <span className="bg-card px-2">หรือเข้าสู่ระบบด้วยผู้ให้บริการอื่น</span>
               </div>
             </div>
 
@@ -863,7 +740,7 @@ function AuthPage() {
                 className="flex items-center justify-center gap-2 rounded-xl border border-border bg-secondary/50 py-2.5 px-3 text-xs font-semibold text-foreground transition hover:bg-secondary active:scale-[0.99] disabled:opacity-60 cursor-pointer"
               >
                 <Github className="h-3.5 w-3.5 shrink-0" />
-                <span>GitHub</span>
+                <span>GitHub OAuth</span>
               </button>
 
               <button
@@ -874,60 +751,8 @@ function AuthPage() {
                 className="flex items-center justify-center gap-2 rounded-xl border border-[#06C755]/40 bg-[#06C755]/10 py-2.5 px-3 text-xs font-bold text-foreground transition hover:bg-[#06C755]/20 active:scale-[0.99] disabled:opacity-60 cursor-pointer"
               >
                 <MessageCircle className="h-3.5 w-3.5 text-[#06C755] shrink-0" />
-                <span>LINE LIFF</span>
+                <span>LINE Official Login</span>
               </button>
-            </div>
-
-            <div className="text-left pt-1">
-              <button
-                type="button"
-                onClick={() => setShowConfigHelp((prev) => !prev)}
-                className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-primary transition cursor-pointer"
-              >
-                <HelpCircle className="h-3.5 w-3.5" />
-                <span>คำแนะนำการตั้งค่า OAuth ใน Supabase</span>
-              </button>
-
-              {showConfigHelp && (
-                <div className="mt-2.5 space-y-2 rounded-xl border border-primary/20 bg-info-soft/40 p-3 text-[11px] text-muted-foreground animate-in fade-in-50 duration-200">
-                  <p className="font-semibold text-foreground">
-                    ขั้นตอนเปิดใช้งาน Google/GitHub/LINE Login ใน Supabase Dashboard:
-                  </p>
-                  <ol className="list-decimal pl-4 space-y-1 leading-relaxed">
-                    <li>
-                      ไปที่ Supabase &gt; Authentication &gt; Providers แล้วเปิด Google, GitHub หรือ
-                      Custom OIDC (LINE)
-                    </li>
-                    <li>เปิดใช้งาน Provider และใส่ Client ID/Client Secret ใน Supabase เท่านั้น</li>
-                    <li>
-                      สำหรับ LINE ให้ใช้ provider name `line`, เปิด OIDC และไม่ใส่ Channel Secret ใน
-                      frontend
-                    </li>
-                    <li>
-                      เพิ่ม URL ของเว็บไซต์และ <code>/auth/callback</code> ใน Supabase Redirect URLs
-                    </li>
-                    <li>
-                      สำหรับ GitHub ให้ใช้ Supabase Callback URL ที่หน้า Provider แสดงใน GitHub
-                      OAuth App
-                    </li>
-                  </ol>
-                  <div className="pt-1.5 flex items-center justify-between gap-2">
-                    <span className="truncate font-mono text-[10px] bg-card px-2 py-1 rounded border border-border">
-                      {typeof window !== "undefined"
-                        ? `${window.location.origin}/auth/callback`
-                        : ""}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={copyRedirectUrl}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-semibold bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 shrink-0 cursor-pointer"
-                    >
-                      {copiedUrl ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                      <span>{copiedUrl ? "คัดลอกแล้ว" : "คัดลอก URL"}</span>
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         ) : mode === "phone" ? (
@@ -937,38 +762,27 @@ function AuthPage() {
           >
             <div className="rounded-xl border border-primary/20 bg-info-soft/60 p-3 text-xs text-muted-foreground">
               {!phoneOtpSent
-                ? "กรอกเบอร์โทรศัพท์เพื่อรับรหัส OTP ทาง SMS"
-                : "กรอกรหัส OTP 6 หลักที่ส่งไปยังโทรศัพท์ของคุณ"}
+                ? "กรอกเบอร์โทรศัพท์จริงของคุณเพื่อรับรหัสยืนยัน OTP ทาง SMS"
+                : "กรอกรหัส OTP 6 หลักที่ส่งไปยังโทรศัพท์ของคุณทาง SMS จริง"}
             </div>
             <div>
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-muted-foreground" htmlFor="phone-number">
-                  เบอร์โทรศัพท์
-                </label>
-                {!phoneOtpSent && (
-                  <button
-                    type="button"
-                    onClick={() => setPhone("081-234-5678")}
-                    className="text-[10px] text-primary hover:underline"
-                  >
-                    ⚡ ใส่เบอร์ทดสอบ 081-234-5678
-                  </button>
-                )}
-              </div>
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="phone-number">
+                เบอร์โทรศัพท์
+              </label>
               <input
                 id="phone-number"
                 type="tel"
                 inputMode="tel"
                 autoComplete="tel"
                 required
-                placeholder="081-234-5678 หรือ +66812345678"
+                placeholder="0812345678 หรือ +66812345678"
                 value={phone}
                 onChange={(event) => setPhone(event.target.value)}
                 disabled={phoneOtpSent || busy}
                 className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               />
               <p className="mt-1 text-[11px] text-muted-foreground">
-                ระบบจะปรับเบอร์ไทยเป็นรูปแบบสากลให้อัตโนมัติ
+                ระบบจะส่ง SMS OTP ไปยังหมายเลขโทรศัพท์จริงของคุณ
               </p>
             </div>
             {phoneOtpSent ? (
@@ -1000,7 +814,7 @@ function AuthPage() {
                 >
                   {busy ? (
                     <>
-                      <EngineWorkingAnimation size="sm" label="กำลังตรวจสอบ" />
+                      <EngineWorkingAnimation size="sm" label="กำลังตรวจสอบ OTP" />
                       กำลังตรวจสอบ...
                     </>
                   ) : (
@@ -1040,13 +854,13 @@ function AuthPage() {
               >
                 {busy ? (
                   <>
-                    <EngineWorkingAnimation size="sm" label="กำลังส่งรหัส" />
-                    กำลังส่งรหัส...
+                    <EngineWorkingAnimation size="sm" label="กำลังส่งรหัส OTP" />
+                    กำลังส่งรหัส OTP...
                   </>
                 ) : (
                   <>
                     <Phone className="h-4 w-4" />
-                    ส่งรหัส OTP
+                    ส่งรหัส OTP ทาง SMS
                   </>
                 )}
               </button>
@@ -1059,12 +873,14 @@ function AuthPage() {
           >
             {resetMode ? (
               <div className="rounded-xl border border-primary/20 bg-info-soft/60 p-3 text-xs text-muted-foreground">
-                กรอกอีเมลเพื่อรับลิงก์ตั้งรหัสผ่านใหม่
+                กรอกอีเมลของคุณเพื่อรับลิงก์ตั้งรหัสผ่านใหม่
               </div>
             ) : null}
             {!resetMode && mode === "signup" ? (
               <div>
-                <label className="text-xs font-medium text-muted-foreground">ชื่อผู้ใช้งาน</label>
+                <label className="text-xs font-medium text-muted-foreground">
+                  ชื่อ-นามสกุล หรือชื่อเรียก
+                </label>
                 <input
                   type="text"
                   placeholder="เช่น สมชาย ใจดี"
@@ -1075,20 +891,7 @@ function AuthPage() {
               </div>
             ) : null}
             <div>
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-muted-foreground">อีเมล</label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmail("jayautobot.dev@gmail.com");
-                    setPassword("password123");
-                    setName("Jay Autobot");
-                  }}
-                  className="text-[10px] text-primary hover:underline cursor-pointer"
-                >
-                  ⚡ เติมอีเมลทดสอบ
-                </button>
-              </div>
+              <label className="text-xs font-medium text-muted-foreground">อีเมล</label>
               <input
                 type="email"
                 required
@@ -1160,7 +963,7 @@ function AuthPage() {
               ) : mode === "signup" ? (
                 <>
                   <UserPlus className="h-4 w-4" />
-                  ลงทะเบียนใหม่
+                  ลงทะเบียนบัญชีใหม่
                 </>
               ) : (
                 <>
