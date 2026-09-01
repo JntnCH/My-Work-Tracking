@@ -296,65 +296,65 @@ export function CheckInPanel({
 
   return (
     <div className="space-y-5">
-      {/* Status banner */}
+      {/* Status banner + aligned edit-time control */}
       <div
-        className={`surface-card flex flex-col items-center justify-between gap-4 p-5 md:flex-row ${
+        className={`surface-card flex flex-col gap-4 p-5 ${
           active ? "work-active-card" : ""
         }`}
       >
-        <div className="flex w-full items-center gap-4">
-          <StatusMotion running={!!active} />
+        <div className="flex w-full flex-col items-stretch justify-between gap-4 md:flex-row md:items-center">
+          <div className="flex w-full min-w-0 items-center gap-4">
+            <StatusMotion running={!!active} />
 
-          <div className="min-w-0">
-            <div className="text-base font-bold md:text-lg" data-testid="status-title">
-              {active ? (
-                <span className="flex items-center gap-2">
-                  <span
-                    aria-hidden
-                    className="flex h-4 items-end gap-[2px]"
-                    data-testid="working-animation"
-                  >
-                    <span className="work-bar block h-3 w-[3px] rounded-full bg-success [animation-delay:0ms]" />
-                    <span className="work-bar block h-4 w-[3px] rounded-full bg-success [animation-delay:150ms]" />
-                    <span className="work-bar block h-2.5 w-[3px] rounded-full bg-success [animation-delay:300ms]" />
+            <div className="min-w-0">
+              <div className="text-base font-bold md:text-lg" data-testid="status-title">
+                {active ? (
+                  <span className="flex items-center gap-2">
+                    <span
+                      aria-hidden
+                      className="flex h-4 items-end gap-[2px]"
+                      data-testid="working-animation"
+                    >
+                      <span className="work-bar block h-3 w-[3px] rounded-full bg-success [animation-delay:0ms]" />
+                      <span className="work-bar block h-4 w-[3px] rounded-full bg-success [animation-delay:150ms]" />
+                      <span className="work-bar block h-2.5 w-[3px] rounded-full bg-success [animation-delay:300ms]" />
+                    </span>
+                    <span>
+                      กำลังทำงาน: <span className="text-success">{active.workType}</span>
+                    </span>
                   </span>
-                  <span>
-                    กำลังทำงาน: <span className="text-success">{active.workType}</span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <span className="sleep-breathe inline-block text-muted-foreground">😴</span>
+                    <span>ยังไม่ได้ CHECK-IN 🥱</span>
                   </span>
-                </span>
-              ) : (
-                <span className="flex items-center gap-2">
-                  <span className="sleep-breathe inline-block text-muted-foreground">😴</span>
-                  <span>ยังไม่ได้ CHECK-IN 🥱</span>
-                </span>
-              )}
+                )}
+              </div>
+              <p className="truncate text-xs text-muted-foreground md:text-sm">
+                {active
+                  ? `สถานที่: ${active.locationName} | Check-in เมื่อ ${new Date(active.checkInTime).toLocaleTimeString("th-TH", { hour12: false })}`
+                  : "พร้อมเริ่มงาน? กดปุ่ม ค้นหาตำแหน่ง เพื่อบันทึกพิกัดและเวลา แล้วกด Check-in"}
+              </p>
             </div>
-            <p className="truncate text-xs text-muted-foreground md:text-sm">
-              {active
-                ? `สถานที่: ${active.locationName} | Check-in เมื่อ ${new Date(active.checkInTime).toLocaleTimeString("th-TH", { hour12: false })}`
-                : "พร้อมเริ่มงาน? กดปุ่ม ค้นหาตำแหน่ง เพื่อบันทึกพิกัดและเวลา แล้วกด Check-in"}
-            </p>
           </div>
+          {active ? (
+            <div className="w-full rounded-xl border border-border bg-info-soft px-4 py-2.5 text-center">
+              <span className="flex items-center justify-center gap-2 text-xs font-medium text-primary">
+                <span className="work-blink h-2 w-2 rounded-full bg-success" aria-hidden />
+                เวลาทำงาน (รวมพัก)
+              </span>
+              <span
+                className="text-xl font-bold text-primary tabular-nums"
+                data-testid="active-timer"
+              >
+                {formatDuration(elapsed)}
+              </span>
+            </div>
+          ) : null}
         </div>
-        {active ? (
-          <div className="w-full rounded-xl border border-border bg-info-soft px-4 py-2 text-center md:w-auto">
-            <span className="flex items-center justify-center gap-2 text-xs font-medium text-primary">
-              <span className="work-blink h-2 w-2 rounded-full bg-success" aria-hidden />
-              เวลาทำงาน (รวมพัก)
-            </span>
-            <span
-              className="text-xl font-bold text-primary tabular-nums"
-              data-testid="active-timer"
-            >
-              {formatDuration(elapsed)}
-            </span>
-          </div>
-        ) : null}
-      </div>
 
-      {active ? (
-        <div className="surface-card flex flex-wrap items-end gap-3 p-4">
-          <div className="min-w-[220px] flex-1">
+        {active ? (
+          <div className="w-full">
             <label
               htmlFor="editCheckInTime"
               className="mb-1 block text-xs font-semibold text-muted-foreground"
@@ -370,14 +370,14 @@ export function CheckInPanel({
                 const iso = fromLocalInput(e.target.value);
                 if (iso) onEditActiveTime(iso);
               }}
-              className="w-full rounded-lg border border-input bg-secondary p-2.5 text-sm"
+              className="w-full rounded-xl border border-border bg-info-soft px-4 py-2.5 text-sm"
             />
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              ปรับเวลาให้ตรงกับเวลาเริ่มงานจริงได้ ตัวจับเวลาจะคำนวณใหม่ทันที
+            </p>
           </div>
-          <p className="text-xs text-muted-foreground">
-            ปรับเวลาให้ตรงกับเวลาเริ่มงานจริงได้ ตัวจับเวลาจะคำนวณใหม่ทันที
-          </p>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
 
       {/* Main form */}
       <div className="surface-card neon-form-card space-y-6 p-5 sm:p-6">
