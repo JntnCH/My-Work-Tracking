@@ -298,7 +298,7 @@ export function CheckInPanel({
     <div className="space-y-5">
       {/* Status banner + aligned edit-time control */}
       <div
-        className={`surface-card flex flex-col gap-4 p-5 ${
+        className={`surface-card work-panel-card flex flex-col gap-4 p-5 ${
           active ? "work-active-card" : ""
         }`}
       >
@@ -380,7 +380,7 @@ export function CheckInPanel({
       </div>
 
       {/* Main form */}
-      <div className="surface-card neon-form-card space-y-6 p-5 sm:p-6">
+      <div className="surface-card work-panel-card neon-form-card space-y-6 p-5 sm:p-6">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <div className="mb-1 flex items-center justify-between">
