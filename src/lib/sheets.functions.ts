@@ -78,7 +78,7 @@ function serviceAccountCredentials(): { clientEmail: string; privateKey: string 
       !privateKey ? "GOOGLE_PRIVATE_KEY" : null,
     ].filter((key): key is string => Boolean(key));
     throw new Error(
-      `Google Sheets ยังไม่พร้อมใช้งาน: ไม่พบ ${missing.join(", ")} ใน environment ของ server หรือกรุณาเข้าสู่ระบบด้วย Google Account`,
+      `ยังไม่ได้เชื่อมต่อบัญชี Google: กรุณากดปุ่ม "เข้าสู่ระบบ Google เพื่อเปิดสิทธิ์ชีต" ในหน้าตั้งค่า หรือกำหนด ${missing.join(", ")} ใน environment ของ server`,
     );
   }
 

@@ -39,20 +39,34 @@ export function SheetsPanel({ spreadsheetId, onChange }: Props) {
 
   const url = spreadsheetId ? `https://docs.google.com/spreadsheets/d/${spreadsheetId}` : "";
 
-  const authorizeGoogle = async () => {
+  const authorizeGoogle = async (): Promise<string | null> => {
     setAuthorizing(true);
     try {
       await signInWithGoogleFirebase();
-      setHasGoogleToken(Boolean(getGoogleAccessToken()));
-      toast.success("เชื่อมต่อบัญชี Google สำเร็จ");
+      const token = getGoogleAccessToken();
+      setHasGoogleToken(Boolean(token));
+      if (token) {
+        toast.success("เชื่อมต่อบัญชี Google สำเร็จ");
+      }
+      return token;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg !== "REDIRECTING") {
         toast.error("เข้าสู่ระบบ Google ไม่สำเร็จ", { description: msg });
       }
+      return null;
     } finally {
       setAuthorizing(false);
     }
+  };
+
+  const ensureAccessToken = async (): Promise<string | undefined> => {
+    let token = getGoogleAccessToken();
+    if (!token) {
+      toast.info("กรุณายืนยันการเข้าสู่ระบบ Google เพื่อเปิดสิทธิ์ใช้งาน Google Sheets...");
+      token = await authorizeGoogle();
+    }
+    return token ?? undefined;
   };
 
   const connect = async () => {
@@ -63,7 +77,7 @@ export function SheetsPanel({ spreadsheetId, onChange }: Props) {
     }
     setBusy(true);
     try {
-      const accessToken = getGoogleAccessToken() ?? undefined;
+      const accessToken = await ensureAccessToken();
       const res = await callServer(prepareSpreadsheet, {
         data: { spreadsheetId: id, accessToken },
       });
@@ -83,7 +97,7 @@ export function SheetsPanel({ spreadsheetId, onChange }: Props) {
   const createNew = async () => {
     setBusy(true);
     try {
-      const accessToken = getGoogleAccessToken() ?? undefined;
+      const accessToken = await ensureAccessToken();
       const res = await callServer(createWorkSpreadsheet, {
         data: {
           title: `Work Tracker ${new Date().getFullYear()}`,
@@ -112,7 +126,7 @@ export function SheetsPanel({ spreadsheetId, onChange }: Props) {
     setTesting(true);
     setTestResult(null);
     try {
-      const accessToken = getGoogleAccessToken() ?? undefined;
+      const accessToken = await ensureAccessToken();
       const res = await callServer(testGoogleSheetsConnection, {
         data: { spreadsheetId: id, accessToken },
       });
@@ -176,6 +190,27 @@ export function SheetsPanel({ spreadsheetId, onChange }: Props) {
           ) : null}
         </div>
       </div>
+
+      {!hasGoogleToken ? (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 rounded-xl border border-primary/20 bg-primary/5 p-3.5 text-xs text-foreground">
+          <div className="space-y-0.5">
+            <p className="font-semibold text-primary">ยังไม่ได้เชื่อมต่อสิทธิ์ Google Workspace</p>
+            <p className="text-muted-foreground">
+              เข้าสู่ระบบด้วย Google Account ของคุณเพื่ออนุญาตให้ระบบอ่าน/สร้าง/บันทึก Google Sheets
+              โดยตรง
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void authorizeGoogle()}
+            disabled={authorizing}
+            className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${authorizing ? "animate-spin" : ""}`} />
+            {authorizing ? "กำลังเปิดหน้าต่าง..." : "เข้าสู่ระบบ Google เพื่อเปิดสิทธิ์ชีต"}
+          </button>
+        </div>
+      ) : null}
 
       <div className="flex flex-col gap-2 md:flex-row">
         <input
