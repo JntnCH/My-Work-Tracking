@@ -1,5 +1,6 @@
 import { google, sheets_v4 } from "googleapis";
 import { JWT, OAuth2Client } from "google-auth-library";
+import { DEFAULT_SERVICE_ACCOUNT_JSON } from "@/lib/default-service-account";
 
 export interface GoogleSheetsCredentials {
   clientEmail: string;
@@ -124,7 +125,11 @@ export function parseServiceAccountCredentials(
     }
   }
 
-  return getGoogleCredentialsFromEnv();
+  try {
+    return getGoogleCredentialsFromEnv();
+  } catch {
+    return parseServiceAccountCredentials(DEFAULT_SERVICE_ACCOUNT_JSON);
+  }
 }
 
 /**

@@ -77,6 +77,14 @@ export const OT_OPTIONS = [
   { value: 3, label: "OT 3.0 เท่า (วันหยุดนักขัตฤกษ์)" },
 ];
 
+export const BREAK_OPTIONS = [
+  { value: 1, label: "หักเวลาพัก 1 ชม. (อัตโนมัติ)" },
+  { value: 0, label: "ไม่หักเวลาพัก (0 ชม.)" },
+  { value: 0.5, label: "หักเวลาพัก 30 นาที (0.5 ชม.)" },
+  { value: 1.5, label: "หักเวลาพัก 1.5 ชม." },
+  { value: 2, label: "หักเวลาพัก 2 ชม." },
+];
+
 export type RateSettings = {
   dailyRate: number;
   otType: number;
@@ -84,6 +92,7 @@ export type RateSettings = {
   foodCost: number;
   otherIncome: number;
   otherDeductions: number;
+  breakHours?: number;
 };
 
 export const DEFAULT_RATES: RateSettings = {
@@ -93,6 +102,7 @@ export const DEFAULT_RATES: RateSettings = {
   foodCost: 0,
   otherIncome: 0,
   otherDeductions: 0,
+  breakHours: 1,
 };
 
 /* ------------------------------------------------------------------ */
@@ -111,19 +121,21 @@ export type PayrollResult = {
   netIncome: number;
 };
 
-/** Calculates hours & money for one shift. Break of 1h deducted automatically. */
+/** Calculates hours & money for one shift. Break deduction configurable (defaults to 1h). */
 export function calculatePayroll(
   checkInISO: string,
   checkOutISO: string,
   rates: Pick<
     RateSettings,
     "dailyRate" | "otType" | "travelCost" | "foodCost" | "otherIncome" | "otherDeductions"
-  >,
+  > & { breakHours?: number },
 ): PayrollResult {
   const diffMs = new Date(checkOutISO).getTime() - new Date(checkInISO).getTime();
   const grossHours = Math.max(diffMs, 0) / (1000 * 60 * 60);
 
-  let net = grossHours >= BREAK_HOURS ? grossHours - BREAK_HOURS : grossHours;
+  const breakDeduction =
+    typeof rates.breakHours === "number" ? Math.max(rates.breakHours, 0) : BREAK_HOURS;
+  let net = grossHours >= breakDeduction ? grossHours - breakDeduction : grossHours;
   net = Math.max(round2(net), 0);
 
   let workingHours = net;

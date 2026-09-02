@@ -17,6 +17,7 @@ import { EngineWorkingAnimation } from "@/components/ui/engine-working-animation
 import { toast } from "sonner";
 import type { GPSPoint, RateSettings, WorkLog, ActiveCheckIn } from "@/lib/work-log";
 import {
+  BREAK_OPTIONS,
   OT_OPTIONS,
   formatDuration,
   fromLocalInput,
@@ -44,10 +45,11 @@ type Props = {
     rates: RateSettings;
     tasks: string[];
   }) => void;
-  onCheckOut: (gps: GPSPoint, photo: string | null) => void;
+  onCheckOut: (gps: GPSPoint, photo: string | null, overrides?: Partial<ActiveCheckIn>) => void;
   onCancelActive: () => void;
   onEditActiveTime: (iso: string) => void;
   onEditActiveTasks: (tasks: string[]) => void;
+  onEditActiveDetails?: (patch: Partial<ActiveCheckIn>) => void;
 };
 
 const EMPTY_GPS: GPSPoint = { lat: null, lng: null, text: "ยังไม่ได้ดึงพิกัด", addressName: "" };
@@ -89,6 +91,7 @@ export function CheckInPanel({
   onCancelActive,
   onEditActiveTime,
   onEditActiveTasks,
+  onEditActiveDetails,
 }: Props) {
   const [workType, setWorkType] = useState(categories[0] ?? "");
   const [locationName, setLocationName] = useState("");
@@ -115,13 +118,33 @@ export function CheckInPanel({
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setForm(rates);
-    setDailyRateInput(String(rates.dailyRate ?? ""));
-    setTravelCostInput(rates.travelCost ? String(rates.travelCost) : "");
-    setFoodCostInput(rates.foodCost ? String(rates.foodCost) : "");
-    setOtherIncomeInput(rates.otherIncome ? String(rates.otherIncome) : "");
-    setOtherDeductionsInput(rates.otherDeductions ? String(rates.otherDeductions) : "");
-  }, [rates]);
+    if (active) {
+      setWorkType(active.workType || categories[0] || "");
+      setLocationName(active.locationName ?? "");
+      setForm({
+        dailyRate: active.dailyRate ?? rates.dailyRate,
+        otType: active.otType ?? rates.otType ?? 0,
+        travelCost: active.travelCost ?? rates.travelCost ?? 0,
+        foodCost: active.foodCost ?? rates.foodCost ?? 0,
+        otherIncome: active.otherIncome ?? rates.otherIncome ?? 0,
+        otherDeductions: active.otherDeductions ?? rates.otherDeductions ?? 0,
+        breakHours: active.breakHours ?? rates.breakHours ?? 1,
+      });
+      setDailyRateInput(String(active.dailyRate ?? rates.dailyRate ?? ""));
+      setTravelCostInput(active.travelCost ? String(active.travelCost) : "");
+      setFoodCostInput(active.foodCost ? String(active.foodCost) : "");
+      setOtherIncomeInput(active.otherIncome ? String(active.otherIncome) : "");
+      setOtherDeductionsInput(active.otherDeductions ? String(active.otherDeductions) : "");
+    } else {
+      setForm(rates);
+      setDailyRateInput(String(rates.dailyRate ?? ""));
+      setTravelCostInput(rates.travelCost ? String(rates.travelCost) : "");
+      setFoodCostInput(rates.foodCost ? String(rates.foodCost) : "");
+      setOtherIncomeInput(rates.otherIncome ? String(rates.otherIncome) : "");
+      setOtherDeductionsInput(rates.otherDeductions ? String(rates.otherDeductions) : "");
+    }
+  }, [active, categories, rates]);
+
   useEffect(() => {
     if (!categories.includes(workType)) setWorkType(categories[0] ?? "");
   }, [categories, workType]);
@@ -277,6 +300,7 @@ export function CheckInPanel({
       rates: {
         ...form,
         dailyRate,
+        breakHours: typeof form.breakHours === "number" ? form.breakHours : 1,
         travelCost: Number.isFinite(travelCost) ? travelCost : 0,
         foodCost: Number.isFinite(foodCost) ? foodCost : 0,
         otherIncome: Number.isFinite(otherIncome) ? otherIncome : 0,
@@ -300,7 +324,28 @@ export function CheckInPanel({
       return;
     }
 
-    onCheckOut(checkoutGPS, photo);
+    const rawDailyRate = dailyRateInput.trim();
+    const dailyRate = Number(rawDailyRate);
+    const travelCost = travelCostInput.trim() ? Number(travelCostInput) : 0;
+    const foodCost = foodCostInput.trim() ? Number(foodCostInput) : 0;
+    const otherIncome = otherIncomeInput.trim() ? Number(otherIncomeInput) : 0;
+    const otherDeductions = otherDeductionsInput.trim() ? Number(otherDeductionsInput) : 0;
+
+    const currentRates: RateSettings = {
+      dailyRate: Number.isFinite(dailyRate) ? dailyRate : active.dailyRate || 0,
+      otType: form.otType ?? active.otType ?? 0,
+      breakHours: typeof form.breakHours === "number" ? form.breakHours : (active.breakHours ?? 1),
+      travelCost: Number.isFinite(travelCost) ? travelCost : 0,
+      foodCost: Number.isFinite(foodCost) ? foodCost : 0,
+      otherIncome: Number.isFinite(otherIncome) ? otherIncome : 0,
+      otherDeductions: Number.isFinite(otherDeductions) ? otherDeductions : 0,
+    };
+
+    onCheckOut(checkoutGPS, photo, {
+      ...currentRates,
+      workType,
+      locationName: locationName.trim() || active.locationName || "ไม่ได้ระบุสถานที่",
+    });
     setTaskInput("");
     resetPhoto();
   };
@@ -428,9 +473,12 @@ export function CheckInPanel({
             <select
               id="workType"
               value={workType}
-              disabled={!!active}
-              onChange={(e) => setWorkType(e.target.value)}
-              className="w-full rounded-xl border border-input bg-secondary/80 p-2.5 text-sm font-medium disabled:opacity-60 focus:border-primary focus:ring-1 focus:ring-primary"
+              onChange={(e) => {
+                const val = e.target.value;
+                setWorkType(val);
+                if (active) onEditActiveDetails?.({ workType: val });
+              }}
+              className="w-full rounded-xl border border-input bg-secondary/80 p-2.5 text-sm font-medium focus:border-primary focus:ring-1 focus:ring-primary"
             >
               {categories.map((c) => (
                 <option key={c} value={c}>
@@ -461,10 +509,13 @@ export function CheckInPanel({
             <input
               id="locationName"
               value={locationName}
-              disabled={!!active}
-              onChange={(e) => handleLocationChange(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                handleLocationChange(val);
+                if (active) onEditActiveDetails?.({ locationName: val });
+              }}
               placeholder="พิมพ์สถานที่ หรือ วางลิงก์ Google Maps"
-              className="w-full rounded-xl border border-input bg-secondary/80 p-2.5 text-sm font-medium disabled:opacity-60 focus:border-primary focus:ring-1 focus:ring-primary"
+              className="w-full rounded-xl border border-input bg-secondary/80 p-2.5 text-sm font-medium focus:border-primary focus:ring-1 focus:ring-primary"
             />
             <div className="mt-2.5 rounded-xl border border-border/80 bg-secondary/50 p-3.5 shadow-sm">
               <div className="flex items-center justify-between gap-2">
@@ -594,9 +645,16 @@ export function CheckInPanel({
 
         {/* Rates */}
         <div className="space-y-4 rounded-xl border border-border bg-secondary/60 p-4">
-          <h3 className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
-            การคำนวณค่าแรง &amp; OT &amp; รายรับ-รายหัก
-          </h3>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
+              การคำนวณค่าแรง &amp; OT &amp; รายรับ-รายหัก
+            </h3>
+            {active ? (
+              <span className="rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
+                ปรับแก้ได้ก่อนกด Check-out
+              </span>
+            ) : null}
+          </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <Field label="ค่าแรงปกติ (บาท/วัน)" id="dailyRate">
               <input
@@ -604,18 +662,19 @@ export function CheckInPanel({
                 type="number"
                 min="0"
                 value={dailyRateInput}
-                disabled={!!active}
                 onChange={(e) => {
                   const raw = e.target.value;
                   setDailyRateInput(raw);
                   if (raw === "") {
-                    setForm({ ...form, dailyRate: 0 });
+                    setForm((f) => ({ ...f, dailyRate: 0 }));
+                    if (active) onEditActiveDetails?.({ dailyRate: 0 });
                     return;
                   }
 
                   const dailyRate = Number(raw);
                   if (Number.isFinite(dailyRate)) {
-                    setForm({ ...form, dailyRate });
+                    setForm((f) => ({ ...f, dailyRate }));
+                    if (active) onEditActiveDetails?.({ dailyRate });
                   }
                 }}
                 className={inputCls}
@@ -625,8 +684,11 @@ export function CheckInPanel({
               <select
                 id="otType"
                 value={form.otType}
-                disabled={!!active}
-                onChange={(e) => setForm({ ...form, otType: Number(e.target.value) })}
+                onChange={(e) => {
+                  const nextOt = Number(e.target.value);
+                  setForm((f) => ({ ...f, otType: nextOt }));
+                  if (active) onEditActiveDetails?.({ otType: nextOt });
+                }}
                 className={inputCls}
               >
                 {OT_OPTIONS.map((o) => (
@@ -636,10 +698,23 @@ export function CheckInPanel({
                 ))}
               </select>
             </Field>
-            <Field label="การหักพักกลางวัน" id="breakInfo">
-              <div className="flex h-[38px] items-center rounded-lg border border-border bg-info-soft px-2 text-xs font-medium text-primary">
-                หักเวลาพัก 1 ชม. อัตโนมัติ
-              </div>
+            <Field label="การหักพักกลางวัน" id="breakHours">
+              <select
+                id="breakHours"
+                value={form.breakHours ?? 1}
+                onChange={(e) => {
+                  const nextBreak = Number(e.target.value);
+                  setForm((f) => ({ ...f, breakHours: nextBreak }));
+                  if (active) onEditActiveDetails?.({ breakHours: nextBreak });
+                }}
+                className={inputCls}
+              >
+                {BREAK_OPTIONS.map((b) => (
+                  <option key={b.value} value={b.value}>
+                    {b.label}
+                  </option>
+                ))}
+              </select>
             </Field>
           </div>
           <div className="grid grid-cols-2 gap-3 border-t border-border pt-3 md:grid-cols-4">
@@ -651,12 +726,13 @@ export function CheckInPanel({
                 step="any"
                 placeholder="0"
                 value={travelCostInput}
-                disabled={!!active}
                 onChange={(e) => {
                   const val = e.target.value;
                   setTravelCostInput(val);
                   const n = Number(val);
-                  setForm((f) => ({ ...f, travelCost: Number.isFinite(n) && val !== "" ? n : 0 }));
+                  const cost = Number.isFinite(n) && val !== "" ? n : 0;
+                  setForm((f) => ({ ...f, travelCost: cost }));
+                  if (active) onEditActiveDetails?.({ travelCost: cost });
                 }}
                 className={inputCls}
               />
@@ -669,12 +745,13 @@ export function CheckInPanel({
                 step="any"
                 placeholder="0"
                 value={foodCostInput}
-                disabled={!!active}
                 onChange={(e) => {
                   const val = e.target.value;
                   setFoodCostInput(val);
                   const n = Number(val);
-                  setForm((f) => ({ ...f, foodCost: Number.isFinite(n) && val !== "" ? n : 0 }));
+                  const cost = Number.isFinite(n) && val !== "" ? n : 0;
+                  setForm((f) => ({ ...f, foodCost: cost }));
+                  if (active) onEditActiveDetails?.({ foodCost: cost });
                 }}
                 className={inputCls}
               />
@@ -687,15 +764,16 @@ export function CheckInPanel({
                 step="any"
                 placeholder="0"
                 value={otherIncomeInput}
-                disabled={!!active}
                 onChange={(e) => {
                   const val = e.target.value;
                   setOtherIncomeInput(val);
                   const n = Number(val);
+                  const inc = Number.isFinite(n) && val !== "" ? n : 0;
                   setForm((f) => ({
                     ...f,
-                    otherIncome: Number.isFinite(n) && val !== "" ? n : 0,
+                    otherIncome: inc,
                   }));
+                  if (active) onEditActiveDetails?.({ otherIncome: inc });
                 }}
                 className={`${inputCls} text-success`}
               />
@@ -708,15 +786,16 @@ export function CheckInPanel({
                 step="any"
                 placeholder="0"
                 value={otherDeductionsInput}
-                disabled={!!active}
                 onChange={(e) => {
                   const val = e.target.value;
                   setOtherDeductionsInput(val);
                   const n = Number(val);
+                  const ded = Number.isFinite(n) && val !== "" ? n : 0;
                   setForm((f) => ({
                     ...f,
-                    otherDeductions: Number.isFinite(n) && val !== "" ? n : 0,
+                    otherDeductions: ded,
                   }));
+                  if (active) onEditActiveDetails?.({ otherDeductions: ded });
                 }}
                 className={`${inputCls} text-destructive`}
               />

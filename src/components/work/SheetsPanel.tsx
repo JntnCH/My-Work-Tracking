@@ -31,7 +31,11 @@ import {
   type ConnectionTestResult,
 } from "@/lib/sheets-diagnostics";
 import { getGoogleAccessToken, signInWithGoogleFirebase } from "@/lib/firebase";
-import { getSheetsAuthPayload, parseServiceAccountInfo } from "@/lib/sheets-credentials";
+import {
+  getSheetsAuthPayload,
+  getStoredOrInitialServiceAccount,
+  parseServiceAccountInfo,
+} from "@/lib/sheets-credentials";
 
 type Props = {
   spreadsheetId: string;
@@ -51,8 +55,10 @@ export function SheetsPanel({ spreadsheetId, onChange }: Props) {
   const [authorizing, setAuthorizing] = useState(false);
 
   // Service Account state
-  const [serviceAccountJson, setServiceAccountJson] = useState(() => storage.getServiceAccount());
-  const [saInput, setSaInput] = useState(() => storage.getServiceAccount());
+  const [serviceAccountJson, setServiceAccountJson] = useState(() =>
+    getStoredOrInitialServiceAccount(),
+  );
+  const [saInput, setSaInput] = useState(() => getStoredOrInitialServiceAccount());
   const [showSaConfig, setShowSaConfig] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [copiedEmail, setCopiedEmail] = useState(false);

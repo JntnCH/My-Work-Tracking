@@ -798,14 +798,15 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
   );
 
   const checkOut = useCallback(
-    async (gps: GPSPoint, photo: string | null) => {
+    async (gps: GPSPoint, photo: string | null, overrides?: Partial<ActiveCheckIn>) => {
       if (!active) return null;
       const now = new Date().toISOString();
-      const payroll = calculatePayroll(active.checkInTime, now, active);
-      const doneTasks = (active.tasks ?? []).filter((t) => t.trim());
+      const mergedActive: ActiveCheckIn = { ...active, ...overrides };
+      const payroll = calculatePayroll(mergedActive.checkInTime, now, mergedActive);
+      const doneTasks = (mergedActive.tasks ?? []).filter((t) => t.trim());
       const completed: WorkLog = {
-        ...active,
-        tasks: doneTasks.length > 0 ? doneTasks : [active.workType || "งานที่ทำเสร็จ"],
+        ...mergedActive,
+        tasks: doneTasks.length > 0 ? doneTasks : [mergedActive.workType || "งานที่ทำเสร็จ"],
         checkOutTime: now,
         checkOutGPS: gps,
         checkOutPhoto: photo,
@@ -872,6 +873,16 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
       setActive(next);
       storage.setActive(next);
       toast.success("แก้ไขเวลาเข้างานแล้ว");
+    },
+    [active],
+  );
+
+  const updateActiveDetails = useCallback(
+    (patch: Partial<ActiveCheckIn>) => {
+      if (!active) return;
+      const next: ActiveCheckIn = { ...active, ...patch };
+      setActive(next);
+      storage.setActive(next);
     },
     [active],
   );
@@ -1014,6 +1025,7 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
     cancelActive,
     updateActiveTime,
     updateActiveTasks,
+    updateActiveDetails,
     updateLogTasks,
     updateLog,
     pullFromSheet,

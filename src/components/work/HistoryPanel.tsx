@@ -14,6 +14,7 @@ import {
 import { toast } from "sonner";
 import {
   type WorkLog,
+  BREAK_OPTIONS,
   DEFAULT_SEED_LOGS,
   OT_OPTIONS,
   buildCSV,
@@ -46,6 +47,7 @@ type Draft = {
   locationName: string;
   dailyRate: string;
   otType: string;
+  breakHours: string;
   travelCost: string;
   foodCost: string;
   otherIncome: string;
@@ -62,6 +64,7 @@ const emptyDraft: Draft = {
   locationName: "",
   dailyRate: "",
   otType: "1.5",
+  breakHours: "1",
   travelCost: "",
   foodCost: "",
   otherIncome: "",
@@ -152,6 +155,7 @@ export function HistoryPanel({
       locationName: log.locationName ?? "",
       dailyRate: log.dailyRate !== undefined && log.dailyRate !== null ? String(log.dailyRate) : "",
       otType: String(log.otType ?? 1.5),
+      breakHours: String(log.breakHours ?? 1),
       travelCost: log.travelCost ? String(log.travelCost) : "",
       foodCost: log.foodCost ? String(log.foodCost) : "",
       otherIncome: log.otherIncome ? String(log.otherIncome) : "",
@@ -193,6 +197,8 @@ export function HistoryPanel({
       locationName: draft.locationName.trim(),
       dailyRate: toNum(draft.dailyRate),
       otType: draft.otType !== "" && draft.otType !== undefined ? toNum(draft.otType) : 0,
+      breakHours:
+        draft.breakHours !== "" && draft.breakHours !== undefined ? toNum(draft.breakHours) : 1,
       travelCost: toNum(draft.travelCost),
       foodCost: toNum(draft.foodCost),
       otherIncome: toNum(draft.otherIncome),
@@ -507,6 +513,20 @@ export function HistoryPanel({
                           {OT_OPTIONS.map((o) => (
                             <option key={o.value} value={o.value}>
                               {o.label}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field label="หักเวลาพัก">
+                        <select
+                          aria-label="หักเวลาพัก"
+                          value={draft.breakHours}
+                          onChange={(e) => setDraft({ ...draft, breakHours: e.target.value })}
+                          className={inputCls}
+                        >
+                          {BREAK_OPTIONS.map((b) => (
+                            <option key={b.value} value={b.value}>
+                              {b.label}
                             </option>
                           ))}
                         </select>

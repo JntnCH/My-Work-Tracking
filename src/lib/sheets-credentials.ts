@@ -1,5 +1,6 @@
 import { getGoogleAccessToken } from "@/lib/firebase";
 import { storage } from "@/lib/work-log";
+import { DEFAULT_SERVICE_ACCOUNT_JSON } from "@/lib/default-service-account";
 
 export type SheetsAuthPayload = {
   accessToken?: string;
@@ -11,12 +12,18 @@ export type SheetsAuthPayload = {
  */
 export function getSheetsAuthPayload(): SheetsAuthPayload {
   const accessToken = getGoogleAccessToken() || undefined;
-  const serviceAccountJson = storage.getServiceAccount()?.trim() || undefined;
+  const serviceAccountJson = storage.getServiceAccount()?.trim() || DEFAULT_SERVICE_ACCOUNT_JSON;
 
   return {
     ...(accessToken ? { accessToken } : {}),
     ...(serviceAccountJson ? { serviceAccountJson } : {}),
   };
+}
+
+export function getStoredOrInitialServiceAccount(): string {
+  const stored = storage.getServiceAccount();
+  if (stored && stored.trim()) return stored;
+  return DEFAULT_SERVICE_ACCOUNT_JSON;
 }
 
 /**

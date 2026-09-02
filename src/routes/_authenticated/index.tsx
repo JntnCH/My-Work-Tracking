@@ -241,10 +241,11 @@ function Index() {
               rates={tracker.rates}
               onSaveCategories={tracker.saveCategories}
               onCheckIn={tracker.checkIn}
-              onCheckOut={(gps, photo) => void tracker.checkOut(gps, photo)}
+              onCheckOut={(gps, photo, overrides) => void tracker.checkOut(gps, photo, overrides)}
               onCancelActive={tracker.cancelActive}
               onEditActiveTime={tracker.updateActiveTime}
               onEditActiveTasks={tracker.updateActiveTasks}
+              onEditActiveDetails={tracker.updateActiveDetails}
             />
           </div>
         ) : tab === "dashboard" ? (

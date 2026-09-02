@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { ConnectionTestResult } from "@/lib/sheets-diagnostics";
+import { DEFAULT_SERVICE_ACCOUNT_JSON } from "@/lib/default-service-account";
 
 const SHEET_TITLE = "WorkLogs";
 const SETTINGS_TITLE = "Settings";
@@ -65,7 +66,9 @@ function serviceAccountCredentials(auth?: SheetsAuthInput): {
   privateKey: string;
 } {
   const json =
-    auth?.serviceAccountJson?.trim() || process.env["GOOGLE_SERVICE_ACCOUNT_JSON"]?.trim();
+    auth?.serviceAccountJson?.trim() ||
+    process.env["GOOGLE_SERVICE_ACCOUNT_JSON"]?.trim() ||
+    DEFAULT_SERVICE_ACCOUNT_JSON;
   let credentials: ServiceAccountCredentials = {};
 
   if (json) {
