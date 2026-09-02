@@ -928,6 +928,24 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
     autoMirror(logs);
   }, [autoMirror, logs, spreadsheetId]);
 
+  const importLogs = useCallback(
+    (newLogs: WorkLog[]) => {
+      if (!newLogs || newLogs.length === 0) return;
+      const mergedById = new Map(logs.map((log) => [log.id, log]));
+      for (const log of newLogs) mergedById.set(log.id, log);
+      const merged = [...mergedById.values()].sort(
+        (a, b) => new Date(b.checkInTime).getTime() - new Date(a.checkInTime).getTime(),
+      );
+      persistLogs(merged);
+      if (useSupabase && userId) {
+        void Promise.all(newLogs.map((log) => saveDBWorkLog(userId, log)));
+      }
+      autoMirror(merged);
+      toast.success(`นำเข้าข้อมูลสำเร็จ ${newLogs.length} รายการ`);
+    },
+    [autoMirror, logs, persistLogs, useSupabase, userId],
+  );
+
   return {
     ready,
     logs,
@@ -971,6 +989,7 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
     updateLog,
     pullFromSheet,
     syncPending,
+    importLogs,
     syncAirtableAll,
   };
 }

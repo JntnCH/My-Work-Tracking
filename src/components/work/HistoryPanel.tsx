@@ -1,16 +1,20 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   Check,
   CloudDownload,
   CloudUpload,
   Download,
+  FileSpreadsheet,
   MapPin,
   Pencil,
   Trash2,
+  Upload,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   type WorkLog,
+  DEFAULT_SEED_LOGS,
   OT_OPTIONS,
   buildCSV,
   formatTHB,
@@ -18,6 +22,7 @@ import {
   fromLocalInput,
   gpsFromText,
   gpsText,
+  parseCSVToLogs,
   taskCount,
   toLocalInput,
 } from "@/lib/work-log";
@@ -31,6 +36,7 @@ type Props = {
   onSync: () => void;
   onPull: () => void;
   onUpdate: (id: string, patch: Partial<WorkLog>) => void;
+  onImport?: (logs: WorkLog[]) => void;
 };
 
 type Draft = {
@@ -105,11 +111,36 @@ export function HistoryPanel({
   onSync,
   onPull,
   onUpdate,
+  onImport,
 }: Props) {
   const [editing, setEditing] = useState<string | null>(null);
   const [month, setMonth] = useState("all");
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [taskSelection, setTaskSelection] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const text = evt.target?.result;
+      if (typeof text === "string") {
+        const parsed = parseCSVToLogs(text);
+        if (parsed.length === 0) {
+          toast.error("ไม่พบข้อมูลที่ถูกต้องในไฟล์ CSV");
+          return;
+        }
+        onImport?.(parsed);
+      }
+    };
+    reader.readAsText(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const loadSeedLogs = () => {
+    onImport?.(DEFAULT_SEED_LOGS);
+  };
 
   const startEdit = (log: WorkLog) => {
     setEditing(log.id);
@@ -238,6 +269,20 @@ export function HistoryPanel({
           >
             <CloudDownload className="h-4 w-4" /> ดึงจากชีต
           </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            accept=".csv,text/csv"
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-secondary/80"
+            title="นำเข้าไฟล์ CSV ประวัติการทำงาน"
+          >
+            <Upload className="h-4 w-4" /> นำเข้า CSV
+          </button>
           <button
             onClick={exportCSV}
             disabled={logs.length === 0}
@@ -247,6 +292,23 @@ export function HistoryPanel({
           </button>
         </div>
       </div>
+
+      {logs.length === 0 && (
+        <div className="surface-card flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-dashed border-2 border-primary/30 bg-primary/5">
+          <div className="flex items-center gap-2">
+            <FileSpreadsheet className="h-5 w-5 text-primary" />
+            <span className="text-xs font-medium">
+              มีชุดข้อมูลบันทึกงานเดือนสิงหาคม 2026 (18 รายการ) พร้อมใช้งาน
+            </span>
+          </div>
+          <button
+            onClick={loadSeedLogs}
+            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-sm hover:opacity-90"
+          >
+            <Upload className="h-3.5 w-3.5" /> โหลดชุดข้อมูล 18 รายการ
+          </button>
+        </div>
+      )}
 
       {visibleLogs.length === 0 ? (
         <div className="surface-card p-10 text-center text-sm text-muted-foreground">

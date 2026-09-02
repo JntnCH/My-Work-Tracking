@@ -268,6 +268,7 @@ function Index() {
             onSync={() => void tracker.syncPending()}
             onPull={() => void tracker.pullFromSheet()}
             onUpdate={tracker.updateLog}
+            onImport={tracker.importLogs}
           />
         ) : (
           <SettingsPanel
