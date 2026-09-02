@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { getGoogleCredentialsFromEnv, normalizeSpreadsheetId } from "./google-sheets";
+import {
+  GoogleSheetsService,
+  createJWTClient,
+  getGoogleCredentialsFromEnv,
+  normalizeSpreadsheetId,
+  parseServiceAccountCredentials,
+} from "./google-sheets";
 
 describe("Google Sheets Service", () => {
   const originalEnv = { ...process.env };
@@ -73,6 +79,54 @@ describe("Google Sheets Service", () => {
       expect(() => getGoogleCredentialsFromEnv()).toThrowError(
         /Missing Google credentials in environment variables/,
       );
+    });
+  });
+
+  describe("parseServiceAccountCredentials", () => {
+    it("parses explicit GoogleSheetsCredentials object", () => {
+      const creds = parseServiceAccountCredentials({
+        clientEmail: "test@project.iam.gserviceaccount.com",
+        privateKey: "-----BEGIN PRIVATE KEY-----\nKEY\n-----END PRIVATE KEY-----",
+      });
+
+      expect(creds.clientEmail).toBe("test@project.iam.gserviceaccount.com");
+      expect(creds.privateKey).toContain("KEY");
+    });
+
+    it("parses JSON string representation of service account key", () => {
+      const jsonKey = JSON.stringify({
+        client_email: "test-json@project.iam.gserviceaccount.com",
+        private_key: "-----BEGIN PRIVATE KEY-----\\nKEY\\n-----END PRIVATE KEY-----",
+      });
+
+      const creds = parseServiceAccountCredentials(jsonKey);
+      expect(creds.clientEmail).toBe("test-json@project.iam.gserviceaccount.com");
+      expect(creds.privateKey).toContain("\n");
+    });
+  });
+
+  describe("createJWTClient", () => {
+    it("creates a JWT client from service account credentials using google-auth-library", () => {
+      const jwtClient = createJWTClient({
+        clientEmail: "service-acc@example.iam.gserviceaccount.com",
+        privateKey: "-----BEGIN PRIVATE KEY-----\nFAKEKEY\n-----END PRIVATE KEY-----",
+      });
+
+      expect(jwtClient).toBeDefined();
+      expect(jwtClient.email).toBe("service-acc@example.iam.gserviceaccount.com");
+    });
+  });
+
+  describe("GoogleSheetsService class", () => {
+    it("instantiates successfully with credentials and default scopes", () => {
+      const service = new GoogleSheetsService({
+        credentials: {
+          clientEmail: "service-acc@example.iam.gserviceaccount.com",
+          privateKey: "-----BEGIN PRIVATE KEY-----\nFAKEKEY\n-----END PRIVATE KEY-----",
+        },
+      });
+
+      expect(service).toBeInstanceOf(GoogleSheetsService);
     });
   });
 });

@@ -1,14 +1,30 @@
 import { google, sheets_v4 } from "googleapis";
+import { JWT, OAuth2Client } from "google-auth-library";
 
 export interface GoogleSheetsCredentials {
   clientEmail: string;
   privateKey: string;
+  projectId?: string;
+}
+
+export interface ServiceAccountKeyJson {
+  type?: string;
+  project_id?: string;
+  private_key_id?: string;
+  private_key?: string;
+  client_email?: string;
+  client_id?: string;
+  auth_uri?: string;
+  token_uri?: string;
+  auth_provider_x509_cert_url?: string;
+  client_x509_cert_url?: string;
 }
 
 export interface FetchSpreadsheetDataOptions {
   spreadsheetId: string;
   range?: string;
   accessToken?: string;
+  credentials?: GoogleSheetsCredentials | ServiceAccountKeyJson | string;
   valueRenderOption?: "FORMATTED_VALUE" | "UNFORMATTED_VALUE" | "FORMULA";
   dateTimeRenderOption?: "SERIAL_NUMBER" | "FORMATTED_STRING";
 }
@@ -34,13 +50,32 @@ export interface SpreadsheetMetadata {
   }[];
 }
 
-const DEFAULT_SCOPES = [
+export interface AppendSpreadsheetRowsOptions {
+  spreadsheetId: string;
+  range?: string;
+  rows: (string | number | boolean | null)[][];
+  accessToken?: string;
+  credentials?: GoogleSheetsCredentials | ServiceAccountKeyJson | string;
+  valueInputOption?: "USER_ENTERED" | "RAW";
+  insertDataOption?: "OVERWRITE" | "INSERT_ROWS";
+}
+
+export interface UpdateSpreadsheetValuesOptions {
+  spreadsheetId: string;
+  range: string;
+  values: (string | number | boolean | null)[][];
+  accessToken?: string;
+  credentials?: GoogleSheetsCredentials | ServiceAccountKeyJson | string;
+  valueInputOption?: "USER_ENTERED" | "RAW";
+}
+
+export const DEFAULT_SHEETS_SCOPES = [
   "https://www.googleapis.com/auth/spreadsheets",
   "https://www.googleapis.com/auth/drive.readonly",
 ];
 
 /**
- * Normalizes spreadsheet URL or ID into a clean ID string.
+ * Normalizes a Google Spreadsheet URL or raw ID into a valid spreadsheet ID string.
  */
 export function normalizeSpreadsheetId(value: string): string {
   if (!value) return "";
@@ -50,22 +85,63 @@ export function normalizeSpreadsheetId(value: string): string {
 }
 
 /**
- * Parses and retrieves Google service account credentials from environment variables.
- * Supports GOOGLE_SERVICE_ACCOUNT_JSON or (GOOGLE_SERVICE_ACCOUNT_EMAIL / GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY).
+ * Parses and validates Google service account credentials from input or environment variables.
+ */
+export function parseServiceAccountCredentials(
+  input?: GoogleSheetsCredentials | ServiceAccountKeyJson | string,
+): GoogleSheetsCredentials {
+  if (typeof input === "string") {
+    try {
+      const parsed = JSON.parse(input) as ServiceAccountKeyJson;
+      return parseServiceAccountCredentials(parsed);
+    } catch {
+      throw new Error(
+        "Failed to parse Google service account credentials: Input is not valid JSON.",
+      );
+    }
+  }
+
+  if (input && typeof input === "object") {
+    const clientEmail =
+      ("clientEmail" in input ? input.clientEmail : undefined) ||
+      ("client_email" in input ? input.client_email : undefined);
+
+    const rawPrivateKey =
+      ("privateKey" in input ? input.privateKey : undefined) ||
+      ("private_key" in input ? input.private_key : undefined);
+
+    if (clientEmail && rawPrivateKey) {
+      return {
+        clientEmail: clientEmail.trim(),
+        privateKey: rawPrivateKey.trim().replace(/\\n/g, "\n"),
+        projectId:
+          "projectId" in input
+            ? input.projectId
+            : "project_id" in input
+              ? input.project_id
+              : undefined,
+      };
+    }
+  }
+
+  return getGoogleCredentialsFromEnv();
+}
+
+/**
+ * Retrieves Google service account credentials from process.env.
+ * Checks GOOGLE_SERVICE_ACCOUNT_JSON or (GOOGLE_SERVICE_ACCOUNT_EMAIL / GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY).
  */
 export function getGoogleCredentialsFromEnv(): GoogleSheetsCredentials {
   const jsonStr = process.env["GOOGLE_SERVICE_ACCOUNT_JSON"]?.trim();
 
   if (jsonStr && jsonStr.startsWith("{")) {
     try {
-      const parsed = JSON.parse(jsonStr) as {
-        client_email?: string;
-        private_key?: string;
-      };
+      const parsed = JSON.parse(jsonStr) as ServiceAccountKeyJson;
       if (parsed.client_email && parsed.private_key) {
         return {
-          clientEmail: parsed.client_email,
-          privateKey: parsed.private_key.replace(/\\n/g, "\n"),
+          clientEmail: parsed.client_email.trim(),
+          privateKey: parsed.private_key.trim().replace(/\\n/g, "\n"),
+          projectId: parsed.project_id,
         };
       }
     } catch {
@@ -98,50 +174,141 @@ export function getGoogleCredentialsFromEnv(): GoogleSheetsCredentials {
 }
 
 /**
+ * Creates an authenticated Google JWT client from service account credentials using google-auth-library.
+ */
+export function createJWTClient(
+  credentials?: GoogleSheetsCredentials | ServiceAccountKeyJson | string,
+  scopes: string[] = DEFAULT_SHEETS_SCOPES,
+): JWT {
+  const creds = parseServiceAccountCredentials(credentials);
+  return new JWT({
+    email: creds.clientEmail,
+    key: creds.privateKey,
+    scopes,
+  });
+}
+
+/**
  * Authenticates and returns a connected Google Sheets API client (v4).
- * Uses OAuth2 access token if provided, or JWT service account credentials from environment variables.
+ * Uses OAuth2 access token if provided, or JWT service account credentials using google-auth-library.
  */
 export async function getGoogleSheetsClient(options?: {
   accessToken?: string;
+  credentials?: GoogleSheetsCredentials | ServiceAccountKeyJson | string;
   scopes?: string[];
 }): Promise<sheets_v4.Sheets> {
-  const { accessToken, scopes = DEFAULT_SCOPES } = options ?? {};
+  const { accessToken, credentials, scopes = DEFAULT_SHEETS_SCOPES } = options ?? {};
 
-  // 1. If an OAuth access token is provided, use it directly
+  // 1. If an OAuth access token is provided, use OAuth2Client
   if (accessToken && accessToken.trim().length > 10) {
-    const oauth2Client = new google.auth.OAuth2();
+    const oauth2Client = new OAuth2Client();
     oauth2Client.setCredentials({ access_token: accessToken.trim() });
     return google.sheets({ version: "v4", auth: oauth2Client });
   }
 
-  // 2. Otherwise, authenticate with Service Account credentials from environment variables
-  const credentials = getGoogleCredentialsFromEnv();
-
-  const jwtClient = new google.auth.JWT({
-    email: credentials.clientEmail,
-    key: credentials.privateKey,
-    scopes,
-  });
-
+  // 2. Otherwise authenticate via google-auth-library JWT using service account credentials
+  const jwtClient = createJWTClient(credentials, scopes);
   await jwtClient.authorize();
 
   return google.sheets({ version: "v4", auth: jwtClient });
 }
 
 /**
+ * Service class for interacting with the Google Sheets API using google-auth-library credentials.
+ */
+export class GoogleSheetsService {
+  private credentials?: GoogleSheetsCredentials;
+  private accessToken?: string;
+  private scopes: string[];
+
+  constructor(options?: {
+    credentials?: GoogleSheetsCredentials | ServiceAccountKeyJson | string;
+    accessToken?: string;
+    scopes?: string[];
+  }) {
+    if (options?.credentials) {
+      this.credentials = parseServiceAccountCredentials(options.credentials);
+    }
+    this.accessToken = options?.accessToken;
+    this.scopes = options?.scopes ?? DEFAULT_SHEETS_SCOPES;
+  }
+
+  /**
+   * Returns an authenticated Google Sheets client instance.
+   */
+  async getClient(): Promise<sheets_v4.Sheets> {
+    return getGoogleSheetsClient({
+      accessToken: this.accessToken,
+      credentials: this.credentials,
+      scopes: this.scopes,
+    });
+  }
+
+  /**
+   * Fetches raw cell values from a spreadsheet range.
+   */
+  async fetchData(options: {
+    spreadsheetId: string;
+    range?: string;
+    valueRenderOption?: "FORMATTED_VALUE" | "UNFORMATTED_VALUE" | "FORMULA";
+    dateTimeRenderOption?: "SERIAL_NUMBER" | "FORMATTED_STRING";
+  }): Promise<SpreadsheetDataResponse> {
+    return fetchSpreadsheetData({
+      ...options,
+      credentials: this.credentials,
+      accessToken: this.accessToken,
+    });
+  }
+
+  /**
+   * Fetches rows from a spreadsheet parsed into objects based on header row names.
+   */
+  async fetchRowsAsObjects<T = Record<string, string | number | null>>(options: {
+    spreadsheetId: string;
+    range?: string;
+    valueRenderOption?: "FORMATTED_VALUE" | "UNFORMATTED_VALUE" | "FORMULA";
+  }): Promise<{ headers: string[]; rows: T[] }> {
+    return fetchSpreadsheetRowsAsObjects<T>({
+      ...options,
+      credentials: this.credentials,
+      accessToken: this.accessToken,
+    });
+  }
+
+  /**
+   * Fetches metadata including spreadsheet title and list of sheets.
+   */
+  async fetchMetadata(spreadsheetId: string): Promise<SpreadsheetMetadata> {
+    return fetchSpreadsheetMetadata({
+      spreadsheetId,
+      credentials: this.credentials,
+      accessToken: this.accessToken,
+    });
+  }
+
+  /**
+   * Appends rows of data to the spreadsheet.
+   */
+  async appendRows(options: {
+    spreadsheetId: string;
+    range?: string;
+    rows: (string | number | boolean | null)[][];
+    valueInputOption?: "USER_ENTERED" | "RAW";
+    insertDataOption?: "OVERWRITE" | "INSERT_ROWS";
+  }): Promise<{ updatedRows: number; updatedRange: string }> {
+    return appendSpreadsheetRows({
+      ...options,
+      credentials: this.credentials,
+      accessToken: this.accessToken,
+    });
+  }
+}
+
+/**
  * Fetches data (cell values) from a specific Google Spreadsheet and range.
  *
- * @param options Object containing spreadsheetId, optional range, and optional accessToken
+ * @param options Object containing spreadsheetId, optional range, credentials, or accessToken
  * @returns Object containing spreadsheetId, range, and 2D array of cell values
- *
- * @example
- * ```ts
- * const data = await fetchSpreadsheetData({
- *   spreadsheetId: "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms",
- *   range: "Sheet1!A1:E20",
- * });
- * console.log(data.values);
- * ```
  */
 export async function fetchSpreadsheetData(
   options: FetchSpreadsheetDataOptions,
@@ -156,6 +323,7 @@ export async function fetchSpreadsheetData(
   try {
     const sheets = await getGoogleSheetsClient({
       accessToken: options.accessToken,
+      credentials: options.credentials,
     });
 
     const response = await sheets.spreadsheets.values.get({
@@ -215,6 +383,7 @@ export async function fetchSpreadsheetRowsAsObjects<T = Record<string, string | 
 export async function fetchSpreadsheetMetadata(options: {
   spreadsheetId: string;
   accessToken?: string;
+  credentials?: GoogleSheetsCredentials | ServiceAccountKeyJson | string;
 }): Promise<SpreadsheetMetadata> {
   const spreadsheetId = normalizeSpreadsheetId(options.spreadsheetId);
   if (!spreadsheetId) {
@@ -224,6 +393,7 @@ export async function fetchSpreadsheetMetadata(options: {
   try {
     const sheets = await getGoogleSheetsClient({
       accessToken: options.accessToken,
+      credentials: options.credentials,
     });
 
     const res = await sheets.spreadsheets.get({
@@ -255,25 +425,23 @@ export async function fetchSpreadsheetMetadata(options: {
 /**
  * Appends rows to a spreadsheet.
  */
-export async function appendSpreadsheetRows(options: {
-  spreadsheetId: string;
-  range?: string;
-  rows: (string | number | boolean | null)[][];
-  accessToken?: string;
-}): Promise<{ updatedRows: number; updatedRange: string }> {
+export async function appendSpreadsheetRows(
+  options: AppendSpreadsheetRowsOptions,
+): Promise<{ updatedRows: number; updatedRange: string }> {
   const spreadsheetId = normalizeSpreadsheetId(options.spreadsheetId);
   const range = options.range?.trim() || "A:Z";
 
   try {
     const sheets = await getGoogleSheetsClient({
       accessToken: options.accessToken,
+      credentials: options.credentials,
     });
 
     const response = await sheets.spreadsheets.values.append({
       spreadsheetId,
       range,
-      valueInputOption: "USER_ENTERED",
-      insertDataOption: "INSERT_ROWS",
+      valueInputOption: options.valueInputOption ?? "USER_ENTERED",
+      insertDataOption: options.insertDataOption ?? "INSERT_ROWS",
       requestBody: {
         values: options.rows,
       },
@@ -289,9 +457,45 @@ export async function appendSpreadsheetRows(options: {
 }
 
 /**
- * Helper to produce human-friendly error messages from Google Sheets API errors.
+ * Updates spreadsheet cell values in a specified range.
  */
-function formatGoogleSheetsError(error: unknown, spreadsheetId?: string, range?: string): Error {
+export async function updateSpreadsheetValues(
+  options: UpdateSpreadsheetValuesOptions,
+): Promise<{ updatedCells: number; updatedRange: string }> {
+  const spreadsheetId = normalizeSpreadsheetId(options.spreadsheetId);
+
+  try {
+    const sheets = await getGoogleSheetsClient({
+      accessToken: options.accessToken,
+      credentials: options.credentials,
+    });
+
+    const response = await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: options.range,
+      valueInputOption: options.valueInputOption ?? "USER_ENTERED",
+      requestBody: {
+        values: options.values,
+      },
+    });
+
+    return {
+      updatedCells: response.data.updatedCells ?? 0,
+      updatedRange: response.data.updatedRange ?? options.range,
+    };
+  } catch (error: unknown) {
+    throw formatGoogleSheetsError(error, spreadsheetId, options.range);
+  }
+}
+
+/**
+ * Formats Google Sheets API errors into clear, actionable messages.
+ */
+export function formatGoogleSheetsError(
+  error: unknown,
+  spreadsheetId?: string,
+  range?: string,
+): Error {
   const apiError = error as {
     code?: number;
     status?: number;
