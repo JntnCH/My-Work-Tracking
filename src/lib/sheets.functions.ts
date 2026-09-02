@@ -503,3 +503,25 @@ export const testGoogleSheetsConnection = createServerFn({ method: "POST" })
 
     return result;
   });
+
+/**
+ * Server function to fetch arbitrary spreadsheet data using the Google Sheets service.
+ */
+export const fetchSpreadsheetDataFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) =>
+    z
+      .object({
+        spreadsheetId: z.string().min(10).transform(normalizeSpreadsheetId),
+        range: z.string().optional(),
+        accessToken: z.string().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { fetchSpreadsheetData } = await import("@/services/google-sheets");
+    return fetchSpreadsheetData({
+      spreadsheetId: data.spreadsheetId,
+      range: data.range,
+      accessToken: data.accessToken,
+    });
+  });

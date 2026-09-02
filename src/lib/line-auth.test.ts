@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
     isLoggedIn: vi.fn(),
     login: vi.fn(),
     getIDToken: vi.fn(),
+    getProfile: vi.fn(),
   },
   auth: {
     signInWithIdToken: vi.fn(),
@@ -14,7 +15,10 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@line/liff", () => ({ default: mocks.liff }));
-vi.mock("@/integrations/supabase/client", () => ({ supabase: { auth: mocks.auth } }));
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: { auth: mocks.auth },
+  isSupabaseConfigured: () => true,
+}));
 
 import {
   getLineAuthErrorMessage,

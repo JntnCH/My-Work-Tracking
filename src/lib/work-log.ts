@@ -548,3 +548,55 @@ export function rowToLog(row: string[]): WorkLog | null {
     syncedAt: new Date().toISOString(),
   };
 }
+
+/** Parses a single CSV line with support for double-quoted comma values. */
+export function parseCSVLine(line: string): string[] {
+  const result: string[] = [];
+  let cur = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        cur += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === "," && !inQuotes) {
+      result.push(cur.trim());
+      cur = "";
+    } else {
+      cur += char;
+    }
+  }
+  result.push(cur.trim());
+  return result;
+}
+
+/** Parses raw CSV text containing WorkLogs into an array of WorkLog objects. */
+export function parseCSVToLogs(csvText: string): WorkLog[] {
+  const lines = csvText
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (lines.length === 0) return [];
+
+  const headers = parseCSVLine(lines[0] ?? "");
+  const isHeaderRow =
+    headers[0]?.includes("รหัส") ||
+    headers[1]?.includes("วันที่") ||
+    headers[0]?.toLowerCase().includes("id") ||
+    headers[1]?.toLowerCase().includes("date");
+  const startIndex = isHeaderRow ? 1 : 0;
+
+  const logs: WorkLog[] = [];
+  for (let i = startIndex; i < lines.length; i++) {
+    const row = parseCSVLine(lines[i]!);
+    const log = rowToLog(row);
+    if (log) {
+      logs.push(log);
+    }
+  }
+  return logs;
+}
