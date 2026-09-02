@@ -22,6 +22,7 @@ import {
   writeCategoryList,
 } from "@/lib/sheets.functions";
 import { callServer } from "@/lib/server-call";
+import { getGoogleAccessToken } from "@/lib/firebase";
 import {
   addDBBranch,
   addDBWorkType,
@@ -243,8 +244,9 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
           let seedCategories: string[] = [];
           if (sheetIdForImport) {
             try {
+              const accessToken = getGoogleAccessToken() ?? undefined;
               const sheetResult = await callServer(readCategoryList, {
-                data: { spreadsheetId: sheetIdForImport },
+                data: { spreadsheetId: sheetIdForImport, accessToken },
               });
               seedCategories = sheetResult.categories;
               importedCategories = seedCategories.length;
@@ -496,8 +498,9 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
       }
 
       if (spreadsheetId) {
+        const accessToken = getGoogleAccessToken() ?? undefined;
         void callServer(writeCategoryList, {
-          data: { spreadsheetId, categories: normalized },
+          data: { spreadsheetId, categories: normalized, accessToken },
         }).catch((error: unknown) => {
           console.warn("Google Sheets category mirror warning:", error);
         });
@@ -605,9 +608,11 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
 
   const mirrorToSheet = useCallback(async (allLogs: WorkLog[], sheetId: string) => {
     if (!sheetId) return;
+    const accessToken = getGoogleAccessToken() ?? undefined;
     await callServer(replaceWorkLogRows, {
       data: {
         spreadsheetId: sheetId,
+        accessToken,
         rows: allLogs.slice().reverse().map(logToRow),
       },
     });

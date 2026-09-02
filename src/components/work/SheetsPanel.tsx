@@ -21,6 +21,7 @@ import {
   countPassedConnectionTests,
   type ConnectionTestResult,
 } from "@/lib/sheets-diagnostics";
+import { getGoogleAccessToken, signInWithGoogleFirebase } from "@/lib/firebase";
 
 type Props = {
   spreadsheetId: string;
@@ -44,7 +45,10 @@ export function SheetsPanel({ spreadsheetId, onChange }: Props) {
     }
     setBusy(true);
     try {
-      const res = await callServer(prepareSpreadsheet, { data: { spreadsheetId: id } });
+      const accessToken = getGoogleAccessToken() ?? undefined;
+      const res = await callServer(prepareSpreadsheet, {
+        data: { spreadsheetId: id, accessToken },
+      });
       onChange(res.spreadsheetId);
       setInput(res.spreadsheetId);
       setTitle(res.title ?? "");
@@ -61,8 +65,12 @@ export function SheetsPanel({ spreadsheetId, onChange }: Props) {
   const createNew = async () => {
     setBusy(true);
     try {
+      const accessToken = getGoogleAccessToken() ?? undefined;
       const res = await callServer(createWorkSpreadsheet, {
-        data: { title: `Work Tracker ${new Date().getFullYear()}` },
+        data: {
+          title: `Work Tracker ${new Date().getFullYear()}`,
+          accessToken,
+        },
       });
       onChange(res.spreadsheetId);
       setInput(res.spreadsheetId);
@@ -86,7 +94,10 @@ export function SheetsPanel({ spreadsheetId, onChange }: Props) {
     setTesting(true);
     setTestResult(null);
     try {
-      const res = await callServer(testGoogleSheetsConnection, { data: { spreadsheetId: id } });
+      const accessToken = getGoogleAccessToken() ?? undefined;
+      const res = await callServer(testGoogleSheetsConnection, {
+        data: { spreadsheetId: id, accessToken },
+      });
       setTestResult(res);
       const passed = countPassedConnectionTests(res);
       if (allConnectionTestsPassed(res)) {

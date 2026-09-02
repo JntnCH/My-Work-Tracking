@@ -196,8 +196,26 @@ export async function syncUserProfileToFirestore(
   }
 }
 
+export const GOOGLE_WORKSPACE_SCOPES = [
+  "https://www.googleapis.com/auth/spreadsheets",
+  "https://www.googleapis.com/auth/spreadsheets.readonly",
+  "https://www.googleapis.com/auth/drive.file",
+  "https://www.googleapis.com/auth/drive.readonly",
+  "https://www.googleapis.com/auth/drive",
+];
+
+let cachedGoogleAccessToken: string | null = null;
+
+export function getGoogleAccessToken(): string | null {
+  return cachedGoogleAccessToken;
+}
+
+export function setGoogleAccessToken(token: string | null): void {
+  cachedGoogleAccessToken = token;
+}
+
 /**
- * 1. Perform Google Sign-In via Firebase Auth.
+ * 1. Perform Google Sign-In via Firebase Auth with Workspace Scopes.
  */
 export async function signInWithGoogleFirebase(): Promise<UserCredential> {
   const auth = getFirebaseAuthInstance();
@@ -210,12 +228,20 @@ export async function signInWithGoogleFirebase(): Promise<UserCredential> {
   const provider = new GoogleAuthProvider();
   provider.addScope("profile");
   provider.addScope("email");
+  for (const scope of GOOGLE_WORKSPACE_SCOPES) {
+    provider.addScope(scope);
+  }
   provider.setCustomParameters({
     prompt: "select_account",
+    access_type: "offline",
   });
 
   try {
     const result = await signInWithPopup(auth, provider);
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    if (credential?.accessToken) {
+      cachedGoogleAccessToken = credential.accessToken;
+    }
     if (result.user) {
       void syncUserProfileToFirestore(result.user);
     }
@@ -407,6 +433,10 @@ export async function checkFirebaseRedirectResult(): Promise<UserCredential | nu
   try {
     const result = await getRedirectResult(auth);
     if (result?.user) {
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (credential?.accessToken) {
+        cachedGoogleAccessToken = credential.accessToken;
+      }
       void syncUserProfileToFirestore(result.user);
     }
     return result;
@@ -420,6 +450,7 @@ export async function signOutFirebase(): Promise<void> {
   const auth = getFirebaseAuthInstance();
   if (auth) {
     await firebaseSignOut(auth);
+    cachedGoogleAccessToken = null;
   }
 }
 
