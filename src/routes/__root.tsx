@@ -16,6 +16,8 @@ import {
   initializeLineLiffOnPrimaryRedirect,
   isLineLiffPrimaryRedirect,
 } from "@/lib/line-auth";
+import { applyTheme, DEFAULT_COLORS_LIGHT, type CustomColors } from "@/lib/theme";
+import { storage } from "@/lib/work-log";
 
 import appCss from "../styles.css?url";
 import { EngineWorkingAnimation } from "@/components/ui/engine-working-animation";
@@ -148,6 +150,15 @@ function RootComponent() {
   const [isLiffPrimaryRedirectPending, setIsLiffPrimaryRedirectPending] = useState(() =>
     isLineLiffPrimaryRedirect(),
   );
+
+  useEffect(() => {
+    try {
+      const localTheme = storage.getTheme<CustomColors>(DEFAULT_COLORS_LIGHT);
+      applyTheme(localTheme);
+    } catch {
+      applyTheme(DEFAULT_COLORS_LIGHT);
+    }
+  }, []);
 
   useEffect(() => {
     if (!isLiffPrimaryRedirectPending) return;

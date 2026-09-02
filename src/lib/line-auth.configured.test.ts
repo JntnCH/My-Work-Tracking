@@ -70,7 +70,12 @@ describe("configured LINE LIFF authentication", () => {
 
     const result = await completeLineLiffLoginIfNeeded();
 
-    expect(result).toEqual({ redirected: false });
+    expect(result.redirected).toBe(false);
+    expect(result.user).toEqual({
+      displayName: "Test User",
+      pictureUrl: "",
+      userId: undefined,
+    });
     expect(mocks.auth.signInWithIdToken).toHaveBeenCalledWith({
       provider: "custom:line",
       token: "raw-line-id-token",

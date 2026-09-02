@@ -22,6 +22,7 @@ import {
   writeCategoryList,
 } from "@/lib/sheets.functions";
 import { callServer } from "@/lib/server-call";
+import { getSheetsAuthPayload } from "@/lib/sheets-credentials";
 import { getGoogleAccessToken } from "@/lib/firebase";
 import {
   addDBBranch,
@@ -155,22 +156,47 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
           ? String(dbSettings.spreadsheet_id ?? "").trim()
           : localSheetId.trim();
         if (dbSettings && isMounted) {
+          const isLegacyGoogleBlue =
+            (!dbSettings.preset_name || dbSettings.preset_name === "google-blue") &&
+            (!dbSettings.primary_color || dbSettings.primary_color === "#1A73E8");
+
           const colors: CustomColors = {
             themeMode: (dbSettings.theme as CustomColors["themeMode"]) || "light",
-            backgroundColor: dbSettings.background_color || DEFAULT_COLORS_LIGHT.backgroundColor,
-            cardColor: dbSettings.card_color || DEFAULT_COLORS_LIGHT.cardColor,
-            foregroundColor: dbSettings.foreground_color || DEFAULT_COLORS_LIGHT.foregroundColor,
-            borderColor: dbSettings.border_color || DEFAULT_COLORS_LIGHT.borderColor,
-            primaryColor: dbSettings.primary_color || DEFAULT_COLORS_LIGHT.primaryColor,
-            secondaryColor: dbSettings.secondary_color || DEFAULT_COLORS_LIGHT.secondaryColor,
-            accentColor: dbSettings.accent_color || DEFAULT_COLORS_LIGHT.accentColor,
-            successColor: dbSettings.success_color || DEFAULT_COLORS_LIGHT.successColor,
-            warningColor: dbSettings.warning_color || DEFAULT_COLORS_LIGHT.warningColor,
-            destructiveColor: dbSettings.destructive_color || DEFAULT_COLORS_LIGHT.destructiveColor,
-            chartColors: dbSettings.chart_colors?.length
-              ? dbSettings.chart_colors
-              : DEFAULT_COLORS_LIGHT.chartColors,
-            presetName: dbSettings.preset_name || "google-blue",
+            backgroundColor: isLegacyGoogleBlue
+              ? DEFAULT_COLORS_LIGHT.backgroundColor
+              : dbSettings.background_color || DEFAULT_COLORS_LIGHT.backgroundColor,
+            cardColor: isLegacyGoogleBlue
+              ? DEFAULT_COLORS_LIGHT.cardColor
+              : dbSettings.card_color || DEFAULT_COLORS_LIGHT.cardColor,
+            foregroundColor: isLegacyGoogleBlue
+              ? DEFAULT_COLORS_LIGHT.foregroundColor
+              : dbSettings.foreground_color || DEFAULT_COLORS_LIGHT.foregroundColor,
+            borderColor: isLegacyGoogleBlue
+              ? DEFAULT_COLORS_LIGHT.borderColor
+              : dbSettings.border_color || DEFAULT_COLORS_LIGHT.borderColor,
+            primaryColor: isLegacyGoogleBlue
+              ? DEFAULT_COLORS_LIGHT.primaryColor
+              : dbSettings.primary_color || DEFAULT_COLORS_LIGHT.primaryColor,
+            secondaryColor: isLegacyGoogleBlue
+              ? DEFAULT_COLORS_LIGHT.secondaryColor
+              : dbSettings.secondary_color || DEFAULT_COLORS_LIGHT.secondaryColor,
+            accentColor: isLegacyGoogleBlue
+              ? DEFAULT_COLORS_LIGHT.accentColor
+              : dbSettings.accent_color || DEFAULT_COLORS_LIGHT.accentColor,
+            successColor: isLegacyGoogleBlue
+              ? DEFAULT_COLORS_LIGHT.successColor
+              : dbSettings.success_color || DEFAULT_COLORS_LIGHT.successColor,
+            warningColor: isLegacyGoogleBlue
+              ? DEFAULT_COLORS_LIGHT.warningColor
+              : dbSettings.warning_color || DEFAULT_COLORS_LIGHT.warningColor,
+            destructiveColor: isLegacyGoogleBlue
+              ? DEFAULT_COLORS_LIGHT.destructiveColor
+              : dbSettings.destructive_color || DEFAULT_COLORS_LIGHT.destructiveColor,
+            chartColors:
+              isLegacyGoogleBlue || !dbSettings.chart_colors?.length
+                ? DEFAULT_COLORS_LIGHT.chartColors
+                : dbSettings.chart_colors,
+            presetName: isLegacyGoogleBlue ? "neon-ai" : dbSettings.preset_name || "neon-ai",
             borderRadius: (dbSettings.border_radius as CustomColors["borderRadius"]) || "normal",
             buttonStyle: (dbSettings.button_style as CustomColors["buttonStyle"]) || "filled",
             density: (dbSettings.density as CustomColors["density"]) || "normal",
@@ -244,9 +270,9 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
           let seedCategories: string[] = [];
           if (sheetIdForImport) {
             try {
-              const accessToken = getGoogleAccessToken() ?? undefined;
+              const authPayload = getSheetsAuthPayload();
               const sheetResult = await callServer(readCategoryList, {
-                data: { spreadsheetId: sheetIdForImport, accessToken },
+                data: { spreadsheetId: sheetIdForImport, ...authPayload },
               });
               seedCategories = sheetResult.categories;
               importedCategories = seedCategories.length;
@@ -498,9 +524,9 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
       }
 
       if (spreadsheetId) {
-        const accessToken = getGoogleAccessToken() ?? undefined;
+        const authPayload = getSheetsAuthPayload();
         void callServer(writeCategoryList, {
-          data: { spreadsheetId, categories: normalized, accessToken },
+          data: { spreadsheetId, categories: normalized, ...authPayload },
         }).catch((error: unknown) => {
           console.warn("Google Sheets category mirror warning:", error);
         });
@@ -608,11 +634,11 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
 
   const mirrorToSheet = useCallback(async (allLogs: WorkLog[], sheetId: string) => {
     if (!sheetId) return;
-    const accessToken = getGoogleAccessToken() ?? undefined;
+    const authPayload = getSheetsAuthPayload();
     await callServer(replaceWorkLogRows, {
       data: {
         spreadsheetId: sheetId,
-        accessToken,
+        ...authPayload,
         rows: allLogs.slice().reverse().map(logToRow),
       },
     });
@@ -892,9 +918,9 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
       }
       setSyncing(true);
       try {
-        const accessToken = getGoogleAccessToken() ?? undefined;
+        const authPayload = getSheetsAuthPayload();
         const result = await callServer(readWorkLogRows, {
-          data: { spreadsheetId, accessToken },
+          data: { spreadsheetId, ...authPayload },
         });
         const pulled = result.rows.map(rowToLog).filter((item): item is WorkLog => item !== null);
         if (pulled.length === 0) {

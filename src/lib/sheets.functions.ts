@@ -41,9 +41,17 @@ type GoogleError = {
   message?: string;
 };
 
-const spreadsheetInputSchema = z.object({
-  spreadsheetId: z.string().min(10).transform(normalizeSpreadsheetId),
+export const sheetsAuthSchema = z.object({
   accessToken: z.string().optional(),
+  serviceAccountJson: z.string().optional(),
+  serviceAccountEmail: z.string().optional(),
+  serviceAccountPrivateKey: z.string().optional(),
+});
+
+export type SheetsAuthInput = z.infer<typeof sheetsAuthSchema>;
+
+export const spreadsheetInputSchema = sheetsAuthSchema.extend({
+  spreadsheetId: z.string().min(10).transform(normalizeSpreadsheetId),
 });
 
 export function normalizeSpreadsheetId(value: string) {
@@ -52,8 +60,12 @@ export function normalizeSpreadsheetId(value: string) {
   return match?.[1] ?? trimmed;
 }
 
-function serviceAccountCredentials(): { clientEmail: string; privateKey: string } {
-  const json = process.env["GOOGLE_SERVICE_ACCOUNT_JSON"]?.trim();
+function serviceAccountCredentials(auth?: SheetsAuthInput): {
+  clientEmail: string;
+  privateKey: string;
+} {
+  const json =
+    auth?.serviceAccountJson?.trim() || process.env["GOOGLE_SERVICE_ACCOUNT_JSON"]?.trim();
   let credentials: ServiceAccountCredentials = {};
 
   if (json) {
@@ -61,50 +73,53 @@ function serviceAccountCredentials(): { clientEmail: string; privateKey: string 
       credentials = JSON.parse(json) as ServiceAccountCredentials;
     } catch {
       throw new Error(
-        "Google Sheets ยังไม่พร้อมใช้งาน: GOOGLE_SERVICE_ACCOUNT_JSON ไม่ใช่ JSON ที่ถูกต้อง",
+        "Google Sheets ยังไม่พร้อมใช้งาน: Service Account JSON ไม่ใช่รูปแบบ JSON ที่ถูกต้อง",
       );
     }
   }
 
   const clientEmail =
     credentials.client_email ??
+    auth?.serviceAccountEmail?.trim() ??
     process.env["GOOGLE_SERVICE_ACCOUNT_EMAIL"] ??
     process.env["GOOGLE_CLIENT_EMAIL"];
-  const privateKey = credentials.private_key ?? process.env["GOOGLE_PRIVATE_KEY"];
+  const privateKey =
+    credentials.private_key ??
+    auth?.serviceAccountPrivateKey?.trim() ??
+    process.env["GOOGLE_PRIVATE_KEY"];
 
   if (!clientEmail || !privateKey) {
-    const missing = [
-      !clientEmail ? "GOOGLE_SERVICE_ACCOUNT_EMAIL" : null,
-      !privateKey ? "GOOGLE_PRIVATE_KEY" : null,
-    ].filter((key): key is string => Boolean(key));
     throw new Error(
-      `ยังไม่ได้เชื่อมต่อบัญชี Google: กรุณากดปุ่ม "เข้าสู่ระบบ Google เพื่อเปิดสิทธิ์ชีต" ในหน้าตั้งค่า หรือกำหนด ${missing.join(", ")} ใน environment ของ server`,
+      `ยังไม่ได้เชื่อมต่อ Google Sheets: กรุณาวาง Service Account JSON หรือกดปุ่ม "เข้าสู่ระบบ Google เพื่อเปิดสิทธิ์ชีต" ในหน้าตั้งค่า`,
     );
   }
 
   return {
-    clientEmail,
-    privateKey: privateKey.replace(/\\n/g, "\n"),
+    clientEmail: clientEmail.trim(),
+    privateKey: privateKey.trim().replace(/\\n/g, "\n"),
   };
 }
 
-async function sheetsClient(accessToken?: string) {
+async function sheetsClient(auth?: SheetsAuthInput | string) {
   const { google } = await import("googleapis");
-  if (accessToken && accessToken.trim().length > 10) {
-    const auth = new google.auth.OAuth2();
-    auth.setCredentials({ access_token: accessToken.trim() });
-    return google.sheets({ version: "v4", auth });
+  const authPayload: SheetsAuthInput =
+    typeof auth === "string" ? { accessToken: auth } : (auth ?? {});
+
+  if (authPayload.accessToken && authPayload.accessToken.trim().length > 10) {
+    const oauthAuth = new google.auth.OAuth2();
+    oauthAuth.setCredentials({ access_token: authPayload.accessToken.trim() });
+    return google.sheets({ version: "v4", auth: oauthAuth });
   }
 
-  const credentials = serviceAccountCredentials();
-  const auth = new google.auth.JWT({
+  const credentials = serviceAccountCredentials(authPayload);
+  const jwtAuth = new google.auth.JWT({
     email: credentials.clientEmail,
     key: credentials.privateKey,
     scopes: [GOOGLE_SHEETS_SCOPE],
   });
 
-  await auth.authorize();
-  return google.sheets({ version: "v4", auth });
+  await jwtAuth.authorize();
+  return google.sheets({ version: "v4", auth: jwtAuth });
 }
 
 function googleSheetsError(error: unknown) {
@@ -114,13 +129,13 @@ function googleSheetsError(error: unknown) {
   const message = apiMessage ?? apiError.message ?? "ไม่ทราบสาเหตุ";
 
   if (status === 401) {
-    return "Google authentication ไม่ผ่าน: ตรวจสอบ Service Account email และ private key";
+    return "Google authentication ไม่ผ่าน: ตรวจสอบ Service Account email และ private key หรือล็อกอินใหม่อีกครั้ง";
   }
   if (status === 403) {
-    return "Google Sheets ปฏิเสธการเข้าถึง: แชร์ spreadsheet ให้ Service Account email ด้วยสิทธิ์ Editor และตรวจว่าเปิด Google Sheets API แล้ว";
+    return "Google Sheets ปฏิเสธการเข้าถึง (403): กรุณากดปุ่ม 'แชร์' ใน Google Sheets แล้วเพิ่ม Service Account Email นี้เป็น 'Editor (ผู้แก้ไข)'";
   }
   if (status === 404) {
-    return "ไม่พบ Spreadsheet หรือแท็บที่ระบุ: ตรวจสอบ Spreadsheet ID และชื่อแท็บ WorkLogs";
+    return "ไม่พบ Spreadsheet หรือแท็บที่ระบุ: ตรวจสอบ Spreadsheet ID และแท็บ WorkLogs";
   }
   return `Google Sheets API error${status ? ` [${status}]` : ""}: ${message.slice(0, 400)}`;
 }
@@ -166,16 +181,15 @@ function spreadsheetResult(
 /** Creates a new spreadsheet with the WorkLogs tab and header row. */
 export const createWorkSpreadsheet = createServerFn({ method: "POST" })
   .validator((input: unknown) =>
-    z
-      .object({
+    sheetsAuthSchema
+      .extend({
         title: z.string().min(1).max(120).optional(),
-        accessToken: z.string().optional(),
       })
       .parse(input ?? {}),
   )
   .handler(async ({ data }) => {
     try {
-      const sheets = await sheetsClient(data.accessToken);
+      const sheets = await sheetsClient(data);
       const created = await sheets.spreadsheets.create({
         requestBody: {
           properties: { title: data.title || `Work Tracker ${new Date().getFullYear()}` },
@@ -210,7 +224,7 @@ export const prepareSpreadsheet = createServerFn({ method: "POST" })
   .validator((input: unknown) => spreadsheetInputSchema.parse(input))
   .handler(async ({ data }) => {
     try {
-      const sheets = await sheetsClient(data.accessToken);
+      const sheets = await sheetsClient(data);
       const meta = await ensureSheet(sheets, data.spreadsheetId, SHEET_TITLE);
       const existing = await sheets.spreadsheets.values.get({
         spreadsheetId: data.spreadsheetId,
@@ -235,10 +249,8 @@ export const prepareSpreadsheet = createServerFn({ method: "POST" })
 /** Appends one or more work-log rows to the WorkLogs tab. */
 export const appendWorkLogRows = createServerFn({ method: "POST" })
   .validator((input: unknown) =>
-    z
-      .object({
-        spreadsheetId: z.string().min(10).transform(normalizeSpreadsheetId),
-        accessToken: z.string().optional(),
+    spreadsheetInputSchema
+      .extend({
         rows: z
           .array(z.array(z.union([z.string(), z.number()])))
           .min(1)
@@ -248,7 +260,7 @@ export const appendWorkLogRows = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     try {
-      const sheets = await sheetsClient(data.accessToken);
+      const sheets = await sheetsClient(data);
       const result = await sheets.spreadsheets.values.append({
         spreadsheetId: data.spreadsheetId,
         range: `${SHEET_TITLE}!A:U`,
@@ -268,17 +280,15 @@ export const appendWorkLogRows = createServerFn({ method: "POST" })
 /** Overwrites the WorkLogs tab so the sheet mirrors app history exactly. */
 export const replaceWorkLogRows = createServerFn({ method: "POST" })
   .validator((input: unknown) =>
-    z
-      .object({
-        spreadsheetId: z.string().min(10).transform(normalizeSpreadsheetId),
-        accessToken: z.string().optional(),
+    spreadsheetInputSchema
+      .extend({
         rows: z.array(z.array(z.union([z.string(), z.number()]))).max(5000),
       })
       .parse(input),
   )
   .handler(async ({ data }) => {
     try {
-      const sheets = await sheetsClient(data.accessToken);
+      const sheets = await sheetsClient(data);
       await sheets.spreadsheets.values.clear({
         spreadsheetId: data.spreadsheetId,
         range: `${SHEET_TITLE}!A2:U`,
@@ -318,7 +328,7 @@ export const readCategoryList = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     let sheets: Awaited<ReturnType<typeof sheetsClient>>;
     try {
-      sheets = await sheetsClient(data.accessToken);
+      sheets = await sheetsClient(data);
     } catch (error) {
       console.warn(
         "Google Sheets client unavailable for category import:",
@@ -356,17 +366,15 @@ export const readCategoryList = createServerFn({ method: "POST" })
 /** Stores the work-type list in the Settings tab. */
 export const writeCategoryList = createServerFn({ method: "POST" })
   .validator((input: unknown) =>
-    z
-      .object({
-        spreadsheetId: z.string().min(10).transform(normalizeSpreadsheetId),
-        accessToken: z.string().optional(),
+    spreadsheetInputSchema
+      .extend({
         categories: z.array(z.string().min(1).max(120)).max(200),
       })
       .parse(input),
   )
   .handler(async ({ data }) => {
     try {
-      const sheets = await sheetsClient(data.accessToken);
+      const sheets = await sheetsClient(data);
       await ensureSheet(sheets, data.spreadsheetId, SETTINGS_TITLE);
       await sheets.spreadsheets.values.clear({
         spreadsheetId: data.spreadsheetId,
@@ -392,7 +400,7 @@ export const readWorkLogRows = createServerFn({ method: "POST" })
   .validator((input: unknown) => spreadsheetInputSchema.parse(input))
   .handler(async ({ data }) => {
     try {
-      const sheets = await sheetsClient(data.accessToken);
+      const sheets = await sheetsClient(data);
       const res = await sheets.spreadsheets.values.get({
         spreadsheetId: data.spreadsheetId,
         range: `${SHEET_TITLE}!A2:U`,
@@ -428,7 +436,7 @@ export const testGoogleSheetsConnection = createServerFn({ method: "POST" })
     let sheets: Awaited<ReturnType<typeof sheetsClient>> | null = null;
 
     try {
-      sheets = await sheetsClient(data.accessToken);
+      sheets = await sheetsClient(data);
       result.googleAccount = true;
       result.serviceAccount = true;
 
@@ -509,11 +517,9 @@ export const testGoogleSheetsConnection = createServerFn({ method: "POST" })
  */
 export const fetchSpreadsheetDataFn = createServerFn({ method: "POST" })
   .validator((input: unknown) =>
-    z
-      .object({
-        spreadsheetId: z.string().min(10).transform(normalizeSpreadsheetId),
+    spreadsheetInputSchema
+      .extend({
         range: z.string().optional(),
-        accessToken: z.string().optional(),
       })
       .parse(input),
   )
@@ -523,5 +529,6 @@ export const fetchSpreadsheetDataFn = createServerFn({ method: "POST" })
       spreadsheetId: data.spreadsheetId,
       range: data.range,
       accessToken: data.accessToken,
+      credentials: data.serviceAccountJson,
     });
   });

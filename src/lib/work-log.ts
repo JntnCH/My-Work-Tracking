@@ -54,6 +54,7 @@ export const STORAGE_KEYS = {
   settings: "work_tracker_settings",
   theme: "work_tracker_theme",
   sheet: "work_tracker_sheet",
+  serviceAccount: "work_tracker_service_account",
 } as const;
 
 export const DEFAULT_CATEGORIES = [
@@ -437,6 +438,8 @@ export const storage = {
   setTheme: (theme: unknown) => write(STORAGE_KEYS.theme, theme),
   getSheetId: () => read<string>(STORAGE_KEYS.sheet, ""),
   setSheetId: (id: string) => write(STORAGE_KEYS.sheet, id),
+  getServiceAccount: () => read<string>(STORAGE_KEYS.serviceAccount, ""),
+  setServiceAccount: (jsonOrKey: string) => write(STORAGE_KEYS.serviceAccount, jsonOrKey),
 };
 
 /* ------------------------------------------------------------------ */

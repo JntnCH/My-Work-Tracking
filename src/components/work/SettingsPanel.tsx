@@ -893,7 +893,7 @@ export function SettingsPanel({
                 onClick={() => void handleResetColors()}
                 className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground transition hover:bg-accent hover:text-foreground cursor-pointer"
               >
-                <RotateCcw className="h-3.5 w-3.5" /> รีเซ็ตเป็น Google Default
+                <RotateCcw className="h-3.5 w-3.5" /> รีเซ็ตเป็นธีมพรีวิว (Modern Purple)
               </button>
             </div>
 
@@ -901,7 +901,7 @@ export function SettingsPanel({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">
-                  ชุดสีทางการของ Google (Google Color Presets)
+                  ชุดสีธีมมาตรฐาน (Color Presets)
                 </label>
                 <span className="text-[11px] text-primary font-semibold">6 ชุดสีมาตรฐาน</span>
               </div>
@@ -909,7 +909,7 @@ export function SettingsPanel({
                 {GOOGLE_PRESETS.map((preset) => {
                   const isSelected =
                     draftColors.presetName === preset.id ||
-                    (!draftColors.presetName && preset.id === "google-blue");
+                    (!draftColors.presetName && preset.id === "neon-ai");
                   return (
                     <button
                       key={preset.id}
