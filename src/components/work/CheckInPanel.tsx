@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   BedDouble,
   Camera,
+  Clock,
   Cog,
   Crosshair,
   LocateFixed,
@@ -154,8 +155,18 @@ export function CheckInPanel({
         setGps((current) =>
           current.lat === lat && current.lng === lng ? { ...current, addressName } : current,
         );
-        // Do not overwrite text the user entered while reverse geocoding was in flight.
-        setLocationName((current) => (current.trim() ? current : addressName));
+        // Automatically populate location name into the box above if user hasn't typed a custom location
+        setLocationName((curr) => {
+          if (
+            !curr ||
+            curr === "ไม่ได้ระบุสถานที่" ||
+            curr.startsWith("Lat:") ||
+            curr.startsWith("ยังไม่ได้")
+          ) {
+            return addressName;
+          }
+          return curr;
+        });
       });
       return nextGPS;
     } catch (error) {
@@ -296,18 +307,18 @@ export function CheckInPanel({
 
   return (
     <div className="space-y-5">
-      {/* Status banner + aligned edit-time control */}
+      {/* Status & Active Shift Banner */}
       <div
-        className={`surface-card work-panel-card flex flex-col gap-4 p-5 ${
-          active ? "work-active-card" : ""
+        className={`surface-card overflow-hidden p-5 sm:p-6 transition-all duration-300 ${
+          active ? "work-active-card border-primary/40 shadow-xl" : "shadow-md"
         }`}
       >
-        <div className="flex w-full flex-col items-stretch justify-between gap-4 md:flex-row md:items-center">
-          <div className="flex w-full min-w-0 items-center gap-4">
+        <div className="flex flex-col gap-4 sm:gap-5">
+          <div className="flex items-center gap-4">
             <StatusMotion running={!!active} />
 
-            <div className="min-w-0">
-              <div className="text-base font-bold md:text-lg" data-testid="status-title">
+            <div className="min-w-0 flex-1">
+              <div className="text-base font-bold sm:text-lg" data-testid="status-title">
                 {active ? (
                   <span className="flex items-center gap-2">
                     <span
@@ -319,77 +330,97 @@ export function CheckInPanel({
                       <span className="work-bar block h-4 w-[3px] rounded-full bg-success [animation-delay:150ms]" />
                       <span className="work-bar block h-2.5 w-[3px] rounded-full bg-success [animation-delay:300ms]" />
                     </span>
-                    <span>
-                      กำลังทำงาน: <span className="text-success">{active.workType}</span>
+                    <span className="truncate">
+                      กำลังทำงาน:{" "}
+                      <span className="text-success font-extrabold">{active.workType}</span>
                     </span>
                   </span>
                 ) : (
                   <span className="flex items-center gap-2">
-                    <span className="sleep-breathe inline-block text-muted-foreground">😴</span>
-                    <span>ยังไม่ได้ CHECK-IN 🥱</span>
+                    <span className="sleep-breathe inline-block text-xl text-muted-foreground">
+                      😴
+                    </span>
+                    <span className="font-extrabold">ยังไม่ได้ CHECK-IN 🥱</span>
                   </span>
                 )}
               </div>
-              <p className="truncate text-xs text-muted-foreground md:text-sm">
+              <p className="mt-0.5 truncate text-xs text-muted-foreground sm:text-sm">
                 {active
                   ? `สถานที่: ${active.locationName} | Check-in เมื่อ ${new Date(active.checkInTime).toLocaleTimeString("th-TH", { hour12: false })}`
                   : "พร้อมเริ่มงาน? กดปุ่ม ค้นหาตำแหน่ง เพื่อบันทึกพิกัดและเวลา แล้วกด Check-in"}
               </p>
             </div>
           </div>
+
           {active ? (
-            <div className="w-full rounded-xl border border-border bg-info-soft px-4 py-2.5 text-center">
-              <span className="flex items-center justify-center gap-2 text-xs font-medium text-primary">
-                <span className="work-blink h-2 w-2 rounded-full bg-success" aria-hidden />
-                เวลาทำงาน (รวมพัก)
-              </span>
-              <span
-                className="text-xl font-bold text-primary tabular-nums"
-                data-testid="active-timer"
-              >
-                {formatDuration(elapsed)}
-              </span>
+            <div className="grid grid-cols-1 gap-3.5 border-t border-border/70 pt-4 md:grid-cols-2">
+              {/* Timer Box - Centered clearly, balanced spacing, prominent font-mono time */}
+              <div className="flex flex-col items-center justify-center rounded-xl border border-primary/25 bg-gradient-to-b from-info-soft/80 to-info-soft/40 p-4 text-center shadow-sm sm:p-5">
+                <div className="inline-flex items-center justify-center gap-2 text-xs font-bold text-primary sm:text-sm">
+                  <span
+                    className="work-blink inline-block h-2.5 w-2.5 rounded-full bg-success shadow-[0_0_8px_rgba(34,197,94,0.6)]"
+                    aria-hidden
+                  />
+                  <span>เวลาทำงาน (รวมพัก)</span>
+                </div>
+                <div
+                  className="my-1.5 font-mono text-3xl font-black tracking-wider text-primary tabular-nums drop-shadow-sm sm:text-4xl"
+                  data-testid="active-timer"
+                >
+                  {formatDuration(elapsed)}
+                </div>
+                <span className="text-[11px] font-medium text-muted-foreground sm:text-xs">
+                  นับเวลาอัตโนมัติตั้งแต่เริ่ม Check-in
+                </span>
+              </div>
+
+              {/* Edit Check-In Time Box - Matching equal height, clean mobile layout */}
+              <div className="flex flex-col justify-between rounded-xl border border-border/80 bg-secondary/60 p-4 shadow-sm sm:p-5">
+                <div className="flex items-center justify-between gap-1.5 text-xs font-bold text-muted-foreground">
+                  <label
+                    htmlFor="editCheckInTime"
+                    className="flex cursor-pointer items-center gap-1.5"
+                  >
+                    <Clock className="h-3.5 w-3.5 text-primary" />
+                    <span>แก้ไขเวลาเข้างาน</span>
+                  </label>
+                  <span className="text-[10px] font-normal text-muted-foreground">
+                    ปรับเวลาจริง
+                  </span>
+                </div>
+                <div className="my-1.5 w-full">
+                  <input
+                    id="editCheckInTime"
+                    type="datetime-local"
+                    data-testid="edit-checkin-time"
+                    value={toLocalInput(active.checkInTime)}
+                    onChange={(e) => {
+                      const iso = fromLocalInput(e.target.value);
+                      if (iso) onEditActiveTime(iso);
+                    }}
+                    className="w-full rounded-lg border border-input bg-card px-3 py-2 text-center text-sm font-semibold text-foreground shadow-sm outline-none transition focus:border-primary focus:ring-1 focus:ring-primary sm:text-left"
+                  />
+                </div>
+                <span className="text-[11px] font-medium text-muted-foreground">
+                  ปรับเวลาให้ตรงกับเวลาจริง ตัวจับเวลาจะคำนวณใหม่ทันที
+                </span>
+              </div>
             </div>
           ) : null}
         </div>
-
-        {active ? (
-          <div className="w-full">
-            <label
-              htmlFor="editCheckInTime"
-              className="mb-1 block text-xs font-semibold text-muted-foreground"
-            >
-              แก้ไขเวลาเข้างาน
-            </label>
-            <input
-              id="editCheckInTime"
-              type="datetime-local"
-              data-testid="edit-checkin-time"
-              value={toLocalInput(active.checkInTime)}
-              onChange={(e) => {
-                const iso = fromLocalInput(e.target.value);
-                if (iso) onEditActiveTime(iso);
-              }}
-              className="w-full rounded-xl border border-border bg-info-soft px-4 py-2.5 text-sm"
-            />
-            <p className="mt-1.5 text-xs text-muted-foreground">
-              ปรับเวลาให้ตรงกับเวลาเริ่มงานจริงได้ ตัวจับเวลาจะคำนวณใหม่ทันที
-            </p>
-          </div>
-        ) : null}
       </div>
 
       {/* Main form */}
-      <div className="surface-card work-panel-card neon-form-card space-y-6 p-5 sm:p-6">
+      <div className="surface-card space-y-6 p-5 sm:p-6 shadow-md">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
-            <div className="mb-1 flex items-center justify-between">
-              <label htmlFor="workType" className="text-xs font-semibold text-muted-foreground">
+            <div className="mb-1.5 flex items-center justify-between">
+              <label htmlFor="workType" className="text-xs font-bold text-muted-foreground">
                 ประเภทงาน / ชื่องาน
               </label>
               <button
                 onClick={() => setCatOpen(true)}
-                className="flex items-center gap-1 text-xs text-primary hover:underline"
+                className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
               >
                 <Settings2 className="h-3.5 w-3.5" /> จัดการประเภทงาน
               </button>
@@ -399,7 +430,7 @@ export function CheckInPanel({
               value={workType}
               disabled={!!active}
               onChange={(e) => setWorkType(e.target.value)}
-              className="w-full rounded-lg border border-input bg-secondary p-2.5 text-sm disabled:opacity-60"
+              className="w-full rounded-xl border border-input bg-secondary/80 p-2.5 text-sm font-medium disabled:opacity-60 focus:border-primary focus:ring-1 focus:ring-primary"
             >
               {categories.map((c) => (
                 <option key={c} value={c}>
@@ -410,8 +441,8 @@ export function CheckInPanel({
           </div>
 
           <div>
-            <div className="mb-1 flex items-center justify-between">
-              <label htmlFor="locationName" className="text-xs font-semibold text-muted-foreground">
+            <div className="mb-1.5 flex items-center justify-between">
+              <label htmlFor="locationName" className="text-xs font-bold text-muted-foreground">
                 สถานที่ทำงาน / ไซต์งาน
               </label>
               <a
@@ -433,11 +464,11 @@ export function CheckInPanel({
               disabled={!!active}
               onChange={(e) => handleLocationChange(e.target.value)}
               placeholder="พิมพ์สถานที่ หรือ วางลิงก์ Google Maps"
-              className="neon-input w-full rounded-lg border border-input bg-secondary p-2.5 text-sm disabled:opacity-60"
+              className="w-full rounded-xl border border-input bg-secondary/80 p-2.5 text-sm font-medium disabled:opacity-60 focus:border-primary focus:ring-1 focus:ring-primary"
             />
-            <div className="neon-location-card mt-2 rounded-xl border border-border bg-secondary/60 p-3">
+            <div className="mt-2.5 rounded-xl border border-border/80 bg-secondary/50 p-3.5 shadow-sm">
               <div className="flex items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                <div className="flex min-w-0 items-center gap-1.5 text-xs font-bold text-muted-foreground">
                   <LocateFixed className="h-4 w-4 shrink-0 text-primary" /> ตำแหน่งปัจจุบัน
                 </div>
                 <button
@@ -445,20 +476,34 @@ export function CheckInPanel({
                   disabled={gpsLoading}
                   title="ค้นหาตำแหน่งปัจจุบัน"
                   aria-label="ค้นหาตำแหน่งปัจจุบัน"
-                  className="neon-secondary-button flex shrink-0 items-center gap-1.5 rounded-lg bg-accent px-2.5 py-1.5 text-xs font-medium text-primary transition active:scale-95 disabled:opacity-60"
+                  className="flex shrink-0 items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-bold text-accent-foreground shadow-sm transition hover:brightness-105 active:scale-95 disabled:opacity-60"
                 >
                   <Crosshair className={`h-4 w-4 ${gpsLoading ? "animate-spin" : ""}`} />
                   {gpsLoading ? "กำลังค้นหา…" : "ค้นหาตำแหน่ง"}
                 </button>
               </div>
               <div
-                className="mt-1.5 font-mono text-sm font-semibold break-words text-primary"
+                className="mt-1.5 font-mono text-sm font-bold break-words text-primary"
                 data-testid="gps-text"
               >
                 {gps.text}
               </div>
+              {gps.addressName ? (
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary/20 bg-primary/10 p-2 text-xs">
+                  <span className="font-medium text-primary truncate max-w-[200px] sm:max-w-none">
+                    📍 {gps.addressName}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setLocationName(gps.addressName)}
+                    className="rounded bg-primary/20 px-2 py-0.5 text-[11px] font-bold text-primary hover:bg-primary/30 transition"
+                  >
+                    ใส่ในช่องสถานที่ ↑
+                  </button>
+                </div>
+              ) : null}
               {typeof gps.accuracy === "number" ? (
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1.5 text-[11px] text-muted-foreground">
                   ความแม่นยำประมาณ ±{Math.round(gps.accuracy)} เมตร
                 </p>
               ) : null}
@@ -471,7 +516,7 @@ export function CheckInPanel({
                   <button
                     key={loc}
                     onClick={() => setLocationName(loc)}
-                    className="neon-chip rounded border border-border bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-primary"
+                    className="rounded-md border border-border bg-secondary px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition hover:bg-accent hover:text-accent-foreground"
                   >
                     {loc}
                   </button>
@@ -483,7 +528,7 @@ export function CheckInPanel({
 
         {/* Jobs done during the running shift */}
         {active ? (
-          <div className="neon-inset-card space-y-3 rounded-xl border border-border bg-secondary/60 p-4">
+          <div className="space-y-3 rounded-xl border border-border bg-secondary/60 p-4">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
                 งานที่ทำเสร็จในกะที่กำลังทำอยู่
@@ -548,7 +593,7 @@ export function CheckInPanel({
         ) : null}
 
         {/* Rates */}
-        <div className="neon-inset-card space-y-4 rounded-xl border border-border bg-secondary/60 p-4">
+        <div className="space-y-4 rounded-xl border border-border bg-secondary/60 p-4">
           <h3 className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
             การคำนวณค่าแรง &amp; OT &amp; รายรับ-รายหัก
           </h3>
@@ -681,7 +726,7 @@ export function CheckInPanel({
 
         {/* Evidence */}
         <div className="grid grid-cols-1 gap-4">
-          <div className="neon-dropzone rounded-xl border-2 border-dashed border-border p-4 text-center">
+          <div className="rounded-xl border-2 border-dashed border-border p-4 text-center">
             <input
               ref={fileRef}
               id="imageInput"
@@ -714,18 +759,18 @@ export function CheckInPanel({
         </div>
 
         {/* Actions */}
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
           <button
             onClick={() => void doCheckIn()}
             disabled={!!active || gpsLoading}
-            className="neon-checkin-button flex items-center justify-center gap-2 rounded-xl bg-success py-4 text-lg font-bold text-success-foreground shadow-lg transition active:scale-95 disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
+            className="flex items-center justify-center gap-2.5 rounded-xl bg-success py-4 text-base sm:text-lg font-extrabold text-success-foreground shadow-[0_6px_20px_-2px_rgba(16,185,129,0.4)] transition hover:brightness-105 active:scale-[0.98] active:translate-y-0.5 disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
           >
             <LogIn className="h-5 w-5" /> {gpsLoading ? "กำลังค้นหาพิกัด…" : "Check-in เริ่มงาน"}
           </button>
           <button
             onClick={() => void doCheckOut()}
             disabled={!active || gpsLoading}
-            className="neon-checkout-button flex items-center justify-center gap-2 rounded-xl bg-destructive py-4 text-lg font-bold text-destructive-foreground shadow-lg transition active:scale-95 disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
+            className="flex items-center justify-center gap-2.5 rounded-xl bg-destructive py-4 text-base sm:text-lg font-extrabold text-destructive-foreground shadow-[0_6px_20px_-2px_rgba(239,68,68,0.4)] transition hover:brightness-105 active:scale-[0.98] active:translate-y-0.5 disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
           >
             <LogOut className="h-5 w-5" /> {gpsLoading ? "กำลังบันทึกพิกัด…" : "Check-out จบงาน"}
           </button>
@@ -733,7 +778,7 @@ export function CheckInPanel({
         {active ? (
           <button
             onClick={onCancelActive}
-            className="w-full text-xs text-muted-foreground hover:text-destructive hover:underline"
+            className="w-full text-center text-xs font-medium text-muted-foreground transition hover:text-destructive hover:underline"
           >
             ยกเลิกการ Check-in นี้ (ไม่บันทึก)
           </button>
@@ -759,10 +804,10 @@ function StatusMotion({ running }: { running: boolean }) {
     <div
       aria-hidden
       data-testid={running ? "engine-animation" : "resting-animation"}
-      className={`relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full ${
+      className={`relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl shadow-md ${
         running
-          ? "work-pulse-ring bg-success-soft text-success"
-          : "rest-halo bg-destructive-soft text-destructive"
+          ? "work-pulse-ring bg-success-soft text-success border border-success/30"
+          : "rest-halo bg-secondary text-muted-foreground border border-border"
       }`}
     >
       {running ? (
@@ -791,12 +836,12 @@ function StatusMotion({ running }: { running: boolean }) {
 }
 
 const inputCls =
-  "w-full rounded-lg border border-input bg-card p-2 text-sm font-medium disabled:opacity-60";
+  "w-full rounded-xl border border-input bg-card px-3 py-2.5 text-sm font-semibold transition focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-60";
 
 function Field({ label, id, children }: { label: string; id: string; children: React.ReactNode }) {
   return (
     <div>
-      <label htmlFor={id} className="mb-1 block text-xs text-muted-foreground">
+      <label htmlFor={id} className="mb-1.5 block text-xs font-semibold text-muted-foreground">
         {label}
       </label>
       {children}
