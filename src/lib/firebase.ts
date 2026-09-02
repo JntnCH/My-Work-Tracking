@@ -204,14 +204,39 @@ export const GOOGLE_WORKSPACE_SCOPES = [
   "https://www.googleapis.com/auth/drive",
 ];
 
+const GOOGLE_ACCESS_TOKEN_STORAGE_KEY = "work_tracker_google_access_token";
+
 let cachedGoogleAccessToken: string | null = null;
 
 export function getGoogleAccessToken(): string | null {
-  return cachedGoogleAccessToken;
+  if (cachedGoogleAccessToken) return cachedGoogleAccessToken;
+  if (typeof window !== "undefined") {
+    try {
+      const stored = localStorage.getItem(GOOGLE_ACCESS_TOKEN_STORAGE_KEY);
+      if (stored) {
+        cachedGoogleAccessToken = stored;
+        return stored;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return null;
 }
 
 export function setGoogleAccessToken(token: string | null): void {
   cachedGoogleAccessToken = token;
+  if (typeof window !== "undefined") {
+    try {
+      if (token) {
+        localStorage.setItem(GOOGLE_ACCESS_TOKEN_STORAGE_KEY, token);
+      } else {
+        localStorage.removeItem(GOOGLE_ACCESS_TOKEN_STORAGE_KEY);
+      }
+    } catch {
+      // ignore
+    }
+  }
 }
 
 /**
@@ -240,7 +265,7 @@ export async function signInWithGoogleFirebase(): Promise<UserCredential> {
     const result = await signInWithPopup(auth, provider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
     if (credential?.accessToken) {
-      cachedGoogleAccessToken = credential.accessToken;
+      setGoogleAccessToken(credential.accessToken);
     }
     if (result.user) {
       void syncUserProfileToFirestore(result.user);

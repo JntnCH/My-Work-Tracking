@@ -34,8 +34,26 @@ export function SheetsPanel({ spreadsheetId, onChange }: Props) {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<ConnectionTestResult | null>(null);
   const [title, setTitle] = useState("");
+  const [hasGoogleToken, setHasGoogleToken] = useState(() => Boolean(getGoogleAccessToken()));
+  const [authorizing, setAuthorizing] = useState(false);
 
   const url = spreadsheetId ? `https://docs.google.com/spreadsheets/d/${spreadsheetId}` : "";
+
+  const authorizeGoogle = async () => {
+    setAuthorizing(true);
+    try {
+      await signInWithGoogleFirebase();
+      setHasGoogleToken(Boolean(getGoogleAccessToken()));
+      toast.success("เชื่อมต่อบัญชี Google สำเร็จ");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg !== "REDIRECTING") {
+        toast.error("เข้าสู่ระบบ Google ไม่สำเร็จ", { description: msg });
+      }
+    } finally {
+      setAuthorizing(false);
+    }
+  };
 
   const connect = async () => {
     const id = extractSpreadsheetId(input);
@@ -136,11 +154,27 @@ export function SheetsPanel({ spreadsheetId, onChange }: Props) {
             ทุกครั้งที่ Check-out ระบบจะส่งข้อมูลไปยังชีต “WorkLogs” อัตโนมัติ
           </p>
         </div>
-        {spreadsheetId ? (
-          <span className="flex items-center gap-1 rounded-full bg-success-soft px-2.5 py-1 text-xs font-medium text-success">
-            <CheckCircle2 className="h-3.5 w-3.5" /> เชื่อมต่อแล้ว
-          </span>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {hasGoogleToken ? (
+            <span className="flex items-center gap-1 rounded-full bg-success-soft px-2.5 py-1 text-xs font-medium text-success">
+              <CheckCircle2 className="h-3.5 w-3.5" /> บัญชี Google พร้อมใช้งาน
+            </span>
+          ) : (
+            <button
+              onClick={authorizeGoogle}
+              disabled={authorizing}
+              className="flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 disabled:opacity-50"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${authorizing ? "animate-spin" : ""}`} />
+              {authorizing ? "กำลังเชื่อมต่อ..." : "เข้าสู่ระบบ Google (สิทธิ์ Workspace)"}
+            </button>
+          )}
+          {spreadsheetId ? (
+            <span className="flex items-center gap-1 rounded-full bg-success-soft px-2.5 py-1 text-xs font-medium text-success">
+              <CheckCircle2 className="h-3.5 w-3.5" /> เชื่อมต่อแล้ว
+            </span>
+          ) : null}
+        </div>
       </div>
 
       <div className="flex flex-col gap-2 md:flex-row">

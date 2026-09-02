@@ -892,7 +892,10 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
       }
       setSyncing(true);
       try {
-        const result = await callServer(readWorkLogRows, { data: { spreadsheetId } });
+        const accessToken = getGoogleAccessToken() ?? undefined;
+        const result = await callServer(readWorkLogRows, {
+          data: { spreadsheetId, accessToken },
+        });
         const pulled = result.rows.map(rowToLog).filter((item): item is WorkLog => item !== null);
         if (pulled.length === 0) {
           toast.info("ไม่พบรายการใน Google Sheets จึงไม่ล้างข้อมูลเดิม");
