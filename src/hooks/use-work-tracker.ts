@@ -762,6 +762,7 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
         foodCost: input.rates.foodCost,
         otherIncome: input.rates.otherIncome,
         otherDeductions: input.rates.otherDeductions,
+        breakHours: input.rates.breakHours ?? DEFAULT_RATES.breakHours,
         tasks: input.tasks.filter((t) => t.trim()),
       };
       setActive(record);

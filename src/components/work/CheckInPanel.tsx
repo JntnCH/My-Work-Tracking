@@ -644,17 +644,26 @@ export function CheckInPanel({
         ) : null}
 
         {/* Rates */}
-        <div className="space-y-4 rounded-xl border border-border bg-secondary/60 p-4">
+        <div
+          className={`space-y-4 rounded-xl border bg-secondary/60 p-4 ${
+            active ? "border-primary/50 ring-2 ring-primary/10" : "border-border"
+          }`}
+        >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
-              การคำนวณค่าแรง &amp; OT &amp; รายรับ-รายหัก
+              {active ? "ตั้งค่าก่อน Check-out" : "การคำนวณค่าแรง & OT & รายรับ-รายหัก"}
             </h3>
             {active ? (
               <span className="rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
-                ปรับแก้ได้ก่อนกด Check-out
+                เลือก OT และเวลาพักก่อนกด Check-out
               </span>
             ) : null}
           </div>
+          {active ? (
+            <p className="-mt-2 text-xs leading-relaxed text-muted-foreground">
+              เลือกประเภท OT และเวลาพักที่ใช้จริง ระบบจะนำไปคำนวณรายได้ทันทีเมื่อกด Check-out
+            </p>
+          ) : null}
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <Field label="ค่าแรงปกติ (บาท/วัน)" id="dailyRate">
               <input
@@ -683,6 +692,8 @@ export function CheckInPanel({
             <Field label="ประเภท OT (ตัวคูณ)" id="otType">
               <select
                 id="otType"
+                data-testid="checkout-ot-type"
+                aria-label="เลือกประเภท OT ก่อน Check-out"
                 value={form.otType}
                 onChange={(e) => {
                   const nextOt = Number(e.target.value);
@@ -701,6 +712,8 @@ export function CheckInPanel({
             <Field label="การหักพักกลางวัน" id="breakHours">
               <select
                 id="breakHours"
+                data-testid="checkout-break-hours"
+                aria-label="เลือกเวลาพักที่ต้องการหักก่อน Check-out"
                 value={form.breakHours ?? 1}
                 onChange={(e) => {
                   const nextBreak = Number(e.target.value);

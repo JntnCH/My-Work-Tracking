@@ -70,6 +70,7 @@ type WorkLogRow = {
   working_hours: number;
   ot_hours: number;
   ot_type: number;
+  break_hours: number;
   daily_rate: number;
   base_wage: number;
   ot_income: number;

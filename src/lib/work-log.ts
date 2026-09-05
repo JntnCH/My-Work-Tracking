@@ -25,6 +25,8 @@ export type ActiveCheckIn = {
   foodCost: number;
   otherIncome: number;
   otherDeductions: number;
+  /** Break time deducted from gross hours when calculating payroll. */
+  breakHours?: number;
   /** Jobs finished during this shift (free-text list). */
   tasks?: string[];
 };
