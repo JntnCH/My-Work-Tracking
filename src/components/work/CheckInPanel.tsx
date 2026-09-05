@@ -19,6 +19,7 @@ import type { GPSPoint, RateSettings, WorkLog, ActiveCheckIn } from "@/lib/work-
 import {
   BREAK_OPTIONS,
   OT_OPTIONS,
+  calculatePayroll,
   formatDuration,
   fromLocalInput,
   parseMapsUrl,
@@ -114,6 +115,7 @@ export function CheckInPanel({
   );
   const [elapsed, setElapsed] = useState(0);
   const [catOpen, setCatOpen] = useState(false);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [taskInput, setTaskInput] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -313,7 +315,7 @@ export function CheckInPanel({
   };
 
   const doCheckOut = async () => {
-    if (!active || gpsLoading) return;
+    if (!active || gpsLoading) return false;
 
     // Always read a fresh position at the moment of Check-out; do not reuse Check-in GPS.
     const checkoutGPS = await fetchGPS();
@@ -321,7 +323,7 @@ export function CheckInPanel({
       toast.error("ยังบันทึก Check-out ไม่ได้", {
         description: "ไม่พบพิกัด GPS ณ เวลาจบงาน กรุณาเปิดสิทธิ์ตำแหน่งแล้วลองใหม่",
       });
-      return;
+      return false;
     }
 
     const rawDailyRate = dailyRateInput.trim();
@@ -348,6 +350,8 @@ export function CheckInPanel({
     });
     setTaskInput("");
     resetPhoto();
+    setCheckoutOpen(false);
+    return true;
   };
 
   return (
@@ -860,8 +864,12 @@ export function CheckInPanel({
             <LogIn className="h-5 w-5" /> {gpsLoading ? "กำลังค้นหาพิกัด…" : "Check-in เริ่มงาน"}
           </button>
           <button
-            onClick={() => void doCheckOut()}
+            onClick={() => {
+              if (!active || gpsLoading) return;
+              setCheckoutOpen(true);
+            }}
             disabled={!active || gpsLoading}
+            data-testid="checkout-button"
             className="flex items-center justify-center gap-2.5 rounded-xl bg-destructive py-4 text-base sm:text-lg font-extrabold text-destructive-foreground shadow-[0_6px_20px_-2px_rgba(239,68,68,0.4)] transition hover:brightness-105 active:scale-[0.98] active:translate-y-0.5 disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
           >
             <LogOut className="h-5 w-5" /> {gpsLoading ? "กำลังบันทึกพิกัด…" : "Check-out จบงาน"}
@@ -883,6 +891,34 @@ export function CheckInPanel({
         onSave={onSaveCategories}
         onClose={() => setCatOpen(false)}
       />
+
+      {checkoutOpen && active ? (
+        <CheckoutConfirmSheet
+          elapsed={elapsed}
+          otType={form.otType ?? 0}
+          breakHours={typeof form.breakHours === "number" ? form.breakHours : 1}
+          preview={calculatePayroll(active.checkInTime, new Date().toISOString(), {
+            dailyRate: Number(dailyRateInput) || active.dailyRate || 0,
+            otType: form.otType ?? 0,
+            breakHours: typeof form.breakHours === "number" ? form.breakHours : 1,
+            travelCost: travelCostInput.trim() ? Number(travelCostInput) || 0 : 0,
+            foodCost: foodCostInput.trim() ? Number(foodCostInput) || 0 : 0,
+            otherIncome: otherIncomeInput.trim() ? Number(otherIncomeInput) || 0 : 0,
+            otherDeductions: otherDeductionsInput.trim() ? Number(otherDeductionsInput) || 0 : 0,
+          })}
+          confirming={gpsLoading}
+          onChangeOt={(nextOt) => {
+            setForm((f) => ({ ...f, otType: nextOt }));
+            onEditActiveDetails?.({ otType: nextOt });
+          }}
+          onChangeBreak={(nextBreak) => {
+            setForm((f) => ({ ...f, breakHours: nextBreak }));
+            onEditActiveDetails?.({ breakHours: nextBreak });
+          }}
+          onCancel={() => setCheckoutOpen(false)}
+          onConfirm={() => void doCheckOut()}
+        />
+      ) : null}
     </div>
   );
 }
@@ -940,3 +976,139 @@ function Field({ label, id, children }: { label: string; id: string; children: R
     </div>
   );
 }
+
+function CheckoutConfirmSheet({
+  elapsed,
+  otType,
+  breakHours,
+  preview,
+  confirming,
+  onChangeOt,
+  onChangeBreak,
+  onCancel,
+  onConfirm,
+}: {
+  elapsed: number;
+  otType: number;
+  breakHours: number;
+  preview: ReturnType<typeof calculatePayroll>;
+  confirming: boolean;
+  onChangeOt: (value: number) => void;
+  onChangeBreak: (value: number) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 p-0 md:items-center md:p-4">
+      <div
+        className="surface-card w-full max-w-md rounded-t-3xl p-5 pb-8 shadow-2xl md:rounded-2xl"
+        role="dialog"
+        aria-labelledby="checkout-confirm-title"
+        data-testid="checkout-confirm"
+      >
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <h3 id="checkout-confirm-title" className="text-lg font-bold">
+              ก่อน Check-out
+            </h3>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              เลือกประเภท OT และการหักเวลาพัก แล้วค่อยยืนยันจบงาน
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={confirming}
+            aria-label="ปิด"
+            className="rounded-md p-1 hover:bg-muted disabled:opacity-50"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mb-4 rounded-xl border border-border bg-info-soft px-4 py-3 text-center">
+          <p className="flex items-center justify-center gap-1.5 text-xs font-medium text-primary">
+            <Clock className="h-3.5 w-3.5" />
+            เวลาทำงาน (รวมพัก)
+          </p>
+          <p className="text-xl font-bold tabular-nums text-primary">{formatDuration(elapsed)}</p>
+        </div>
+
+        <div className="space-y-3">
+          <Field label="ประเภท OT (ตัวคูณ)" id="confirmOtType">
+            <select
+              id="confirmOtType"
+              data-testid="confirm-ot-type"
+              aria-label="เลือกประเภท OT ก่อน Check-out"
+              value={otType}
+              disabled={confirming}
+              onChange={(e) => onChangeOt(Number(e.target.value))}
+              className={inputCls}
+            >
+              {OT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="การหักพักกลางวัน" id="confirmBreakHours">
+            <select
+              id="confirmBreakHours"
+              data-testid="confirm-break-hours"
+              aria-label="เลือกเวลาพักที่ต้องการหักก่อน Check-out"
+              value={breakHours}
+              disabled={confirming}
+              onChange={(e) => onChangeBreak(Number(e.target.value))}
+              className={inputCls}
+            >
+              {BREAK_OPTIONS.map((b) => (
+                <option key={b.value} value={b.value}>
+                  {b.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+
+        <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl border border-border bg-secondary/60 p-3 text-center">
+          <div>
+            <p className="text-[10px] font-semibold text-muted-foreground">ชั่วโมงทำงาน</p>
+            <p className="text-sm font-bold tabular-nums">{preview.workingHours.toFixed(2)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-semibold text-muted-foreground">ชั่วโมง OT</p>
+            <p className="text-sm font-bold tabular-nums">{preview.otHours.toFixed(2)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-semibold text-muted-foreground">รายได้ประมาณ</p>
+            <p className="text-sm font-bold tabular-nums text-success">
+              ฿{preview.netIncome.toLocaleString("th-TH")}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={confirming}
+            className="rounded-xl border border-border bg-secondary py-3 text-sm font-bold disabled:opacity-50"
+          >
+            ยกเลิก
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={confirming}
+            data-testid="confirm-checkout"
+            className="rounded-xl bg-destructive py-3 text-sm font-extrabold text-destructive-foreground disabled:opacity-60"
+          >
+            {confirming ? "กำลังบันทึกพิกัด…" : "ยืนยัน Check-out"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
