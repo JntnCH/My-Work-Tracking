@@ -37,13 +37,13 @@ export function renderDashboardCardContent(
   switch (id) {
     case "net-income":
       return (
-        <div className="flex h-full min-h-24 flex-col items-center justify-center rounded-xl bg-secondary/60 p-4 text-center sm:p-5">
-          <div className="flex w-full items-center justify-center gap-1.5 whitespace-nowrap text-center text-xs leading-5 text-muted-foreground">
+        <div className="flex h-full min-h-24 flex-col items-center justify-center rounded-3xl border border-white/60 bg-gradient-to-b from-[#E2F7F2] to-[#C9F0E6] p-4 text-center shadow-[0_12px_28px_-4px_rgba(70,180,150,0.2),inset_0_3px_5px_rgba(255,255,255,0.9),inset_0_-3px_5px_rgba(20,100,80,0.06)] dark:border-white/10 dark:from-[#1A3830] dark:to-[#0F2620] sm:p-5">
+          <div className="flex w-full items-center justify-center gap-1.5 whitespace-nowrap text-center text-xs font-bold leading-5 text-[#0F382D] dark:text-[#88E6CB]">
             <Coins className="h-4 w-4" />
             รายได้สุทธิรวม
           </div>
           <div
-            className="mt-2 w-full text-center text-3xl leading-tight font-bold text-success sm:text-4xl"
+            className="mt-1 w-full text-center text-3xl leading-tight font-extrabold text-[#0C4335] dark:text-[#7EE0C2] sm:text-4xl"
             data-testid="stat-net"
           >
             {formatTHB(summary.totalNet)}
@@ -241,8 +241,8 @@ export function renderDashboardCardContent(
 
 function ChartCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="surface-card flex h-full min-h-0 min-w-0 flex-col items-center justify-center overflow-visible p-5 text-center">
-      <h3 className="mb-3 w-full shrink-0 whitespace-nowrap text-center text-sm font-bold">
+    <div className="clay-card rounded-3xl border border-white/60 bg-card flex h-full min-h-0 min-w-0 flex-col items-center justify-center overflow-visible p-5 text-center shadow-[0_12px_28px_-4px_rgba(110,95,160,0.12),inset_0_3px_5px_rgba(255,255,255,0.9),inset_0_-3px_6px_rgba(0,0,0,0.03)] dark:border-white/10">
+      <h3 className="mb-3 w-full shrink-0 whitespace-nowrap text-center text-sm font-bold text-foreground">
         {title}
       </h3>
       <div className="min-h-0 w-full min-w-0 flex-1 overflow-visible">{children}</div>
@@ -267,20 +267,22 @@ function Stat({
 }) {
   const toneCls =
     tone === "success"
-      ? "text-success"
+      ? "text-[#0C4335] dark:text-[#7EE0C2]"
       : tone === "destructive"
-        ? "text-destructive"
+        ? "text-[#A02810] dark:text-[#FFA088]"
         : "text-foreground";
   return (
     <div
-      className={`surface-card flex h-full min-w-0 flex-col items-center justify-center text-center ${compact ? "p-3" : "p-4"}`}
+      className={`clay-card rounded-3xl border border-white/60 bg-card flex h-full min-w-0 flex-col items-center justify-center text-center shadow-[0_10px_24px_-4px_rgba(110,95,160,0.1),inset_0_3px_5px_rgba(255,255,255,0.9),inset_0_-2px_4px_rgba(0,0,0,0.03)] dark:border-white/10 ${
+        compact ? "p-3" : "p-4"
+      }`}
     >
-      <div className="flex w-full min-w-0 items-center justify-center gap-1.5 text-center text-xs leading-5 text-muted-foreground">
+      <div className="flex w-full min-w-0 items-center justify-center gap-1.5 text-center text-xs font-semibold leading-5 text-muted-foreground">
         {icon}
         <span className="max-w-full whitespace-nowrap">{label}</span>
       </div>
       <div
-        className={`mt-2 w-full text-center text-xl leading-tight font-bold ${toneCls}`}
+        className={`mt-1.5 w-full text-center text-xl leading-tight font-extrabold ${toneCls}`}
         data-testid={testId}
       >
         {value}

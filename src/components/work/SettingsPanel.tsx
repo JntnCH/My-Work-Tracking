@@ -606,7 +606,7 @@ export function SettingsPanel({
             type="button"
             onClick={handleUnlock}
             disabled={!isLocked}
-            className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-45"
+            className="clay-btn-purple px-4 py-2 text-xs disabled:opacity-45 disabled:cursor-not-allowed"
           >
             <Unlock className="h-4 w-4" /> Unlock
           </button>
@@ -614,7 +614,7 @@ export function SettingsPanel({
             type="button"
             onClick={handleLock}
             disabled={isLocked}
-            className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-45"
+            className="clay-btn-white px-4 py-2 text-xs border border-border/80 disabled:opacity-45 disabled:cursor-not-allowed"
           >
             <Lock className="h-4 w-4" /> Lock
           </button>
@@ -622,7 +622,7 @@ export function SettingsPanel({
             type="button"
             onClick={handleCancel}
             disabled={!isDirty}
-            className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-45"
+            className="clay-btn-white px-4 py-2 text-xs border border-border/80 disabled:opacity-45 disabled:cursor-not-allowed"
           >
             <RotateCcw className="h-4 w-4" /> Cancel
           </button>
@@ -630,7 +630,7 @@ export function SettingsPanel({
             type="button"
             onClick={() => void handleSaveAll()}
             disabled={isLocked || !isDirty || isSaving}
-            className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+            className="clay-btn-mint px-5 py-2 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="h-4 w-4" /> {isSaving ? "กำลังบันทึก…" : "Save หมวดนี้"}
           </button>
@@ -903,22 +903,24 @@ export function SettingsPanel({
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">
                   ชุดสีธีมมาตรฐาน (Color Presets)
                 </label>
-                <span className="text-[11px] text-primary font-semibold">6 ชุดสีมาตรฐาน</span>
+                <span className="text-[11px] text-primary font-semibold">
+                  {GOOGLE_PRESETS.length} ชุดสีมาตรฐาน
+                </span>
               </div>
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
                 {GOOGLE_PRESETS.map((preset) => {
                   const isSelected =
                     draftColors.presetName === preset.id ||
-                    (!draftColors.presetName && preset.id === "neon-ai");
+                    (!draftColors.presetName && preset.id === "clay-3d-pastel");
                   return (
                     <button
                       key={preset.id}
                       type="button"
                       onClick={() => selectGooglePreset(preset.id)}
-                      className={`flex items-center justify-between rounded-xl border p-3 text-left transition cursor-pointer ${
+                      className={`flex items-center justify-between rounded-2xl border p-3.5 text-left transition-all cursor-pointer ${
                         isSelected
-                          ? "border-primary bg-primary/10 ring-2 ring-primary shadow-sm"
-                          : "border-border bg-card hover:bg-accent/70"
+                          ? "border-primary/80 bg-primary/10 shadow-[0_8px_18px_-2px_rgba(90,170,230,0.3),inset_0_2px_4px_rgba(255,255,255,0.8)] ring-2 ring-primary"
+                          : "border-border/70 bg-card hover:bg-accent/70 shadow-[0_2px_6px_rgba(0,0,0,0.03),inset_0_1px_2px_rgba(255,255,255,0.7)]"
                       }`}
                     >
                       <div className="space-y-1">
@@ -927,12 +929,12 @@ export function SettingsPanel({
                       </div>
                       <div className="flex items-center gap-1.5">
                         <span
-                          className="h-4 w-4 rounded-full border border-black/10 shadow-sm"
+                          className="h-5 w-5 rounded-full border border-black/10 shadow-[0_2px_4px_rgba(0,0,0,0.15),inset_0_1px_2px_rgba(255,255,255,0.6)]"
                           style={{ backgroundColor: preset.primaryColor }}
                           title="Primary"
                         />
                         <span
-                          className="h-4 w-4 rounded-full border border-black/10 shadow-sm"
+                          className="h-5 w-5 rounded-full border border-black/10 shadow-[0_2px_4px_rgba(0,0,0,0.15),inset_0_1px_2px_rgba(255,255,255,0.6)]"
                           style={{ backgroundColor: preset.accentColor }}
                           title="Accent"
                         />

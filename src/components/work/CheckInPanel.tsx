@@ -859,7 +859,7 @@ export function CheckInPanel({
           <button
             onClick={() => void doCheckIn()}
             disabled={!!active || gpsLoading}
-            className="flex items-center justify-center gap-2.5 rounded-xl bg-success py-4 text-base sm:text-lg font-extrabold text-success-foreground shadow-[0_6px_20px_-2px_rgba(16,185,129,0.4)] transition hover:brightness-105 active:scale-[0.98] active:translate-y-0.5 disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
+            className="flex items-center justify-center gap-2.5 rounded-full bg-gradient-to-b from-[#A4EADB] to-[#70D8BD] py-4 text-base sm:text-lg font-bold text-[#0F382D] shadow-[0_8px_20px_-2px_rgba(70,195,160,0.45),inset_0_3px_4px_rgba(255,255,255,0.85),inset_0_-3px_6px_rgba(25,120,90,0.22)] transition-all hover:brightness-105 active:scale-[0.98] active:translate-y-0.5 disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none dark:disabled:bg-slate-800 dark:disabled:text-slate-600"
           >
             <LogIn className="h-5 w-5" /> {gpsLoading ? "กำลังค้นหาพิกัด…" : "Check-in เริ่มงาน"}
           </button>
@@ -870,7 +870,7 @@ export function CheckInPanel({
             }}
             disabled={!active || gpsLoading}
             data-testid="checkout-button"
-            className="flex items-center justify-center gap-2.5 rounded-xl bg-destructive py-4 text-base sm:text-lg font-extrabold text-destructive-foreground shadow-[0_6px_20px_-2px_rgba(239,68,68,0.4)] transition hover:brightness-105 active:scale-[0.98] active:translate-y-0.5 disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
+            className="flex items-center justify-center gap-2.5 rounded-full bg-gradient-to-b from-[#FFAE9B] to-[#FF856A] py-4 text-base sm:text-lg font-bold text-white shadow-[0_8px_20px_-2px_rgba(255,105,75,0.45),inset_0_3px_4px_rgba(255,255,255,0.8),inset_0_-3px_6px_rgba(160,45,15,0.22)] transition-all hover:brightness-105 active:scale-[0.98] active:translate-y-0.5 disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none dark:disabled:bg-slate-800 dark:disabled:text-slate-600"
           >
             <LogOut className="h-5 w-5" /> {gpsLoading ? "กำลังบันทึกพิกัด…" : "Check-out จบงาน"}
           </button>

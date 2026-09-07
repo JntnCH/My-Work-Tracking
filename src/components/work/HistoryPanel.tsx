@@ -210,6 +210,9 @@ export function HistoryPanel({
     setEditing(null);
   };
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "synced" | "pending">("all");
+
   /** Month keys (YYYY-MM) present in the history, newest first. */
   const months = useMemo(() => {
     const set = new Set<string>();
@@ -220,11 +223,25 @@ export function HistoryPanel({
     return [...set].sort().reverse();
   }, [logs]);
 
-  const visibleLogs = useMemo(
-    () =>
-      month === "all" ? logs : logs.filter((l) => String(l.checkInTime ?? "").startsWith(month)),
-    [logs, month],
-  );
+  const visibleLogs = useMemo(() => {
+    let list =
+      month === "all" ? logs : logs.filter((l) => String(l.checkInTime ?? "").startsWith(month));
+    if (statusFilter === "synced") {
+      list = list.filter((l) => !!l.syncedAt);
+    } else if (statusFilter === "pending") {
+      list = list.filter((l) => !l.syncedAt);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        (l) =>
+          l.workType.toLowerCase().includes(q) ||
+          l.locationName.toLowerCase().includes(q) ||
+          (l.tasks ?? []).some((t) => t.toLowerCase().includes(q)),
+      );
+    }
+    return list;
+  }, [logs, month, statusFilter, searchQuery]);
 
   const exportCSV = () => {
     const blob = new Blob(["\uFEFF" + buildCSV(visibleLogs)], { type: "text/csv;charset=utf-8;" });
@@ -238,64 +255,116 @@ export function HistoryPanel({
 
   return (
     <div className="space-y-4">
-      <div className="surface-card flex flex-wrap items-center justify-between gap-3 p-4">
-        <div>
-          <h2 className="font-bold">ประวัติการทำงาน</h2>
-          <p className="text-xs text-muted-foreground">
-            แสดง {visibleLogs.length} จาก {logs.length} รายการ · รอซิงก์ {pendingCount} รายการ ·
-            ชีตจะถูกเขียนใหม่ให้ตรงกับรายการนี้เสมอ
-          </p>
+      {/* 3D Clay Header & Action Toolbar */}
+      <div className="clay-card rounded-3xl p-5 border border-white/60 bg-card shadow-[0_12px_28px_-4px_rgba(110,95,160,0.12),inset_0_3px_5px_rgba(255,255,255,0.9),inset_0_-3px_6px_rgba(0,0,0,0.03)] dark:border-white/10">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-foreground">ประวัติการทำงาน</h2>
+            <p className="text-xs text-muted-foreground">
+              แสดง {visibleLogs.length} จาก {logs.length} รายการ · รอซิงก์ {pendingCount} รายการ
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              aria-label="เลือกเดือน"
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+              className="rounded-full border border-border/80 bg-card px-4 py-2 text-xs font-semibold shadow-[inset_0_1px_2px_rgba(0,0,0,0.05),0_1px_2px_rgba(255,255,255,0.8)]"
+            >
+              <option value="all">ทุกเดือน · {logs.length} รายการ</option>
+              {months.map((m) => (
+                <option key={m} value={m}>
+                  {monthLabel(m)} ·{" "}
+                  {logs.filter((l) => String(l.checkInTime ?? "").startsWith(m)).length} รายการ
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={onSync}
+              disabled={syncing}
+              className="clay-btn-purple px-4 py-2 text-xs"
+            >
+              <CloudUpload className="h-4 w-4" /> {syncing ? "กำลังซิงก์…" : "ส่งขึ้นชีต"}
+            </button>
+            <button onClick={onPull} disabled={syncing} className="clay-btn-mint px-4 py-2 text-xs">
+              <CloudDownload className="h-4 w-4" /> ดึงจากชีต
+            </button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              accept=".csv,text/csv"
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="clay-btn-white px-3.5 py-2 text-xs border border-border/60"
+              title="นำเข้าไฟล์ CSV ประวัติการทำงาน"
+            >
+              <Upload className="h-4 w-4" /> นำเข้า CSV
+            </button>
+            <button
+              onClick={exportCSV}
+              disabled={logs.length === 0}
+              className="clay-btn-white px-3.5 py-2 text-xs border border-border/60"
+            >
+              <Download className="h-4 w-4" /> CSV
+            </button>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            aria-label="เลือกเดือน"
-            value={month}
-            onChange={(e) => setMonth(e.target.value)}
-            className="rounded-lg border border-input bg-secondary px-3 py-2 text-xs font-medium"
-          >
-            <option value="all">ทุกเดือน · {logs.length} รายการ</option>
-            {months.map((m) => (
-              <option key={m} value={m}>
-                {monthLabel(m)} ·{" "}
-                {logs.filter((l) => String(l.checkInTime ?? "").startsWith(m)).length} รายการ
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={onSync}
-            disabled={syncing}
-            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:bg-muted disabled:text-muted-foreground"
-          >
-            <CloudUpload className="h-4 w-4" /> {syncing ? "กำลังซิงก์…" : "ส่งขึ้นชีต"}
-          </button>
-          <button
-            onClick={onPull}
-            disabled={syncing}
-            className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium disabled:opacity-50"
-          >
-            <CloudDownload className="h-4 w-4" /> ดึงจากชีต
-          </button>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileUpload}
-            accept=".csv,text/csv"
-            className="hidden"
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-secondary/80"
-            title="นำเข้าไฟล์ CSV ประวัติการทำงาน"
-          >
-            <Upload className="h-4 w-4" /> นำเข้า CSV
-          </button>
-          <button
-            onClick={exportCSV}
-            disabled={logs.length === 0}
-            className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium disabled:opacity-50"
-          >
-            <Download className="h-4 w-4" /> CSV
-          </button>
+
+        {/* 3D Clay Search Bar & Filter Badges */}
+        <div className="mt-4 flex flex-col sm:flex-row items-center gap-3 pt-3 border-t border-border/40">
+          <div className="relative w-full sm:flex-1">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="ค้นหาชื่องาน, สถานที่, รายการที่ทำ…"
+              className="clay-search-bar w-full text-xs sm:text-sm pl-4 pr-9 py-2.5 focus:outline-none"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+
+          <div className="flex w-full sm:w-auto items-center gap-1.5 overflow-x-auto">
+            <button
+              onClick={() => setStatusFilter("all")}
+              className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition-all ${
+                statusFilter === "all"
+                  ? "bg-gradient-to-b from-[#BFE3FB] to-[#8ECDF6] text-[#0E2E4A] shadow-[0_4px_10px_rgba(90,170,230,0.3)]"
+                  : "bg-card text-muted-foreground hover:bg-slate-100"
+              }`}
+            >
+              ทั้งหมด
+            </button>
+            <button
+              onClick={() => setStatusFilter("synced")}
+              className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition-all ${
+                statusFilter === "synced"
+                  ? "bg-gradient-to-b from-[#B2EFE2] to-[#83E0C8] text-[#0C4335] shadow-[0_4px_10px_rgba(70,190,155,0.3)]"
+                  : "bg-card text-muted-foreground hover:bg-slate-100"
+              }`}
+            >
+              ● ซิงก์แล้ว
+            </button>
+            <button
+              onClick={() => setStatusFilter("pending")}
+              className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition-all ${
+                statusFilter === "pending"
+                  ? "bg-gradient-to-b from-[#FFEB9C] to-[#FFDB68] text-[#4A3403] shadow-[0_4px_10px_rgba(225,170,30,0.3)]"
+                  : "bg-card text-muted-foreground hover:bg-slate-100"
+              }`}
+            >
+              ● รอซิงก์
+            </button>
+          </div>
         </div>
       </div>
 
@@ -323,45 +392,52 @@ export function HistoryPanel({
       ) : (
         <div className="space-y-3" data-testid="logs-container">
           {visibleLogs.map((log) => (
-            <article key={log.id} className="surface-card overflow-hidden p-4">
+            <article
+              key={log.id}
+              className="clay-card rounded-3xl overflow-hidden p-5 border border-white/60 bg-card shadow-[0_10px_24px_-4px_rgba(110,95,160,0.1),inset_0_3px_5px_rgba(255,255,255,0.9),inset_0_-2px_4px_rgba(0,0,0,0.03)] dark:border-white/10"
+            >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-semibold">{log.workType}</h3>
-                    <span className="rounded-full bg-info-soft px-2 py-0.5 text-[10px] font-bold text-primary">
+                    <h3 className="font-bold text-base text-foreground">{log.workType}</h3>
+                    <span className="clay-badge-archived text-[10px] px-2.5 py-0.5">
                       {taskCount(log)} งาน
                     </span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                        log.syncedAt
-                          ? "bg-success-soft text-success"
-                          : "bg-muted text-muted-foreground"
-                      }`}
-                    >
-                      {log.syncedAt ? "ซิงก์แล้ว" : "รอซิงก์"}
-                    </span>
+                    {log.syncedAt ? (
+                      <span className="clay-badge-active text-[10px] px-2.5 py-0.5">
+                        <span className="h-1.5 w-1.5 rounded-full bg-[#10B981] shadow-xs" />
+                        <span>ซิงก์แล้ว</span>
+                      </span>
+                    ) : (
+                      <span className="clay-badge-pending text-[10px] px-2.5 py-0.5">
+                        <span className="h-1.5 w-1.5 rounded-full bg-[#F59E0B] shadow-xs" />
+                        <span>รอซิงก์</span>
+                      </span>
+                    )}
                   </div>
-                  <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground">
-                    <MapPin className="h-3.5 w-3.5" /> {log.locationName}
+                  <p className="mt-1 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+                    <MapPin className="h-3.5 w-3.5 text-primary" /> {log.locationName}
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="mt-1 text-xs text-muted-foreground/80">
                     {formatThaiDateTime(log.checkInTime)} → {formatThaiDateTime(log.checkOutTime)}
                   </p>
                 </div>
                 <div className="text-right">
-                  <div className="text-lg font-bold text-success">{formatTHB(log.netIncome)}</div>
-                  <div className="mt-1 flex items-center justify-end gap-3">
+                  <div className="text-xl font-extrabold text-[#0C4335] dark:text-[#7EE0C2]">
+                    {formatTHB(log.netIncome)}
+                  </div>
+                  <div className="mt-2 flex items-center justify-end gap-2">
                     {editing === log.id ? (
                       <>
                         <button
                           onClick={() => saveEdit(log.id)}
-                          className="inline-flex items-center gap-1 text-xs text-success hover:underline"
+                          className="clay-btn-mint px-3 py-1 text-xs"
                         >
                           <Check className="h-3.5 w-3.5" /> บันทึก
                         </button>
                         <button
                           onClick={() => setEditing(null)}
-                          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
+                          className="clay-btn-white px-3 py-1 text-xs border border-border"
                         >
                           <X className="h-3.5 w-3.5" /> ยกเลิก
                         </button>
@@ -371,14 +447,14 @@ export function HistoryPanel({
                         <button
                           onClick={() => startEdit(log)}
                           aria-label={`แก้ไขเวลา ${log.id}`}
-                          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                          className="clay-btn-purple px-3 py-1 text-xs"
                         >
                           <Pencil className="h-3.5 w-3.5" /> แก้ไข
                         </button>
                         <button
                           onClick={() => onDelete(log.id)}
                           aria-label={`ลบรายการ ${log.id}`}
-                          className="inline-flex items-center gap-1 text-xs text-destructive hover:underline"
+                          className="clay-btn-white px-3 py-1 text-xs text-destructive border border-destructive/20 hover:bg-destructive/10"
                         >
                           <Trash2 className="h-3.5 w-3.5" /> ลบ
                         </button>

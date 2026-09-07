@@ -50,9 +50,7 @@ function Index() {
   const tracker = useWorkTracker(userId, isGuest);
   const mobileLayout = useDashboardLayout(userId, isGuest, "mobile");
   const desktopLayout = useDashboardLayout(userId, isGuest, "desktop");
-  const [dashboardViewport, setDashboardViewport] = useState<DashboardViewport>(() =>
-    getViewport(),
-  );
+  const [dashboardViewport, setDashboardViewport] = useState<DashboardViewport>("desktop");
   const lock = useFaceLock(userId);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -204,18 +202,18 @@ function Index() {
         />
 
         {/* Navigation Tabs Bar อยู่ในส่วน Auto-Hide Sticky เดียวกัน */}
-        <div className="mx-auto max-w-4xl px-3 pt-2 pb-2 sm:px-4">
-          <div className="surface-card overflow-x-auto rounded-2xl p-1.5">
-            <div className="flex min-w-max gap-1">
+        <div className="mx-auto max-w-4xl px-3 pt-2.5 pb-2.5 sm:px-4">
+          <div className="clay-nav-tray overflow-x-auto rounded-3xl border border-white/60 bg-white/90 p-1.5 shadow-[0_10px_25px_-4px_rgba(100,90,140,0.12),inset_0_2px_4px_rgba(255,255,255,0.9),inset_0_-2px_4px_rgba(0,0,0,0.03)] dark:border-white/10 dark:bg-card/90">
+            <div className="flex min-w-max gap-1.5">
               {TABS.map(({ id, label, icon: Icon }) => (
                 <button
                   key={id}
                   onClick={() => requestTabChange(id)}
                   aria-current={tab === id}
-                  className={`flex min-w-[7.25rem] items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-medium transition md:min-w-0 md:flex-1 md:text-sm ${
+                  className={`flex min-w-[7.5rem] items-center justify-center gap-2 rounded-full px-4 py-2.5 text-xs font-bold transition-all duration-150 active:scale-95 md:min-w-0 md:flex-1 md:text-sm ${
                     tab === id
-                      ? "bg-primary text-primary-foreground shadow"
-                      : "text-muted-foreground hover:bg-accent"
+                      ? "bg-gradient-to-b from-[#BFE3FB] to-[#8ECDF6] text-[#0E2E4A] shadow-[0_6px_16px_-2px_rgba(90,170,230,0.38),inset_0_3px_4px_rgba(255,255,255,0.9),inset_0_-3px_5px_rgba(30,100,160,0.18)] dark:from-[#3E5C76] dark:to-[#1D2D44] dark:text-white"
+                      : "text-muted-foreground hover:bg-slate-100/80 hover:text-foreground dark:hover:bg-slate-800/60"
                   }`}
                 >
                   <Icon className="h-4 w-4" /> {label}

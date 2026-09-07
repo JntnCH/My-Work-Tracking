@@ -231,13 +231,8 @@ const SESSION_CHECK_TIMEOUT_MS = 2500;
 export function useSession() {
   const [session, setSession] = useState<Session | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
-  const [guestUser, setGuestUserState] = useState<User | null>(() => getGuestUser());
-  const [loading, setLoading] = useState(() => {
-    // If local user exists, or no cloud auth is configured, do not block with loading
-    if (typeof window !== "undefined" && getGuestUser()) return false;
-    if (!isSupabaseConfigured() && !isFirebaseConfigured()) return false;
-    return true;
-  });
+  const [guestUser, setGuestUserState] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
@@ -250,7 +245,14 @@ export function useSession() {
     window.addEventListener(AUTH_CHANGE_EVENT, syncUserState);
     window.addEventListener("storage", syncUserState);
 
-    syncUserState();
+    // Sync initial local guest user on client mount
+    const local = getGuestUser();
+    setGuestUserState(local);
+
+    const hasCloudAuth = isSupabaseConfigured() || isFirebaseConfigured();
+    if (local || !hasCloudAuth) {
+      setLoading(false);
+    }
 
     const timeout = setTimeout(() => {
       if (mounted) setLoading(false);
