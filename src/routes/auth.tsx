@@ -25,10 +25,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import {
+  displayName,
   getRecentGmailAccounts,
   removeRecentGmailAccount,
   setGuestUser,
   setLocalUser,
+  signOutAll,
   useSession,
   type RecentGmailAccount,
 } from "@/hooks/use-session";
@@ -144,9 +146,19 @@ function AuthPage() {
     void checkFirebaseRedirectResult().catch(() => {});
   }, []);
 
-  useEffect(() => {
-    if (!loading && user) void navigate({ to: "/", replace: true });
-  }, [loading, user, navigate]);
+  async function handleSignOutCurrent() {
+    setBusy(true);
+    try {
+      await signOutAll();
+      toast.success("ออกจากระบบเรียบร้อยแล้ว คุณสามารถเข้าสู่ระบบใหม่ได้ทันที");
+    } catch (err) {
+      toast.error("ออกจากระบบไม่สำเร็จ", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -651,6 +663,52 @@ function AuthPage() {
             ระบบบันทึกเวลาทำงาน GPS ค่าแรง OT ซิงก์ Google Sheets &amp; Airtable
           </p>
         </div>
+
+        {user && !loading && (
+          <div className="rounded-2xl border border-primary/30 bg-primary/5 p-3.5 text-left space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="h-9 w-9 shrink-0 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm">
+                  {displayName(user)?.[0]?.toUpperCase() || <User className="h-4 w-4" />}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[10px] font-medium text-muted-foreground">
+                    เข้าสู่ระบบอยู่ในขณะนี้
+                  </div>
+                  <div className="truncate text-xs font-bold text-foreground">
+                    {displayName(user)}
+                  </div>
+                  <div className="truncate text-[10px] text-muted-foreground">
+                    {user.email || ""}
+                  </div>
+                </div>
+              </div>
+              <span className="shrink-0 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                ออนไลน์
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-0.5">
+              <button
+                type="button"
+                onClick={() => void navigate({ to: "/", replace: true })}
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-primary py-2 px-3 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition shadow-sm cursor-pointer"
+              >
+                <span>ไปหน้าบันทึกงาน</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSignOutCurrent()}
+                disabled={busy}
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-destructive/30 bg-destructive/10 py-2 px-3 text-xs font-bold text-destructive hover:bg-destructive/20 transition cursor-pointer disabled:opacity-60"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>ออกจากระบบ</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-4 gap-1 rounded-xl bg-muted p-1 text-[11px] font-semibold">
           <button

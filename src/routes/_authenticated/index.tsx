@@ -11,7 +11,7 @@ import { FaceLockScreen, useFaceLock } from "@/components/work/FaceLock";
 import { useWorkTracker } from "@/hooks/use-work-tracker";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import type { DashboardViewport } from "@/lib/dashboard-layout";
-import { clearGuestUser, displayName, useSession } from "@/hooks/use-session";
+import { clearGuestUser, displayName, signOutAll, useSession } from "@/hooks/use-session";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -141,9 +141,8 @@ function Index() {
     }
     await queryClient.cancelQueries();
     queryClient.clear();
-    clearGuestUser();
     try {
-      await supabase.auth.signOut({ scope });
+      await signOutAll(scope);
     } catch (e) {
       console.warn("SignOut notice:", e);
     }

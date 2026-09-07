@@ -205,6 +205,27 @@ export function clearGuestUser() {
   }
 }
 
+export async function signOutAll(scope: "local" | "global" = "local"): Promise<void> {
+  clearGuestUser();
+  try {
+    if (isFirebaseConfigured()) {
+      await signOutFirebase();
+    }
+  } catch (err) {
+    console.warn("[useSession] signOutFirebase error:", err);
+  }
+  try {
+    if (isSupabaseConfigured()) {
+      await supabase.auth.signOut({ scope });
+    }
+  } catch (err) {
+    console.warn("[useSession] supabase signOut error:", err);
+  }
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(AUTH_CHANGE_EVENT));
+  }
+}
+
 const SESSION_CHECK_TIMEOUT_MS = 2500;
 
 export function useSession() {
