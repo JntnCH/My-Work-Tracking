@@ -210,6 +210,15 @@
     0 4px 10px -2px rgba(110, 95, 160, 0.08),
     inset 0 3px 5px rgba(255, 255, 255, 0.95),
     inset 0 -3px 6px rgba(0, 0, 0, 0.04);
+  &:is(.dark *) {
+    background-color: #241E34;
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow:
+      0 14px 32px -4px rgba(0, 0, 0, 0.55),
+      0 4px 12px -2px rgba(0, 0, 0, 0.4),
+      inset 0 2px 4px rgba(255, 255, 255, 0.12),
+      inset 0 -3px 6px rgba(0, 0, 0, 0.5);
+  }
 }
 
 @utility clay-card-purple {
@@ -221,6 +230,15 @@
     inset 0 4px 6px rgba(255, 255, 255, 0.85),
     inset 0 -5px 10px rgba(90, 60, 170, 0.18);
   color: #261F3B;
+  &:is(.dark *) {
+    background: linear-gradient(145deg, #44326B 0%, #302154 100%);
+    border-color: rgba(215, 199, 255, 0.25);
+    box-shadow:
+      0 16px 36px -4px rgba(0, 0, 0, 0.6),
+      inset 0 3px 5px rgba(255, 255, 255, 0.2),
+      inset 0 -5px 10px rgba(0, 0, 0, 0.4);
+    color: #F3EEFF;
+  }
 }
 
 @utility clay-card-peach {
@@ -232,6 +250,15 @@
     inset 0 4px 6px rgba(255, 255, 255, 0.85),
     inset 0 -5px 10px rgba(180, 50, 25, 0.18);
   color: #FFFFFF;
+  &:is(.dark *) {
+    background: linear-gradient(145deg, #6B3428 0%, #4D1E16 100%);
+    border-color: rgba(255, 174, 155, 0.25);
+    box-shadow:
+      0 16px 36px -4px rgba(0, 0, 0, 0.6),
+      inset 0 3px 5px rgba(255, 255, 255, 0.2),
+      inset 0 -5px 10px rgba(0, 0, 0, 0.4);
+    color: #FFE6DF;
+  }
 }
 
 @utility clay-card-mint {
@@ -243,6 +270,15 @@
     inset 0 4px 6px rgba(255, 255, 255, 0.85),
     inset 0 -5px 10px rgba(25, 120, 90, 0.18);
   color: #0E382D;
+  &:is(.dark *) {
+    background: linear-gradient(145deg, #1C5243 0%, #11362C 100%);
+    border-color: rgba(164, 234, 219, 0.25);
+    box-shadow:
+      0 16px 36px -4px rgba(0, 0, 0, 0.6),
+      inset 0 3px 5px rgba(255, 255, 255, 0.2),
+      inset 0 -5px 10px rgba(0, 0, 0, 0.4);
+    color: #E2FAF3;
+  }
 }
 
 @utility clay-btn {
@@ -269,6 +305,13 @@
     0 8px 22px -2px rgba(255, 105, 75, 0.45),
     inset 0 3px 5px rgba(255, 255, 255, 0.75),
     inset 0 -3px 6px rgba(160, 45, 15, 0.22);
+  &:is(.dark *) {
+    background: linear-gradient(180deg, #FF9C87 0%, #F57256 100%);
+    box-shadow:
+      0 8px 22px -2px rgba(0, 0, 0, 0.5),
+      inset 0 3px 4px rgba(255, 255, 255, 0.4),
+      inset 0 -3px 6px rgba(0, 0, 0, 0.4);
+  }
 }
 
 @utility clay-btn-purple {
@@ -280,6 +323,14 @@
     0 8px 20px -2px rgba(130, 95, 230, 0.35),
     inset 0 3px 4px rgba(255, 255, 255, 0.8),
     inset 0 -3px 6px rgba(80, 50, 160, 0.2);
+  &:is(.dark *) {
+    background: linear-gradient(180deg, #C7B5FF 0%, #A58BFF 100%);
+    color: #1F1538;
+    box-shadow:
+      0 8px 20px -2px rgba(0, 0, 0, 0.5),
+      inset 0 3px 4px rgba(255, 255, 255, 0.45),
+      inset 0 -3px 6px rgba(0, 0, 0, 0.35);
+  }
 }
 
 @utility clay-btn-mint {
@@ -291,6 +342,14 @@
     0 8px 20px -2px rgba(70, 195, 160, 0.38),
     inset 0 3px 4px rgba(255, 255, 255, 0.8),
     inset 0 -3px 6px rgba(25, 120, 90, 0.2);
+  &:is(.dark *) {
+    background: linear-gradient(180deg, #87E2C9 0%, #51CCA9 100%);
+    color: #08281E;
+    box-shadow:
+      0 8px 20px -2px rgba(0, 0, 0, 0.5),
+      inset 0 3px 4px rgba(255, 255, 255, 0.45),
+      inset 0 -3px 6px rgba(0, 0, 0, 0.35);
+  }
 }
 
 @utility clay-btn-yellow {
@@ -302,6 +361,14 @@
     0 8px 20px -2px rgba(230, 175, 40, 0.35),
     inset 0 3px 4px rgba(255, 255, 255, 0.85),
     inset 0 -3px 6px rgba(150, 100, 10, 0.18);
+  &:is(.dark *) {
+    background: linear-gradient(180deg, #FFE07D 0%, #F5C53D 100%);
+    color: #2E2104;
+    box-shadow:
+      0 8px 20px -2px rgba(0, 0, 0, 0.5),
+      inset 0 3px 4px rgba(255, 255, 255, 0.45),
+      inset 0 -3px 6px rgba(0, 0, 0, 0.35);
+  }
 }
 
 @utility clay-btn-blue {
@@ -313,6 +380,14 @@
     0 8px 20px -2px rgba(90, 170, 230, 0.35),
     inset 0 3px 4px rgba(255, 255, 255, 0.85),
     inset 0 -3px 6px rgba(30, 100, 160, 0.18);
+  &:is(.dark *) {
+    background: linear-gradient(180deg, #9CD8FC 0%, #63B8F2 100%);
+    color: #092238;
+    box-shadow:
+      0 8px 20px -2px rgba(0, 0, 0, 0.5),
+      inset 0 3px 4px rgba(255, 255, 255, 0.45),
+      inset 0 -3px 6px rgba(0, 0, 0, 0.35);
+  }
 }
 
 @utility clay-btn-white {
@@ -324,6 +399,14 @@
     0 6px 16px -2px rgba(100, 90, 140, 0.12),
     inset 0 2px 3px rgba(255, 255, 255, 0.95),
     inset 0 -2px 4px rgba(0, 0, 0, 0.05);
+  &:is(.dark *) {
+    background: #312944;
+    color: #F7F6FC;
+    box-shadow:
+      0 6px 16px -2px rgba(0, 0, 0, 0.45),
+      inset 0 2px 3px rgba(255, 255, 255, 0.15),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.35);
+  }
 }
 
 @utility clay-badge-active {
@@ -340,6 +423,14 @@
     0 4px 12px rgba(70, 190, 155, 0.28),
     inset 0 2px 3px #ffffff,
     inset 0 -2px 3px rgba(20, 110, 85, 0.2);
+  &:is(.dark *) {
+    background: linear-gradient(180deg, #7FE0C7 0%, #46CCA8 100%);
+    color: #06281E;
+    box-shadow:
+      0 4px 12px rgba(0, 0, 0, 0.4),
+      inset 0 2px 3px rgba(255, 255, 255, 0.5),
+      inset 0 -2px 3px rgba(0, 0, 0, 0.3);
+  }
 }
 
 @utility clay-badge-pending {
@@ -356,6 +447,14 @@
     0 4px 12px rgba(225, 170, 30, 0.25),
     inset 0 2px 3px #ffffff,
     inset 0 -2px 3px rgba(140, 90, 10, 0.18);
+  &:is(.dark *) {
+    background: linear-gradient(180deg, #FFE07D 0%, #F5C53D 100%);
+    color: #382402;
+    box-shadow:
+      0 4px 12px rgba(0, 0, 0, 0.4),
+      inset 0 2px 3px rgba(255, 255, 255, 0.5),
+      inset 0 -2px 3px rgba(0, 0, 0, 0.3);
+  }
 }
 
 @utility clay-badge-archived {
@@ -372,6 +471,14 @@
     0 4px 12px rgba(135, 100, 230, 0.28),
     inset 0 2px 3px #ffffff,
     inset 0 -2px 3px rgba(80, 50, 160, 0.2);
+  &:is(.dark *) {
+    background: linear-gradient(180deg, #C7B5FF 0%, #A58BFF 100%);
+    color: #1F1538;
+    box-shadow:
+      0 4px 12px rgba(0, 0, 0, 0.4),
+      inset 0 2px 3px rgba(255, 255, 255, 0.5),
+      inset 0 -2px 3px rgba(0, 0, 0, 0.3);
+  }
 }
 
 @utility clay-search-bar {
@@ -383,6 +490,15 @@
     inset 0 3px 5px rgba(255, 255, 255, 0.85),
     inset 0 -2px 4px rgba(180, 80, 50, 0.12);
   color: #2D2328;
+  &:is(.dark *) {
+    background: linear-gradient(180deg, #3A2E38 0%, #2D222B 100%);
+    border: 1px solid rgba(255, 174, 155, 0.25);
+    box-shadow:
+      0 6px 18px -2px rgba(0, 0, 0, 0.5),
+      inset 0 2px 4px rgba(255, 255, 255, 0.15),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.4);
+    color: #FFEBE2;
+  }
 }
 
 @utility clay-nav-tray {
@@ -393,6 +509,14 @@
     0 10px 25px -4px rgba(100, 90, 140, 0.12),
     inset 0 2px 4px rgba(255, 255, 255, 0.9),
     inset 0 -2px 4px rgba(0, 0, 0, 0.04);
+  &:is(.dark *) {
+    background: #231E33;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow:
+      0 10px 25px -4px rgba(0, 0, 0, 0.55),
+      inset 0 2px 4px rgba(255, 255, 255, 0.1),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.4);
+  }
 }
 
 @utility clay-icon-box {
@@ -404,6 +528,14 @@
     0 8px 18px -2px rgba(100, 90, 140, 0.18),
     inset 0 3px 4px rgba(255, 255, 255, 0.85),
     inset 0 -3px 5px rgba(0, 0, 0, 0.08);
+  &:is(.dark *) {
+    background: #2C263E;
+    color: #F7F6FC;
+    box-shadow:
+      0 8px 18px -2px rgba(0, 0, 0, 0.45),
+      inset 0 2px 3px rgba(255, 255, 255, 0.12),
+      inset 0 -3px 5px rgba(0, 0, 0, 0.4);
+  }
 }
 
 @utility gradient-header {

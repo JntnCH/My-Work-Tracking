@@ -9,20 +9,20 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default:
-          "border-transparent bg-gradient-to-b from-[#FFAE9B] to-[#FF856A] text-white shadow-[0_4px_10px_rgba(255,105,75,0.3),inset_0_2px_3px_rgba(255,255,255,0.7)]",
+          "border-transparent bg-gradient-to-b from-[#FFAE9B] to-[#FF856A] dark:from-[#FF9C87] dark:to-[#F57256] text-white shadow-[0_4px_10px_rgba(255,105,75,0.3),inset_0_2px_3px_rgba(255,255,255,0.7)] dark:shadow-[0_4px_10px_rgba(0,0,0,0.4),inset_0_2px_3px_rgba(255,255,255,0.4)]",
         secondary:
-          "border-transparent bg-gradient-to-b from-[#D4C4FF] to-[#B89FFF] text-[#241D3B] shadow-[0_4px_10px_rgba(130,95,230,0.25),inset_0_2px_3px_rgba(255,255,255,0.8)]",
+          "border-transparent bg-gradient-to-b from-[#D4C4FF] to-[#B89FFF] dark:from-[#C7B5FF] dark:to-[#A58BFF] text-[#241D3B] dark:text-[#1F1538] shadow-[0_4px_10px_rgba(130,95,230,0.25),inset_0_2px_3px_rgba(255,255,255,0.8)] dark:shadow-[0_4px_10px_rgba(0,0,0,0.4),inset_0_2px_3px_rgba(255,255,255,0.4)]",
         destructive:
-          "border-transparent bg-gradient-to-b from-[#FF97A8] to-[#FF6B82] text-white shadow-[0_4px_10px_rgba(255,107,130,0.3)]",
+          "border-transparent bg-gradient-to-b from-[#FF97A8] to-[#FF6B82] dark:from-[#FFA3B2] dark:to-[#F75971] text-white shadow-[0_4px_10px_rgba(255,107,130,0.3)] dark:shadow-[0_4px_10px_rgba(0,0,0,0.4)]",
         outline: "text-foreground border-border bg-card shadow-sm",
         clayActive:
-          "border-transparent bg-gradient-to-b from-[#B2EFE2] to-[#83E0C8] text-[#0C4335] shadow-[0_4px_12px_rgba(70,190,155,0.28),inset_0_2px_3px_#ffffff,inset_0_-2px_3px_rgba(20,110,85,0.2)]",
+          "border-transparent bg-gradient-to-b from-[#B2EFE2] to-[#83E0C8] dark:from-[#7FE0C7] dark:to-[#46CCA8] text-[#0C4335] dark:text-[#06281E] shadow-[0_4px_12px_rgba(70,190,155,0.28),inset_0_2px_3px_#ffffff,inset_0_-2px_3px_rgba(20,110,85,0.2)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.4),inset_0_2px_3px_rgba(255,255,255,0.5),inset_0_-2px_3px_rgba(0,0,0,0.3)]",
         clayPending:
-          "border-transparent bg-gradient-to-b from-[#FFEB9C] to-[#FFDB68] text-[#4A3403] shadow-[0_4px_12px_rgba(225,170,30,0.25),inset_0_2px_3px_#ffffff,inset_0_-2px_3px_rgba(140,90,10,0.18)]",
+          "border-transparent bg-gradient-to-b from-[#FFEB9C] to-[#FFDB68] dark:from-[#FFE07D] dark:to-[#F5C53D] text-[#4A3403] dark:text-[#382402] shadow-[0_4px_12px_rgba(225,170,30,0.25),inset_0_2px_3px_#ffffff,inset_0_-2px_3px_rgba(140,90,10,0.18)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.4),inset_0_2px_3px_rgba(255,255,255,0.5),inset_0_-2px_3px_rgba(0,0,0,0.3)]",
         clayArchived:
-          "border-transparent bg-gradient-to-b from-[#DDD0FF] to-[#C3AEFF] text-[#2E234D] shadow-[0_4px_12px_rgba(135,100,230,0.28),inset_0_2px_3px_#ffffff,inset_0_-2px_3px_rgba(80,50,160,0.2)]",
+          "border-transparent bg-gradient-to-b from-[#DDD0FF] to-[#C3AEFF] dark:from-[#C7B5FF] dark:to-[#A58BFF] text-[#2E234D] dark:text-[#1F1538] shadow-[0_4px_12px_rgba(135,100,230,0.28),inset_0_2px_3px_#ffffff,inset_0_-2px_3px_rgba(80,50,160,0.2)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.4),inset_0_2px_3px_rgba(255,255,255,0.5),inset_0_-2px_3px_rgba(0,0,0,0.3)]",
         clayPeach:
-          "border-transparent bg-gradient-to-b from-[#FFAE9B] to-[#FF856A] text-white shadow-[0_4px_12px_rgba(255,105,75,0.3),inset_0_2px_3px_#ffffff,inset_0_-2px_3px_rgba(160,45,15,0.2)]",
+          "border-transparent bg-gradient-to-b from-[#FFAE9B] to-[#FF856A] dark:from-[#FF9C87] dark:to-[#F57256] text-white shadow-[0_4px_12px_rgba(255,105,75,0.3),inset_0_2px_3px_#ffffff,inset_0_-2px_3px_rgba(160,45,15,0.2)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.4),inset_0_2px_3px_rgba(255,255,255,0.5),inset_0_-2px_3px_rgba(0,0,0,0.3)]",
       },
     },
     defaultVariants: {

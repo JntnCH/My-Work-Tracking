@@ -649,8 +649,8 @@ function AuthPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-8">
-      <div className="surface-card w-full max-w-md space-y-6 p-7 text-center shadow-lg border border-border">
-        <div className="mx-auto w-fit rounded-2xl bg-primary/10 p-3.5 text-primary">
+      <div className="clay-card w-full max-w-md space-y-6 p-7 text-center">
+        <div className="mx-auto w-fit rounded-2xl bg-primary/15 p-3.5 text-primary shadow-[0_4px_12px_rgba(255,142,118,0.25),inset_0_2px_3px_rgba(255,255,255,0.7)]">
           <Clock3 className="h-8 w-8" />
         </div>
         <div className="space-y-1.5">
@@ -658,17 +658,17 @@ function AuthPage() {
             <Sparkles className="h-3.5 w-3.5" />
             <span>Google Workspace Ready</span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Work Tracker</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight text-foreground">Work Tracker</h1>
           <p className="text-xs text-muted-foreground">
             ระบบบันทึกเวลาทำงาน GPS ค่าแรง OT ซิงก์ Google Sheets &amp; Airtable
           </p>
         </div>
 
         {user && !loading && (
-          <div className="rounded-2xl border border-primary/30 bg-primary/5 p-3.5 text-left space-y-3">
+          <div className="rounded-2xl border border-primary/30 bg-primary/5 p-3.5 text-left space-y-3 shadow-inner">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="h-9 w-9 shrink-0 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm">
+                <div className="h-9 w-9 shrink-0 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm shadow-sm">
                   {displayName(user)?.[0]?.toUpperCase() || <User className="h-4 w-4" />}
                 </div>
                 <div className="min-w-0">
@@ -692,7 +692,7 @@ function AuthPage() {
               <button
                 type="button"
                 onClick={() => void navigate({ to: "/", replace: true })}
-                className="flex items-center justify-center gap-1.5 rounded-xl bg-primary py-2 px-3 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition shadow-sm cursor-pointer"
+                className="clay-btn-peach flex items-center justify-center gap-1.5 py-2 px-3 text-xs"
               >
                 <span>ไปหน้าบันทึกงาน</span>
                 <ArrowRight className="h-3.5 w-3.5" />
@@ -701,7 +701,7 @@ function AuthPage() {
                 type="button"
                 onClick={() => void handleSignOutCurrent()}
                 disabled={busy}
-                className="flex items-center justify-center gap-1.5 rounded-xl border border-destructive/30 bg-destructive/10 py-2 px-3 text-xs font-bold text-destructive hover:bg-destructive/20 transition cursor-pointer disabled:opacity-60"
+                className="clay-btn-white flex items-center justify-center gap-1.5 py-2 px-3 text-xs text-destructive border border-destructive/30"
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 <span>ออกจากระบบ</span>
@@ -710,13 +710,13 @@ function AuthPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-4 gap-1 rounded-xl bg-muted p-1 text-[11px] font-semibold">
+        <div className="clay-nav-tray grid grid-cols-4 gap-1 p-1 text-[11px] font-semibold">
           <button
             type="button"
             onClick={() => selectMode("google")}
-            className={`rounded-lg py-1.5 transition ${
+            className={`rounded-xl py-2 transition font-bold ${
               mode === "google"
-                ? "bg-card text-foreground shadow-sm"
+                ? "bg-gradient-to-b from-[#BFE3FB] to-[#8ECDF6] dark:from-[#3A6B8C] dark:to-[#264E68] text-[#092238] dark:text-[#E1F3FD] shadow-[0_3px_8px_rgba(90,170,230,0.35),inset_0_2px_3px_rgba(255,255,255,0.7)]"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -725,9 +725,9 @@ function AuthPage() {
           <button
             type="button"
             onClick={() => selectMode("phone")}
-            className={`rounded-lg py-1.5 transition ${
+            className={`rounded-xl py-2 transition font-bold ${
               mode === "phone"
-                ? "bg-card text-foreground shadow-sm"
+                ? "bg-gradient-to-b from-[#BFE3FB] to-[#8ECDF6] dark:from-[#3A6B8C] dark:to-[#264E68] text-[#092238] dark:text-[#E1F3FD] shadow-[0_3px_8px_rgba(90,170,230,0.35),inset_0_2px_3px_rgba(255,255,255,0.7)]"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -736,9 +736,9 @@ function AuthPage() {
           <button
             type="button"
             onClick={() => selectMode("email")}
-            className={`rounded-lg py-1.5 transition ${
+            className={`rounded-xl py-2 transition font-bold ${
               mode === "email"
-                ? "bg-card text-foreground shadow-sm"
+                ? "bg-gradient-to-b from-[#BFE3FB] to-[#8ECDF6] dark:from-[#3A6B8C] dark:to-[#264E68] text-[#092238] dark:text-[#E1F3FD] shadow-[0_3px_8px_rgba(90,170,230,0.35),inset_0_2px_3px_rgba(255,255,255,0.7)]"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -747,9 +747,9 @@ function AuthPage() {
           <button
             type="button"
             onClick={() => selectMode("signup")}
-            className={`rounded-lg py-1.5 transition ${
+            className={`rounded-xl py-2 transition font-bold ${
               mode === "signup"
-                ? "bg-card text-foreground shadow-sm"
+                ? "bg-gradient-to-b from-[#BFE3FB] to-[#8ECDF6] dark:from-[#3A6B8C] dark:to-[#264E68] text-[#092238] dark:text-[#E1F3FD] shadow-[0_3px_8px_rgba(90,170,230,0.35),inset_0_2px_3px_rgba(255,255,255,0.7)]"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
