@@ -338,8 +338,8 @@ export function HistoryPanel({
               onClick={() => setStatusFilter("all")}
               className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition-all ${
                 statusFilter === "all"
-                  ? "bg-gradient-to-b from-[#BFE3FB] to-[#8ECDF6] text-[#0E2E4A] shadow-[0_4px_10px_rgba(90,170,230,0.3)]"
-                  : "bg-card text-muted-foreground hover:bg-slate-100"
+                  ? "bg-primary text-primary-foreground shadow-[0_4px_10px_rgba(90,170,230,0.3)]"
+                  : "bg-card text-muted-foreground hover:bg-accent hover:text-foreground"
               }`}
             >
               ทั้งหมด
@@ -348,8 +348,8 @@ export function HistoryPanel({
               onClick={() => setStatusFilter("synced")}
               className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition-all ${
                 statusFilter === "synced"
-                  ? "bg-gradient-to-b from-[#B2EFE2] to-[#83E0C8] text-[#0C4335] shadow-[0_4px_10px_rgba(70,190,155,0.3)]"
-                  : "bg-card text-muted-foreground hover:bg-slate-100"
+                  ? "bg-success text-success-foreground shadow-[0_4px_10px_rgba(70,190,155,0.3)]"
+                  : "bg-card text-muted-foreground hover:bg-accent hover:text-foreground"
               }`}
             >
               ● ซิงก์แล้ว
@@ -358,8 +358,8 @@ export function HistoryPanel({
               onClick={() => setStatusFilter("pending")}
               className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition-all ${
                 statusFilter === "pending"
-                  ? "bg-gradient-to-b from-[#FFEB9C] to-[#FFDB68] text-[#4A3403] shadow-[0_4px_10px_rgba(225,170,30,0.3)]"
-                  : "bg-card text-muted-foreground hover:bg-slate-100"
+                  ? "bg-warning text-warning-foreground shadow-[0_4px_10px_rgba(225,170,30,0.3)]"
+                  : "bg-card text-muted-foreground hover:bg-accent hover:text-foreground"
               }`}
             >
               ● รอซิงก์
