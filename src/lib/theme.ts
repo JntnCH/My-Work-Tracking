@@ -422,23 +422,32 @@ export function applyTheme(colors: Partial<CustomColors>) {
     root.classList.remove("dark");
   }
 
-  const preset = GOOGLE_PRESETS.find((p) => p.id === colors.presetName) ?? GOOGLE_PRESETS[0];
-  const defaults = isDark
-    ? (preset?.dark ?? DEFAULT_COLORS_DARK)
-    : (preset?.light ?? DEFAULT_COLORS_LIGHT);
+  const preset = GOOGLE_PRESETS.find((p) => p.id === colors.presetName);
+  const presetPalette = preset ? (isDark ? preset.dark : preset.light) : undefined;
+  const defaults = presetPalette ?? (isDark ? DEFAULT_COLORS_DARK : DEFAULT_COLORS_LIGHT);
   const fallbackForeground = isDark ? "#F8F9FA" : "#202124";
 
-  const bg = colors.backgroundColor || defaults.backgroundColor;
-  const card = colors.cardColor || defaults.cardColor;
-  const fg = colors.foregroundColor || defaults.foregroundColor;
-  const border = colors.borderColor || defaults.borderColor;
-  const primary = colors.primaryColor || defaults.primaryColor;
-  const secondary = colors.secondaryColor || defaults.secondaryColor;
-  const accent = colors.accentColor || defaults.accentColor;
-  const success = colors.successColor || defaults.successColor;
-  const warning = colors.warningColor || defaults.warningColor;
-  const destructive = colors.destructiveColor || defaults.destructiveColor;
-  const charts = colors.chartColors?.length ? colors.chartColors : defaults.chartColors;
+  // A selected preset owns both its light and dark palettes. Previously the
+  // saved light values were written as inline variables even after `.dark`
+  // was applied, leaving cards, labels and controls with the wrong contrast.
+  // Custom tokens opt out of this branch by clearing `presetName` in Settings.
+  const bg = presetPalette?.backgroundColor ?? colors.backgroundColor ?? defaults.backgroundColor;
+  const card = presetPalette?.cardColor ?? colors.cardColor ?? defaults.cardColor;
+  const fg = presetPalette?.foregroundColor ?? colors.foregroundColor ?? defaults.foregroundColor;
+  const border = presetPalette?.borderColor ?? colors.borderColor ?? defaults.borderColor;
+  const primary = presetPalette?.primaryColor ?? colors.primaryColor ?? defaults.primaryColor;
+  const secondary =
+    presetPalette?.secondaryColor ?? colors.secondaryColor ?? defaults.secondaryColor;
+  const accent = presetPalette?.accentColor ?? colors.accentColor ?? defaults.accentColor;
+  const success = presetPalette?.successColor ?? colors.successColor ?? defaults.successColor;
+  const warning = presetPalette?.warningColor ?? colors.warningColor ?? defaults.warningColor;
+  const destructive =
+    presetPalette?.destructiveColor ?? colors.destructiveColor ?? defaults.destructiveColor;
+  const charts = presetPalette?.chartColors?.length
+    ? presetPalette.chartColors
+    : colors.chartColors?.length
+      ? colors.chartColors
+      : defaults.chartColors;
 
   // Custom radii & layout attributes
   const radius = getRadiusValue(colors.borderRadius);

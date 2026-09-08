@@ -156,7 +156,7 @@ function DashboardControls({
           onClick={onRefresh}
           disabled={syncing}
           data-testid="dashboard-refresh"
-          className="flex items-center justify-center gap-1.5 rounded-lg border border-input bg-secondary px-3 py-2 text-xs font-medium transition hover:bg-accent disabled:opacity-60"
+          className="flex items-center justify-center gap-1.5 rounded-xl border border-border bg-secondary px-3 py-2 text-xs font-semibold text-secondary-foreground shadow-sm transition hover:bg-accent hover:text-accent-foreground disabled:opacity-60"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
           รีเฟรชจากชีต
@@ -167,7 +167,7 @@ function DashboardControls({
         aria-label="เลือกเดือน"
         value={month}
         onChange={(e) => onMonthChange(e.target.value)}
-        className="min-w-0 rounded-lg border border-input bg-secondary p-2 text-sm font-medium sm:w-auto"
+        className="min-w-0 rounded-xl border border-border bg-secondary p-2 text-sm font-semibold text-secondary-foreground shadow-sm outline-none transition focus:ring-2 focus:ring-ring sm:w-auto"
       />
     </div>
   );

@@ -548,14 +548,16 @@ export function SettingsPanel({
   };
 
   const updateColorToken = (key: ColorTokenKey, value: string) => {
-    const next = { ...draftColors, [key]: value };
+    const { presetName: _presetName, ...customColors } = draftColors;
+    const next = { ...customColors, [key]: value };
     setDraftColors(next);
   };
 
   const updateChartColor = (index: number, value: string) => {
     const nextCharts = [...(draftColors.chartColors || DEFAULT_COLORS_LIGHT.chartColors)];
     nextCharts[index] = value;
-    const next = { ...draftColors, chartColors: nextCharts };
+    const { presetName: _presetName, ...customColors } = draftColors;
+    const next = { ...customColors, chartColors: nextCharts };
     setDraftColors(next);
   };
 
