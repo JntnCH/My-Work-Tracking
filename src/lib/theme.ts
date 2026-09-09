@@ -62,33 +62,33 @@ export const GOOGLE_PRESETS: GooglePreset[] = [
     id: "clay-3d-pastel",
     name: "3D Clay Pastel (พาสเทล 3D เคลย์มอร์ฟิซึม)",
     nameEn: "3D Clay Pastel (Soft 3D Tactile UI)",
-    primaryColor: "#FF8E76",
+    primaryColor: "#FF8A72",
     accentColor: "#C7B5FF",
     light: {
-      primaryColor: "#FF8E76",
+      primaryColor: "#FF8A72",
       secondaryColor: "#EFEAFF",
       accentColor: "#C7B5FF",
-      backgroundColor: "#F7F6FC",
+      backgroundColor: "#F7F5FD",
       cardColor: "#FFFFFF",
-      foregroundColor: "#2B2D42",
-      borderColor: "#E6E2F5",
-      successColor: "#6CD6B5",
-      warningColor: "#FFDC69",
-      destructiveColor: "#FF7D90",
-      chartColors: ["#FF8E76", "#C7B5FF", "#6CD6B5", "#FFDC69", "#8BCFF7"],
+      foregroundColor: "#272238",
+      borderColor: "#E5DEF2",
+      successColor: "#52D6AE",
+      warningColor: "#FFD452",
+      destructiveColor: "#FF7388",
+      chartColors: ["#FF8A72", "#C7B5FF", "#52D6AE", "#FFD452", "#82CBF7"],
     },
     dark: {
-      primaryColor: "#FFA994",
-      secondaryColor: "#332B45",
-      accentColor: "#D3C4FF",
-      backgroundColor: "#1B1826",
-      cardColor: "#262235",
-      foregroundColor: "#F7F6FC",
-      borderColor: "#4A425F",
-      successColor: "#7EE0C2",
-      warningColor: "#FFE58A",
-      destructiveColor: "#FF94A4",
-      chartColors: ["#FFA994", "#D3C4FF", "#7EE0C2", "#FFE58A", "#9CD8FC"],
+      primaryColor: "#FFA590",
+      secondaryColor: "#33284B",
+      accentColor: "#D2C2FF",
+      backgroundColor: "#161224",
+      cardColor: "#251E36",
+      foregroundColor: "#FFFFFF",
+      borderColor: "rgba(255, 255, 255, 0.12)",
+      successColor: "#6EE2BE",
+      warningColor: "#FFE17D",
+      destructiveColor: "#FFA0B2",
+      chartColors: ["#FFA590", "#D2C2FF", "#6EE2BE", "#FFE17D", "#96D5FC"],
     },
   },
   {
@@ -330,17 +330,17 @@ export const DEFAULT_COLORS_LIGHT: CustomColors = {
   borderRadius: "pill",
   buttonStyle: "elevated",
   density: "normal",
-  backgroundColor: "#F7F6FC",
+  backgroundColor: "#F7F5FD",
   cardColor: "#FFFFFF",
-  foregroundColor: "#2B2D42",
-  borderColor: "#E6E2F5",
-  primaryColor: "#FF8E76",
+  foregroundColor: "#272238",
+  borderColor: "#E5DEF2",
+  primaryColor: "#FF8A72",
   secondaryColor: "#EFEAFF",
   accentColor: "#C7B5FF",
-  successColor: "#6CD6B5",
-  warningColor: "#FFDC69",
-  destructiveColor: "#FF7D90",
-  chartColors: ["#FF8E76", "#C7B5FF", "#6CD6B5", "#FFDC69", "#8BCFF7"],
+  successColor: "#52D6AE",
+  warningColor: "#FFD452",
+  destructiveColor: "#FF7388",
+  chartColors: ["#FF8A72", "#C7B5FF", "#52D6AE", "#FFD452", "#82CBF7"],
 };
 
 export const DEFAULT_COLORS_DARK: CustomColors = {
@@ -349,17 +349,17 @@ export const DEFAULT_COLORS_DARK: CustomColors = {
   borderRadius: "pill",
   buttonStyle: "elevated",
   density: "normal",
-  backgroundColor: "#1B1826",
-  cardColor: "#262235",
-  foregroundColor: "#F7F6FC",
-  borderColor: "#4A425F",
-  primaryColor: "#FFA994",
-  secondaryColor: "#332B45",
-  accentColor: "#D3C4FF",
-  successColor: "#7EE0C2",
-  warningColor: "#FFE58A",
-  destructiveColor: "#FF94A4",
-  chartColors: ["#FFA994", "#D3C4FF", "#7EE0C2", "#FFE58A", "#9CD8FC"],
+  backgroundColor: "#161224",
+  cardColor: "#251E36",
+  foregroundColor: "#FFFFFF",
+  borderColor: "rgba(255, 255, 255, 0.12)",
+  primaryColor: "#FFA590",
+  secondaryColor: "#33284B",
+  accentColor: "#D2C2FF",
+  successColor: "#6EE2BE",
+  warningColor: "#FFE17D",
+  destructiveColor: "#FFA0B2",
+  chartColors: ["#FFA590", "#D2C2FF", "#6EE2BE", "#FFE17D", "#96D5FC"],
 };
 
 function hexToRgb(value: string) {
@@ -383,7 +383,7 @@ export function readableForeground(color: string, fallback: string) {
   );
   const luminance =
     0.2126 * (linear[0] ?? 0) + 0.7152 * (linear[1] ?? 0) + 0.0722 * (linear[2] ?? 0);
-  return luminance > 0.48 ? "#202124" : "#F8F9FA";
+  return luminance > 0.48 ? "#272238" : "#FFFFFF";
 }
 
 export function getRadiusValue(option?: BorderRadiusOption): string {
@@ -393,13 +393,13 @@ export function getRadiusValue(option?: BorderRadiusOption): string {
     case "compact":
       return "0.5rem"; // 8px
     case "normal":
-      return "0.75rem"; // 12px (Google standard)
+      return "0.75rem"; // 12px
     case "smooth":
       return "1rem"; // 16px
     case "pill":
-      return "1.5rem"; // 24px
+      return "1.75rem"; // 28px (Claymorphism squircle)
     default:
-      return "0.75rem";
+      return "1.75rem";
   }
 }
 
@@ -425,12 +425,9 @@ export function applyTheme(colors: Partial<CustomColors>) {
   const preset = GOOGLE_PRESETS.find((p) => p.id === colors.presetName);
   const presetPalette = preset ? (isDark ? preset.dark : preset.light) : undefined;
   const defaults = presetPalette ?? (isDark ? DEFAULT_COLORS_DARK : DEFAULT_COLORS_LIGHT);
-  const fallbackForeground = isDark ? "#F8F9FA" : "#202124";
+  const fallbackForeground = isDark ? "#FFFFFF" : "#272238";
 
-  // A selected preset owns both its light and dark palettes. Previously the
-  // saved light values were written as inline variables even after `.dark`
-  // was applied, leaving cards, labels and controls with the wrong contrast.
-  // Custom tokens opt out of this branch by clearing `presetName` in Settings.
+  // A selected preset owns both its light and dark palettes.
   const bg = presetPalette?.backgroundColor ?? colors.backgroundColor ?? defaults.backgroundColor;
   const card = presetPalette?.cardColor ?? colors.cardColor ?? defaults.cardColor;
   const fg = presetPalette?.foregroundColor ?? colors.foregroundColor ?? defaults.foregroundColor;
@@ -484,23 +481,23 @@ export function applyTheme(colors: Partial<CustomColors>) {
     "--secondary-foreground",
     readableForeground(secondary, fallbackForeground),
   );
-  root.style.setProperty("--muted", `color-mix(in oklab, ${secondary} 72%, ${bg})`);
-  root.style.setProperty("--muted-foreground", `color-mix(in oklab, ${fg} 64%, ${bg})`);
+  root.style.setProperty("--muted", isDark ? "#2E2543" : "#EDE8F7");
+  root.style.setProperty("--muted-foreground", isDark ? "#D0C9E8" : "#6F6684");
   root.style.setProperty("--accent", accent);
   root.style.setProperty("--accent-foreground", readableForeground(accent, fallbackForeground));
   root.style.setProperty("--success", success);
   root.style.setProperty("--success-foreground", readableForeground(success, fallbackForeground));
-  root.style.setProperty("--success-soft", `color-mix(in oklab, ${success} 14%, ${bg})`);
+  root.style.setProperty("--success-soft", isDark ? "#163B30" : "#DCF8F0");
   root.style.setProperty("--warning", warning);
   root.style.setProperty("--warning-foreground", readableForeground(warning, fallbackForeground));
-  root.style.setProperty("--warning-soft", `color-mix(in oklab, ${warning} 14%, ${bg})`);
+  root.style.setProperty("--warning-soft", isDark ? "#423516" : "#FFF5D6");
   root.style.setProperty("--destructive", destructive);
   root.style.setProperty(
     "--destructive-foreground",
     readableForeground(destructive, fallbackForeground),
   );
-  root.style.setProperty("--destructive-soft", `color-mix(in oklab, ${destructive} 14%, ${bg})`);
-  root.style.setProperty("--info-soft", `color-mix(in oklab, ${primary} 12%, ${bg})`);
+  root.style.setProperty("--destructive-soft", isDark ? "#441E28" : "#FFEAEF");
+  root.style.setProperty("--info-soft", isDark ? "#203348" : "#E1F2FE");
   root.style.setProperty("--border", border);
   root.style.setProperty("--input", border);
   root.style.setProperty("--ring", primary);

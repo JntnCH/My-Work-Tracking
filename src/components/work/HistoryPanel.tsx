@@ -256,7 +256,7 @@ export function HistoryPanel({
   return (
     <div className="space-y-4">
       {/* 3D Clay Header & Action Toolbar */}
-      <div className="clay-card rounded-3xl p-5 border border-white/60 bg-card shadow-[0_12px_28px_-4px_rgba(110,95,160,0.12),inset_0_3px_5px_rgba(255,255,255,0.9),inset_0_-3px_6px_rgba(0,0,0,0.03)] dark:border-white/10">
+      <div className="clay-card p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold text-foreground">ประวัติการทำงาน</h2>
@@ -269,7 +269,7 @@ export function HistoryPanel({
               aria-label="เลือกเดือน"
               value={month}
               onChange={(e) => setMonth(e.target.value)}
-              className="rounded-full border border-border/80 bg-card px-4 py-2 text-xs font-semibold shadow-[inset_0_1px_2px_rgba(0,0,0,0.05),0_1px_2px_rgba(255,255,255,0.8)]"
+              className="clay-input text-xs py-2 px-3 font-semibold"
             >
               <option value="all">ทุกเดือน · {logs.length} รายการ</option>
               {months.map((m) => (
@@ -298,7 +298,7 @@ export function HistoryPanel({
             />
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="clay-btn-white px-3.5 py-2 text-xs border border-border/60"
+              className="clay-btn-white px-3.5 py-2 text-xs"
               title="นำเข้าไฟล์ CSV ประวัติการทำงาน"
             >
               <Upload className="h-4 w-4" /> นำเข้า CSV
@@ -306,7 +306,7 @@ export function HistoryPanel({
             <button
               onClick={exportCSV}
               disabled={logs.length === 0}
-              className="clay-btn-white px-3.5 py-2 text-xs border border-border/60"
+              className="clay-btn-white px-3.5 py-2 text-xs"
             >
               <Download className="h-4 w-4" /> CSV
             </button>
@@ -338,7 +338,7 @@ export function HistoryPanel({
               onClick={() => setStatusFilter("all")}
               className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition-all ${
                 statusFilter === "all"
-                  ? "bg-primary text-primary-foreground shadow-[0_4px_10px_rgba(90,170,230,0.3)]"
+                  ? "clay-btn-blue text-[#0A2944] dark:text-white"
                   : "bg-card text-muted-foreground hover:bg-accent hover:text-foreground"
               }`}
             >
@@ -348,7 +348,7 @@ export function HistoryPanel({
               onClick={() => setStatusFilter("synced")}
               className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition-all ${
                 statusFilter === "synced"
-                  ? "bg-success text-success-foreground shadow-[0_4px_10px_rgba(70,190,155,0.3)]"
+                  ? "clay-btn-mint text-[#0C4335] dark:text-[#7EE0C2]"
                   : "bg-card text-muted-foreground hover:bg-accent hover:text-foreground"
               }`}
             >
@@ -358,7 +358,7 @@ export function HistoryPanel({
               onClick={() => setStatusFilter("pending")}
               className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition-all ${
                 statusFilter === "pending"
-                  ? "bg-warning text-warning-foreground shadow-[0_4px_10px_rgba(225,170,30,0.3)]"
+                  ? "clay-btn-peach text-[#5C2B10] dark:text-[#FFA590]"
                   : "bg-card text-muted-foreground hover:bg-accent hover:text-foreground"
               }`}
             >
@@ -369,33 +369,27 @@ export function HistoryPanel({
       </div>
 
       {logs.length === 0 && (
-        <div className="surface-card flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-dashed border-2 border-primary/30 bg-primary/5">
+        <div className="clay-card flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-dashed border-2 border-primary/30">
           <div className="flex items-center gap-2">
             <FileSpreadsheet className="h-5 w-5 text-primary" />
             <span className="text-xs font-medium">
               มีชุดข้อมูลบันทึกงานเดือนสิงหาคม 2026 (18 รายการ) พร้อมใช้งาน
             </span>
           </div>
-          <button
-            onClick={loadSeedLogs}
-            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-sm hover:opacity-90"
-          >
+          <button onClick={loadSeedLogs} className="clay-btn-purple px-4 py-2 text-xs">
             <Upload className="h-3.5 w-3.5" /> โหลดชุดข้อมูล 18 รายการ
           </button>
         </div>
       )}
 
       {visibleLogs.length === 0 ? (
-        <div className="surface-card p-10 text-center text-sm text-muted-foreground">
+        <div className="clay-card p-10 text-center text-sm text-muted-foreground">
           {logs.length === 0 ? "ยังไม่มีประวัติการทำงาน" : "ไม่มีรายการในเดือนที่เลือก"}
         </div>
       ) : (
         <div className="space-y-3" data-testid="logs-container">
           {visibleLogs.map((log) => (
-            <article
-              key={log.id}
-              className="clay-card rounded-3xl overflow-hidden p-5 border border-white/60 bg-card shadow-[0_10px_24px_-4px_rgba(110,95,160,0.1),inset_0_3px_5px_rgba(255,255,255,0.9),inset_0_-2px_4px_rgba(0,0,0,0.03)] dark:border-white/10"
-            >
+            <article key={log.id} className="clay-card overflow-hidden p-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">

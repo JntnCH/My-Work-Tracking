@@ -193,32 +193,37 @@ function Index() {
           onFaceChanged={lock.refresh}
           onSignOut={() => void signOut()}
           themeMode={tracker.themeSettings.themeMode}
-          onToggleTheme={() =>
-            tracker.previewThemeSettings({
+          onToggleTheme={() => {
+            const nextMode = tracker.themeSettings.themeMode === "dark" ? "light" : "dark";
+            void tracker.saveThemeSettings({
               ...tracker.themeSettings,
-              themeMode: tracker.themeSettings.themeMode === "dark" ? "light" : "dark",
-            })
-          }
+              themeMode: nextMode,
+            });
+          }}
         />
 
         {/* Navigation Tabs Bar อยู่ในส่วน Auto-Hide Sticky เดียวกัน */}
         <div className="mx-auto max-w-4xl px-3 pt-2.5 pb-2.5 sm:px-4">
-          <div className="clay-nav-tray overflow-x-auto rounded-3xl border border-border/70 bg-card/90 p-1.5 shadow-[0_10px_25px_-4px_rgba(100,90,140,0.12),inset_0_2px_4px_rgba(255,255,255,0.9),inset_0_-2px_4px_rgba(0,0,0,0.03)] dark:shadow-[0_12px_28px_-6px_rgba(0,0,0,0.45),inset_0_1px_3px_rgba(255,255,255,0.06)]">
-            <div className="flex min-w-max gap-1.5">
-              {TABS.map(({ id, label, icon: Icon }) => (
-                <button
-                  key={id}
-                  onClick={() => requestTabChange(id)}
-                  aria-current={tab === id}
-                  className={`flex min-w-[7.5rem] items-center justify-center gap-2 rounded-full px-4 py-2.5 text-xs font-bold transition-all duration-150 active:scale-95 md:min-w-0 md:flex-1 md:text-sm ${
-                    tab === id
-                      ? "bg-primary text-primary-foreground shadow-[0_6px_16px_-2px_rgba(90,170,230,0.38),inset_0_3px_4px_rgba(255,255,255,0.36),inset_0_-3px_5px_rgba(30,100,160,0.18)]"
-                      : "text-muted-foreground hover:bg-accent/70 hover:text-foreground"
-                  }`}
-                >
-                  <Icon className="h-4 w-4" /> {label}
-                </button>
-              ))}
+          <div className="clay-nav-tray overflow-x-auto">
+            <div className="flex min-w-max gap-2 p-1">
+              {TABS.map(({ id, label, icon: Icon }) => {
+                const isActive = tab === id;
+                return (
+                  <button
+                    key={id}
+                    onClick={() => requestTabChange(id)}
+                    aria-current={isActive}
+                    className={`flex min-w-[7.5rem] items-center justify-center gap-2 rounded-full px-5 py-2.5 text-xs font-extrabold tracking-wide transition-all duration-150 active:scale-95 md:min-w-0 md:flex-1 md:text-sm ${
+                      isActive
+                        ? "clay-btn-blue text-[#0A2944] dark:text-white"
+                        : "text-muted-foreground hover:bg-white/60 hover:text-foreground dark:hover:bg-white/10"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4 shrink-0 stroke-[2.5]" />
+                    <span>{label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
