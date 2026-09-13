@@ -19,7 +19,7 @@ on:
 env:
   GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
   GCP_REGION: ${{ vars.GCP_REGION }}
-  CLOUD_RUN_SERVICE: ${{ vars.CLOUD_RUN_SERVICE }}
+  CLOUD_RUN_SERVICE: ${{ vars.CLOUD_RUN_SERVICE || 'my-work-tracking' }}
   GAR_REPOSITORY: ${{ vars.GAR_REPOSITORY }}
   IMAGE_NAME: my-work-tracking
 
