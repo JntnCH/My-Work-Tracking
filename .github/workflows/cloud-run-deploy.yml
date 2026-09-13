@@ -87,21 +87,31 @@ jobs:
       # --------------------------------------------------
       - name: Create Artifact Registry Repository
         run: |
-          REPO_EXISTS=$(gcloud artifacts repositories list \
+          set -e
+          
+          echo "Checking if repository exists: ${{ env.GAR_REPOSITORY }}"
+          
+          # Try to describe the repository
+          if gcloud artifacts repositories describe "${{ env.GAR_REPOSITORY }}" \
             --location="${{ env.GCP_REGION }}" \
-            --format="value(name)" \
-            --filter="name=${{ env.GAR_REPOSITORY }}" 2>/dev/null || true)
-
-          if [ -z "$REPO_EXISTS" ]; then
-            echo "Creating repository: ${{ env.GAR_REPOSITORY }}"
+            --project="${{ env.GCP_PROJECT_ID }}" 2>/dev/null; then
+            echo "✓ Repository already exists"
+          else
+            echo "Repository does not exist, creating it..."
             gcloud artifacts repositories create "${{ env.GAR_REPOSITORY }}" \
               --repository-format=docker \
               --location="${{ env.GCP_REGION }}" \
-              --project="${{ env.GCP_PROJECT_ID }}"
-            echo "Repository created successfully!"
-          else
-            echo "Repository already exists: ${{ env.GAR_REPOSITORY }}"
+              --project="${{ env.GCP_PROJECT_ID }}" \
+              --description="Docker repository for My-Work-Tracking"
+            echo "✓ Repository created successfully"
           fi
+          
+          # List all repositories to verify
+          echo ""
+          echo "All repositories in this region:"
+          gcloud artifacts repositories list \
+            --location="${{ env.GCP_REGION }}" \
+            --project="${{ env.GCP_PROJECT_ID }}"
 
 
       # --------------------------------------------------
