@@ -83,7 +83,29 @@ jobs:
 
 
       # --------------------------------------------------
-      # 6. Build Docker image
+      # 6. Create Artifact Registry Repository (if not exists)
+      # --------------------------------------------------
+      - name: Create Artifact Registry Repository
+        run: |
+          REPO_EXISTS=$(gcloud artifacts repositories list \
+            --location="${{ env.GCP_REGION }}" \
+            --format="value(name)" \
+            --filter="name=${{ env.GAR_REPOSITORY }}" 2>/dev/null || true)
+
+          if [ -z "$REPO_EXISTS" ]; then
+            echo "Creating repository: ${{ env.GAR_REPOSITORY }}"
+            gcloud artifacts repositories create "${{ env.GAR_REPOSITORY }}" \
+              --repository-format=docker \
+              --location="${{ env.GCP_REGION }}" \
+              --project="${{ env.GCP_PROJECT_ID }}"
+            echo "Repository created successfully!"
+          else
+            echo "Repository already exists: ${{ env.GAR_REPOSITORY }}"
+          fi
+
+
+      # --------------------------------------------------
+      # 7. Build Docker image
       # --------------------------------------------------
       - name: Build Docker image
         run: |
@@ -104,7 +126,7 @@ jobs:
 
 
       # --------------------------------------------------
-      # 7. Push image SHA
+      # 8. Push image SHA
       # --------------------------------------------------
       - name: Push Docker image
         run: |
@@ -113,7 +135,7 @@ jobs:
 
 
       # --------------------------------------------------
-      # 8. Push latest image
+      # 9. Push latest image
       # --------------------------------------------------
       - name: Push latest Docker image
         run: |
@@ -122,7 +144,7 @@ jobs:
 
 
       # --------------------------------------------------
-      # 9. Deploy Cloud Run
+      # 10. Deploy Cloud Run
       # --------------------------------------------------
       - name: Deploy to Cloud Run
         run: |
@@ -139,7 +161,7 @@ jobs:
 
 
       # --------------------------------------------------
-      # 10. ตรวจสอบ Cloud Run
+      # 11. ตรวจสอบ Cloud Run
       # --------------------------------------------------
       - name: Check Cloud Run deployment
         run: |
@@ -149,7 +171,7 @@ jobs:
 
 
       # --------------------------------------------------
-      # 11. Get Cloud Run URL
+      # 12. Get Cloud Run URL
       # --------------------------------------------------
       - name: Get Cloud Run service URL
         id: service-url
@@ -168,7 +190,7 @@ jobs:
 
 
       # --------------------------------------------------
-      # 12. Test HTTP response
+      # 13. Test HTTP response
       # --------------------------------------------------
       - name: Test Cloud Run URL
         run: |
@@ -195,7 +217,7 @@ jobs:
 
 
       # --------------------------------------------------
-      # 13. Deployment Summary
+      # 14. Deployment Summary
       # --------------------------------------------------
       - name: Deployment Summary
         run: |
