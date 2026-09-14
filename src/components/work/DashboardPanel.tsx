@@ -37,8 +37,8 @@ export function DashboardPanel({
       data-dashboard-layout-loading={layoutLoading ? "true" : "false"}
       aria-busy={layoutLoading}
     >
-      <section className="surface-card mx-auto w-full p-4 sm:p-5">
-        <header className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-start sm:justify-between">
+      <section className="surface-card mx-auto w-full overflow-hidden p-4 sm:p-5">
+        <header className="flex min-w-0 flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <h2 className="font-bold">สรุปรายเดือน</h2>
             <p className="text-xs text-muted-foreground">
@@ -135,6 +135,15 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
+function formatMonthLabel(month: string) {
+  const [year, monthNum] = month.split("-").map(Number);
+  if (!year || !monthNum) return month;
+  return new Date(year, monthNum - 1, 1).toLocaleDateString("th-TH", {
+    month: "short",
+    year: "numeric",
+  });
+}
+
 function DashboardControls({
   spreadsheetId,
   syncing,
@@ -148,27 +157,38 @@ function DashboardControls({
   month: string;
   onMonthChange: (month: string) => void;
 }) {
+  const controlCls =
+    "relative flex h-10 w-full min-w-0 items-center justify-center gap-1.5 overflow-hidden rounded-xl border border-border bg-secondary px-3 text-xs font-semibold text-secondary-foreground shadow-sm outline-none transition hover:bg-accent hover:text-accent-foreground focus-within:ring-2 focus-within:ring-ring disabled:opacity-60";
+
   return (
-    <div className="flex w-full flex-wrap items-center justify-start gap-2 sm:w-auto sm:justify-end">
+    <div
+      className={`grid w-full min-w-0 gap-2 sm:ml-auto sm:max-w-md sm:w-full ${
+        spreadsheetId ? "grid-cols-2" : "grid-cols-1"
+      }`}
+      data-testid="dashboard-controls"
+    >
       {spreadsheetId ? (
         <button
           type="button"
           onClick={onRefresh}
           disabled={syncing}
           data-testid="dashboard-refresh"
-          className="flex items-center justify-center gap-1.5 rounded-xl border border-border bg-secondary px-3 py-2 text-xs font-semibold text-secondary-foreground shadow-sm transition hover:bg-accent hover:text-accent-foreground disabled:opacity-60"
+          className={controlCls}
         >
-          <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
-          รีเฟรชจากชีต
+          <RefreshCw className={`h-3.5 w-3.5 shrink-0 ${syncing ? "animate-spin" : ""}`} />
+          <span className="truncate">รีเฟรชจากชีต</span>
         </button>
       ) : null}
-      <input
-        type="month"
-        aria-label="เลือกเดือน"
-        value={month}
-        onChange={(e) => onMonthChange(e.target.value)}
-        className="min-w-0 rounded-xl border border-border bg-secondary p-2 text-sm font-semibold text-secondary-foreground shadow-sm outline-none transition focus:ring-2 focus:ring-ring sm:w-auto"
-      />
+      <label className={`${controlCls} cursor-pointer`}>
+        <span className="pointer-events-none truncate">{formatMonthLabel(month)}</span>
+        <input
+          type="month"
+          aria-label="เลือกเดือน"
+          value={month}
+          onChange={(e) => onMonthChange(e.target.value)}
+          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+        />
+      </label>
     </div>
   );
 }
