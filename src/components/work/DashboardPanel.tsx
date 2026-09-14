@@ -148,18 +148,26 @@ function DashboardControls({
   month: string;
   onMonthChange: (month: string) => void;
 }) {
+  const controlCls =
+    "flex h-10 w-full min-w-0 items-center justify-center gap-1.5 rounded-xl border border-border bg-secondary px-3 text-xs font-semibold text-secondary-foreground shadow-sm outline-none transition hover:bg-accent hover:text-accent-foreground focus:ring-2 focus:ring-ring disabled:opacity-60";
+
   return (
-    <div className="flex w-full flex-wrap items-center justify-start gap-2 sm:w-auto sm:justify-end">
+    <div
+      className={`grid w-full min-w-0 gap-2 sm:ml-auto sm:w-[min(100%,24rem)] ${
+        spreadsheetId ? "grid-cols-2" : "grid-cols-1"
+      }`}
+      data-testid="dashboard-controls"
+    >
       {spreadsheetId ? (
         <button
           type="button"
           onClick={onRefresh}
           disabled={syncing}
           data-testid="dashboard-refresh"
-          className="flex items-center justify-center gap-1.5 rounded-xl border border-border bg-secondary px-3 py-2 text-xs font-semibold text-secondary-foreground shadow-sm transition hover:bg-accent hover:text-accent-foreground disabled:opacity-60"
+          className={controlCls}
         >
-          <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
-          รีเฟรชจากชีต
+          <RefreshCw className={`h-3.5 w-3.5 shrink-0 ${syncing ? "animate-spin" : ""}`} />
+          <span className="truncate">รีเฟรชจากชีต</span>
         </button>
       ) : null}
       <input
@@ -167,7 +175,7 @@ function DashboardControls({
         aria-label="เลือกเดือน"
         value={month}
         onChange={(e) => onMonthChange(e.target.value)}
-        className="min-w-0 rounded-xl border border-border bg-secondary p-2 text-sm font-semibold text-secondary-foreground shadow-sm outline-none transition focus:ring-2 focus:ring-ring sm:w-auto"
+        className={`${controlCls} [color-scheme:inherit]`}
       />
     </div>
   );
