@@ -8,11 +8,13 @@ export type SheetsAuthPayload = {
 };
 
 /**
- * Retrieves the available Google Sheets authentication credentials (OAuth token or Service Account JSON)
+ * Client-side Sheets credentials.
+ * Only send a Google OAuth token or a Service Account the user actually saved.
+ * The bundled default key stays server-side so LINE login does not ship a 401 JWT.
  */
 export function getSheetsAuthPayload(): SheetsAuthPayload {
   const accessToken = getGoogleAccessToken() || undefined;
-  const serviceAccountJson = storage.getServiceAccount()?.trim() || DEFAULT_SERVICE_ACCOUNT_JSON;
+  const serviceAccountJson = storage.getServiceAccount()?.trim() || undefined;
 
   return {
     ...(accessToken ? { accessToken } : {}),

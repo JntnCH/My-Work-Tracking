@@ -30,10 +30,10 @@ import {
   countPassedConnectionTests,
   type ConnectionTestResult,
 } from "@/lib/sheets-diagnostics";
-import { getGoogleAccessToken, signInWithGoogleFirebase } from "@/lib/firebase";
+import { getGoogleAccessToken } from "@/lib/firebase";
+import { requestGoogleSheetsAccessToken } from "@/lib/google-sheets-oauth";
 import {
   getSheetsAuthPayload,
-  getStoredOrInitialServiceAccount,
   parseServiceAccountInfo,
 } from "@/lib/sheets-credentials";
 
@@ -55,10 +55,10 @@ export function SheetsPanel({ spreadsheetId, onChange }: Props) {
   const [authorizing, setAuthorizing] = useState(false);
 
   // Service Account state
-  const [serviceAccountJson, setServiceAccountJson] = useState(() =>
-    getStoredOrInitialServiceAccount(),
+  const [serviceAccountJson, setServiceAccountJson] = useState(
+    () => storage.getServiceAccount()?.trim() || "",
   );
-  const [saInput, setSaInput] = useState(() => getStoredOrInitialServiceAccount());
+  const [saInput, setSaInput] = useState(() => storage.getServiceAccount()?.trim() || "");
   const [showSaConfig, setShowSaConfig] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [copiedEmail, setCopiedEmail] = useState(false);
@@ -131,18 +131,17 @@ export function SheetsPanel({ spreadsheetId, onChange }: Props) {
   const authorizeGoogle = async (): Promise<string | null> => {
     setAuthorizing(true);
     try {
-      await signInWithGoogleFirebase();
-      const token = getGoogleAccessToken();
+      const token = await requestGoogleSheetsAccessToken({ promptConsent: true });
       setHasGoogleToken(Boolean(token));
       if (token) {
-        toast.success("เชื่อมต่อบัญชี Google สำเร็จ");
+        toast.success("อนุญาต Google Sheets สำเร็จ", {
+          description: "ใช้ได้กับบัญชี LINE โดยไม่ต้องเปลี่ยนการเข้าสู่ระบบ",
+        });
       }
       return token;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg !== "REDIRECTING") {
-        toast.error("เข้าสู่ระบบ Google ไม่สำเร็จ", { description: msg });
-      }
+      toast.error("อนุญาต Google Sheets ไม่สำเร็จ", { description: msg });
       return null;
     } finally {
       setAuthorizing(false);
@@ -155,12 +154,13 @@ export function SheetsPanel({ spreadsheetId, onChange }: Props) {
       return currentPayload;
     }
 
-    // Prompt user to connect
-    toast.info("กำลังเปิดหน้าต่างเข้าสู่ระบบ Google...");
+    toast.info("กำลังขอสิทธิ์ Google Sheets...", {
+      description: "ไม่เปลี่ยนบัญชี LINE ที่ล็อกอินอยู่",
+    });
     const token = await authorizeGoogle();
     return {
       accessToken: token ?? undefined,
-      serviceAccountJson: storage.getServiceAccount() || undefined,
+      serviceAccountJson: storage.getServiceAccount()?.trim() || undefined,
     };
   };
 
@@ -282,7 +282,7 @@ export function SheetsPanel({ spreadsheetId, onChange }: Props) {
           )}
           {hasGoogleToken && !hasValidSa && (
             <span className="flex items-center gap-1 rounded-full bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 text-xs font-medium text-blue-600 dark:text-blue-400">
-              <CheckCircle2 className="h-3.5 w-3.5" /> Google Login พร้อมใช้งาน
+              <CheckCircle2 className="h-3.5 w-3.5" /> Google Sheets พร้อมใช้งาน
             </span>
           )}
         </div>
@@ -452,10 +452,10 @@ export function SheetsPanel({ spreadsheetId, onChange }: Props) {
           <div className="text-muted-foreground">
             {hasGoogleToken ? (
               <span className="text-emerald-600 dark:text-emerald-400 font-medium">
-                ✓ บัญชี Google Login เชื่อมต่อเรียบร้อย
+                ✓ อนุญาต Google Sheets แล้ว (ใช้ได้กับบัญชี LINE)
               </span>
             ) : (
-              <span>หรือใช้การเข้าสู่ระบบ Google ชั่วคราว (OAuth):</span>
+              <span>หรืออนุญาต Google Sheets โดยไม่ต้องออกจากบัญชี LINE:</span>
             )}
           </div>
           <button
@@ -466,10 +466,10 @@ export function SheetsPanel({ spreadsheetId, onChange }: Props) {
           >
             <RefreshCw className={`h-3 w-3 ${authorizing ? "animate-spin" : ""}`} />
             {authorizing
-              ? "กำลังเข้าสู่ระบบ..."
+              ? "กำลังขอสิทธิ์..."
               : hasGoogleToken
-                ? "สลับ/รีเฟรชบัญชี Google"
-                : "เข้าสู่ระบบด้วย Google"}
+                ? "รีเฟรชสิทธิ์ Google Sheets"
+                : "อนุญาต Google Sheets"}
           </button>
         </div>
       </div>

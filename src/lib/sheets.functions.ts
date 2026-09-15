@@ -132,7 +132,7 @@ function googleSheetsError(error: unknown) {
   const message = apiMessage ?? apiError.message ?? "ไม่ทราบสาเหตุ";
 
   if (status === 401) {
-    return "Google authentication ไม่ผ่าน: ตรวจสอบ Service Account email และ private key หรือล็อกอินใหม่อีกครั้ง";
+    return "Google authentication ไม่ผ่าน: บัญชี LINE ต้องกดอนุญาต Google Sheets ก่อน หรือตรวจสอบ Service Account — การอนุญาตชีตจะไม่เปลี่ยนบัญชีที่ล็อกอินอยู่";
   }
   if (status === 403) {
     return "Google Sheets ปฏิเสธการเข้าถึง (403): กรุณากดปุ่ม 'แชร์' ใน Google Sheets แล้วเพิ่ม Service Account Email นี้เป็น 'Editor (ผู้แก้ไข)'";

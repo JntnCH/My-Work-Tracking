@@ -23,7 +23,7 @@ import {
 } from "@/lib/sheets.functions";
 import { callServer } from "@/lib/server-call";
 import { getSheetsAuthPayload } from "@/lib/sheets-credentials";
-import { getGoogleAccessToken } from "@/lib/firebase";
+import { withSheetsAuthRetry, lineSheetsHint } from "@/lib/google-sheets-oauth";
 import {
   addDBBranch,
   addDBWorkType,
@@ -634,14 +634,17 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
 
   const mirrorToSheet = useCallback(async (allLogs: WorkLog[], sheetId: string) => {
     if (!sheetId) return;
-    const authPayload = getSheetsAuthPayload();
-    await callServer(replaceWorkLogRows, {
-      data: {
-        spreadsheetId: sheetId,
-        ...authPayload,
-        rows: allLogs.slice().reverse().map(logToRow),
-      },
-    });
+    await withSheetsAuthRetry(
+      (authPayload) =>
+        callServer(replaceWorkLogRows, {
+          data: {
+            spreadsheetId: sheetId,
+            ...authPayload,
+            rows: allLogs.slice().reverse().map(logToRow),
+          },
+        }),
+      { interactive: false },
+    );
   }, []);
 
   const autoMirror = useCallback(
@@ -923,17 +926,20 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
   );
 
   const pullFromSheet = useCallback(
-    async (_force = false) => {
+    async (silent = false) => {
       if (!spreadsheetId) {
-        toast.info("กรุณาเชื่อมต่อ Google Sheets ก่อน");
+        if (!silent) toast.info("กรุณาเชื่อมต่อ Google Sheets ก่อน");
         return;
       }
       setSyncing(true);
       try {
-        const authPayload = getSheetsAuthPayload();
-        const result = await callServer(readWorkLogRows, {
-          data: { spreadsheetId, ...authPayload },
-        });
+        const result = await withSheetsAuthRetry(
+          (authPayload) =>
+            callServer(readWorkLogRows, {
+              data: { spreadsheetId, ...authPayload },
+            }),
+          { interactive: !silent },
+        );
         const pulled = result.rows.map(rowToLog).filter((item): item is WorkLog => item !== null);
         if (pulled.length === 0) {
           toast.info("ไม่พบรายการใน Google Sheets จึงไม่ล้างข้อมูลเดิม");
@@ -952,7 +958,11 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
         toast.success(`ดึงข้อมูลจาก Google Sheets สำเร็จ ${pulled.length} รายการ`);
       } catch (error) {
         toast.error("ดึงข้อมูลจาก Google Sheets ไม่สำเร็จ", {
-          description: error instanceof Error ? error.message : String(error),
+          description: silent
+            ? lineSheetsHint(error)
+            : error instanceof Error
+              ? error.message
+              : String(error),
         });
       } finally {
         setSyncing(false);
