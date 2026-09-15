@@ -27,7 +27,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
 
     steps:
       - name: Checkout code
@@ -36,10 +35,10 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
 
-      - name: Configure Workload Identity Federation
+      - name: Configure GCP Authentication with Service Account
         uses: google-github-actions/auth@v2
         with:
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
 
       - name: Configure Docker to use gcloud as credential helper
         run: |
