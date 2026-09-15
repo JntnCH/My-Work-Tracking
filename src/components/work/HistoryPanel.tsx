@@ -284,10 +284,11 @@ export function HistoryPanel({
               disabled={syncing}
               className="clay-btn-purple px-4 py-2 text-xs"
             >
-              <CloudUpload className="h-4 w-4" /> {syncing ? "กำลังซิงก์…" : "ส่งขึ้นชีต"}
+              <CloudUpload className="h-4 w-4 text-violet-600 dark:text-violet-300" />{" "}
+              {syncing ? "กำลังซิงก์…" : "ส่งขึ้นชีต"}
             </button>
             <button onClick={onPull} disabled={syncing} className="clay-btn-mint px-4 py-2 text-xs">
-              <CloudDownload className="h-4 w-4" /> ดึงจากชีต
+              <CloudDownload className="h-4 w-4 text-emerald-600 dark:text-emerald-300" /> ดึงจากชีต
             </button>
             <input
               type="file"
@@ -301,14 +302,14 @@ export function HistoryPanel({
               className="clay-btn-white px-3.5 py-2 text-xs"
               title="นำเข้าไฟล์ CSV ประวัติการทำงาน"
             >
-              <Upload className="h-4 w-4" /> นำเข้า CSV
+              <Upload className="h-4 w-4 text-sky-600 dark:text-sky-400" /> นำเข้า CSV
             </button>
             <button
               onClick={exportCSV}
               disabled={logs.length === 0}
               className="clay-btn-white px-3.5 py-2 text-xs"
             >
-              <Download className="h-4 w-4" /> CSV
+              <Download className="h-4 w-4 text-indigo-600 dark:text-indigo-400" /> CSV
             </button>
           </div>
         </div>
@@ -371,13 +372,14 @@ export function HistoryPanel({
       {logs.length === 0 && (
         <div className="clay-card flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-dashed border-2 border-primary/30">
           <div className="flex items-center gap-2">
-            <FileSpreadsheet className="h-5 w-5 text-primary" />
+            <FileSpreadsheet className="h-5 w-5 text-emerald-500 dark:text-emerald-400" />
             <span className="text-xs font-medium">
               มีชุดข้อมูลบันทึกงานเดือนสิงหาคม 2026 (18 รายการ) พร้อมใช้งาน
             </span>
           </div>
           <button onClick={loadSeedLogs} className="clay-btn-purple px-4 py-2 text-xs">
-            <Upload className="h-3.5 w-3.5" /> โหลดชุดข้อมูล 18 รายการ
+            <Upload className="h-3.5 w-3.5 text-sky-600 dark:text-sky-300" /> โหลดชุดข้อมูล 18
+            รายการ
           </button>
         </div>
       )}
@@ -410,7 +412,8 @@ export function HistoryPanel({
                     )}
                   </div>
                   <p className="mt-1 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
-                    <MapPin className="h-3.5 w-3.5 text-primary" /> {log.locationName}
+                    <MapPin className="h-3.5 w-3.5 text-rose-500 dark:text-rose-400" />{" "}
+                    {log.locationName}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground/80">
                     {formatThaiDateTime(log.checkInTime)} → {formatThaiDateTime(log.checkOutTime)}
@@ -427,13 +430,14 @@ export function HistoryPanel({
                           onClick={() => saveEdit(log.id)}
                           className="clay-btn-mint px-3 py-1 text-xs"
                         >
-                          <Check className="h-3.5 w-3.5" /> บันทึก
+                          <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-300" />{" "}
+                          บันทึก
                         </button>
                         <button
                           onClick={() => setEditing(null)}
                           className="clay-btn-white px-3 py-1 text-xs border border-border"
                         >
-                          <X className="h-3.5 w-3.5" /> ยกเลิก
+                          <X className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" /> ยกเลิก
                         </button>
                       </>
                     ) : (
@@ -443,14 +447,15 @@ export function HistoryPanel({
                           aria-label={`แก้ไขเวลา ${log.id}`}
                           className="clay-btn-purple px-3 py-1 text-xs"
                         >
-                          <Pencil className="h-3.5 w-3.5" /> แก้ไข
+                          <Pencil className="h-3.5 w-3.5 text-violet-600 dark:text-violet-300" />{" "}
+                          แก้ไข
                         </button>
                         <button
                           onClick={() => onDelete(log.id)}
                           aria-label={`ลบรายการ ${log.id}`}
                           className="clay-btn-white px-3 py-1 text-xs text-destructive border border-destructive/20 hover:bg-destructive/10"
                         >
-                          <Trash2 className="h-3.5 w-3.5" /> ลบ
+                          <Trash2 className="h-3.5 w-3.5 text-rose-500 dark:text-rose-400" /> ลบ
                         </button>
                       </>
                     )}

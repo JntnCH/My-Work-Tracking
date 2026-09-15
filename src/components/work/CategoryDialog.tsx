@@ -84,7 +84,7 @@ export function CategoryDialog({ open, categories, onSave, onClose }: Props) {
         <div className="mb-4 flex items-center justify-between">
           <h3 className="font-bold">จัดการประเภทงาน</h3>
           <button onClick={onClose} aria-label="ปิด" className="rounded-md p-1 hover:bg-muted">
-            <X className="h-4 w-4" />
+            <X className="h-4 w-4 text-slate-400 hover:text-rose-500" />
           </button>
         </div>
 
@@ -101,7 +101,7 @@ export function CategoryDialog({ open, categories, onSave, onClose }: Props) {
             onClick={add}
             className="flex items-center gap-1 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground"
           >
-            <Plus className="h-4 w-4" /> เพิ่ม
+            <Plus className="h-4 w-4 text-emerald-100" /> เพิ่ม
           </button>
         </div>
         {error ? <p className="mb-2 text-xs text-destructive">{error}</p> : null}
@@ -147,14 +147,14 @@ export function CategoryDialog({ open, categories, onSave, onClose }: Props) {
                       aria-label={`แก้ไข ${cat}`}
                       className="rounded p-1.5 text-primary hover:bg-accent cursor-pointer"
                     >
-                      <Pencil className="h-4 w-4" />
+                      <Pencil className="h-4 w-4 text-violet-500 dark:text-violet-400" />
                     </button>
                     <button
                       onClick={() => remove(index)}
                       aria-label={`ลบ ${cat}`}
                       className="rounded p-1.5 text-destructive hover:bg-destructive/10 cursor-pointer"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-4 w-4 text-rose-500 dark:text-rose-400" />
                     </button>
                   </div>
                 </>

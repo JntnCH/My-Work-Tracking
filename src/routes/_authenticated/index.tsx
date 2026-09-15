@@ -36,10 +36,30 @@ export const Route = createFileRoute("/_authenticated/")({
 });
 
 const TABS = [
-  { id: "checkin", label: "Check-in / Out", icon: MapPinned },
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "history", label: "ประวัติการทำงาน", icon: ClipboardList },
-  { id: "settings", label: "ตั้งค่าระบบ", icon: Settings2 },
+  {
+    id: "checkin",
+    label: "Check-in / Out",
+    icon: MapPinned,
+    iconColor: "text-emerald-500 dark:text-emerald-400",
+  },
+  {
+    id: "dashboard",
+    label: "Dashboard",
+    icon: LayoutDashboard,
+    iconColor: "text-sky-500 dark:text-sky-400",
+  },
+  {
+    id: "history",
+    label: "ประวัติการทำงาน",
+    icon: ClipboardList,
+    iconColor: "text-amber-500 dark:text-amber-400",
+  },
+  {
+    id: "settings",
+    label: "ตั้งค่าระบบ",
+    icon: Settings2,
+    iconColor: "text-violet-500 dark:text-violet-400",
+  },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -206,7 +226,7 @@ function Index() {
         <div className="mx-auto max-w-4xl px-3 pt-2.5 pb-2.5 sm:px-4">
           <div className="clay-nav-tray overflow-x-auto">
             <div className="flex min-w-max gap-2 p-1">
-              {TABS.map(({ id, label, icon: Icon }) => {
+              {TABS.map(({ id, label, icon: Icon, iconColor }) => {
                 const isActive = tab === id;
                 return (
                   <button
@@ -219,7 +239,9 @@ function Index() {
                         : "text-muted-foreground hover:bg-white/60 hover:text-foreground dark:hover:bg-white/10"
                     }`}
                   >
-                    <Icon className="h-4 w-4 shrink-0 stroke-[2.5]" />
+                    <Icon
+                      className={`h-4 w-4 shrink-0 stroke-[2.5] ${isActive ? "text-[#0A2944] dark:text-white" : iconColor}`}
+                    />
                     <span>{label}</span>
                   </button>
                 );

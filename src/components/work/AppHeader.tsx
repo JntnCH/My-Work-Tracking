@@ -62,7 +62,7 @@ export function AppHeader({
     <header className="gradient-header sticky top-0 z-40 text-primary-foreground shadow-lg">
       <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-2 px-3 py-3 sm:gap-3 sm:px-4 sm:py-4">
         <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
-          <div className="rounded-xl bg-card p-2 text-primary shadow-md">
+          <div className="rounded-xl bg-card p-2 text-sky-500 dark:text-sky-400 shadow-md">
             <Clock3 className="h-5 w-5" />
           </div>
           <div className="min-w-0">
@@ -112,7 +112,11 @@ export function AppHeader({
             aria-label={themeMode === "dark" ? "เปลี่ยนเป็นโหมดสว่าง" : "เปลี่ยนเป็นโหมดมืด"}
             className="rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 p-2 transition hover:bg-primary-foreground/20 active:scale-95"
           >
-            {themeMode === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            {themeMode === "dark" ? (
+              <Sun className="h-4 w-4 text-amber-400" />
+            ) : (
+              <Moon className="h-4 w-4 text-indigo-300 dark:text-indigo-200" />
+            )}
           </button>
 
           {faceSupported && (
@@ -125,7 +129,7 @@ export function AppHeader({
                 faceEnrolled ? "bg-primary-foreground/30" : "bg-primary-foreground/10"
               }`}
             >
-              <ScanFace className="h-4 w-4" />
+              <ScanFace className="h-4 w-4 text-emerald-300 dark:text-emerald-400" />
             </button>
           )}
 
@@ -135,7 +139,7 @@ export function AppHeader({
             aria-label="ออกจากระบบ"
             className="rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 p-2 transition hover:bg-primary-foreground/20"
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut className="h-4 w-4 text-rose-300 dark:text-rose-400" />
           </button>
         </div>
       </div>

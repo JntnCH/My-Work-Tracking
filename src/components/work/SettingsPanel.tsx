@@ -570,7 +570,8 @@ export function SettingsPanel({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="flex items-center gap-2 text-lg font-bold">
-              <Settings2 className="h-5 w-5 text-primary" /> ตั้งค่าระบบ (Settings)
+              <Settings2 className="h-5 w-5 text-violet-500 dark:text-violet-400" /> ตั้งค่าระบบ
+              (Settings)
             </h2>
             <p className="text-xs text-muted-foreground">
               Settings → Unlock → Edit → Preview → Save → Lock · การเปลี่ยนแปลงจะแสดงผลทันที
@@ -582,7 +583,7 @@ export function SettingsPanel({
               }`}
               data-testid="settings-source"
             >
-              <Database className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <Database className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sky-500 dark:text-sky-400" />
               <span>
                 {isGuest
                   ? "โหมดไม่ระบุตัวตน (Guest Mode): การตั้งค่าถูกเก็บเฉพาะเบราว์เซอร์นี้ ไม่ซิงก์ข้ามอุปกรณ์"
@@ -610,7 +611,7 @@ export function SettingsPanel({
             disabled={!isLocked}
             className="clay-btn-purple px-4 py-2 text-xs disabled:opacity-45 disabled:cursor-not-allowed"
           >
-            <Unlock className="h-4 w-4" /> Unlock
+            <Unlock className="h-4 w-4 text-purple-600 dark:text-purple-300" /> Unlock
           </button>
           <button
             type="button"
@@ -618,7 +619,7 @@ export function SettingsPanel({
             disabled={isLocked}
             className="clay-btn-white px-4 py-2 text-xs border border-border/80 disabled:opacity-45 disabled:cursor-not-allowed"
           >
-            <Lock className="h-4 w-4" /> Lock
+            <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400" /> Lock
           </button>
           <button
             type="button"
@@ -626,7 +627,7 @@ export function SettingsPanel({
             disabled={!isDirty}
             className="clay-btn-white px-4 py-2 text-xs border border-border/80 disabled:opacity-45 disabled:cursor-not-allowed"
           >
-            <RotateCcw className="h-4 w-4" /> Cancel
+            <RotateCcw className="h-4 w-4 text-slate-600 dark:text-slate-300" /> Cancel
           </button>
           <button
             type="button"
@@ -634,11 +635,13 @@ export function SettingsPanel({
             disabled={isLocked || !isDirty || isSaving}
             className="clay-btn-mint px-5 py-2 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Save className="h-4 w-4" /> {isSaving ? "กำลังบันทึก…" : "Save หมวดนี้"}
+            <Save className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />{" "}
+            {isSaving ? "กำลังบันทึก…" : "Save หมวดนี้"}
           </button>
           {isDirty && (
             <span className="flex items-center gap-1 text-[11px] text-warning-foreground">
-              <AlertTriangle className="h-3.5 w-3.5" /> ต้องกด Save ก่อนออกจากหน้า
+              <AlertTriangle className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" /> ต้องกด
+              Save ก่อนออกจากหน้า
             </span>
           )}
         </div>
@@ -654,8 +657,10 @@ export function SettingsPanel({
               : "text-muted-foreground hover:bg-accent"
           }`}
         >
-          <Briefcase className="h-4 w-4" /> ประเภทงาน ({workTypes.filter((w) => w.is_active).length}
-          )
+          <Briefcase
+            className={`h-4 w-4 ${activeTab === "worktypes" ? "" : "text-amber-500 dark:text-amber-400"}`}
+          />{" "}
+          ประเภทงาน ({workTypes.filter((w) => w.is_active).length})
         </button>
         <button
           onClick={() => setActiveTab("ot")}
@@ -665,7 +670,10 @@ export function SettingsPanel({
               : "text-muted-foreground hover:bg-accent"
           }`}
         >
-          <Clock className="h-4 w-4" /> ประเภท OT
+          <Clock
+            className={`h-4 w-4 ${activeTab === "ot" ? "" : "text-orange-500 dark:text-orange-400"}`}
+          />{" "}
+          ประเภท OT
         </button>
         <button
           onClick={() => setActiveTab("theme")}
@@ -675,7 +683,10 @@ export function SettingsPanel({
               : "text-muted-foreground hover:bg-accent"
           }`}
         >
-          <Palette className="h-4 w-4" /> ธีม &amp; สีกราฟ
+          <Palette
+            className={`h-4 w-4 ${activeTab === "theme" ? "" : "text-pink-500 dark:text-pink-400"}`}
+          />{" "}
+          ธีม &amp; สีกราฟ
         </button>
         <button
           onClick={() => setActiveTab("general")}
@@ -685,7 +696,10 @@ export function SettingsPanel({
               : "text-muted-foreground hover:bg-accent"
           }`}
         >
-          <Settings2 className="h-4 w-4" /> ค่าแรง &amp;
+          <Settings2
+            className={`h-4 w-4 ${activeTab === "general" ? "" : "text-indigo-500 dark:text-indigo-400"}`}
+          />{" "}
+          ค่าแรง &amp; สาขา
         </button>
         <button
           onClick={() => setActiveTab("layout")}
@@ -695,7 +709,10 @@ export function SettingsPanel({
               : "text-muted-foreground hover:bg-accent"
           }`}
         >
-          <Maximize2 className="h-4 w-4" /> Layout Dashboard
+          <Maximize2
+            className={`h-4 w-4 ${activeTab === "layout" ? "" : "text-sky-500 dark:text-sky-400"}`}
+          />{" "}
+          Layout Dashboard
         </button>
         <button
           onClick={() => setActiveTab("authentication")}
@@ -705,7 +722,10 @@ export function SettingsPanel({
               : "text-muted-foreground hover:bg-accent"
           }`}
         >
-          <ShieldCheck className="h-4 w-4" /> Authentication
+          <ShieldCheck
+            className={`h-4 w-4 ${activeTab === "authentication" ? "" : "text-emerald-500 dark:text-emerald-400"}`}
+          />{" "}
+          Authentication
         </button>
         <button
           onClick={() => setActiveTab("integrations")}
@@ -715,7 +735,10 @@ export function SettingsPanel({
               : "text-muted-foreground hover:bg-accent"
           }`}
         >
-          <Database className="h-4 w-4" /> Supabase &amp; Airtable
+          <Database
+            className={`h-4 w-4 ${activeTab === "integrations" ? "" : "text-cyan-500 dark:text-cyan-400"}`}
+          />{" "}
+          Supabase &amp; Airtable
         </button>
       </div>
 

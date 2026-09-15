@@ -112,7 +112,7 @@ export function FaceLockScreen({
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-8">
       <div className="surface-card w-full max-w-sm space-y-6 p-7 text-center">
-        <div className="mx-auto w-fit rounded-2xl bg-primary/10 p-3 text-primary">
+        <div className="mx-auto w-fit rounded-2xl bg-amber-500/10 p-3 text-amber-500 dark:text-amber-400">
           <Lock className="h-7 w-7" />
         </div>
 
@@ -124,7 +124,8 @@ export function FaceLockScreen({
         {inIframe && (
           <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-left text-xs text-amber-600 dark:text-amber-400">
             <p className="font-semibold flex items-center gap-1.5 mb-1">
-              <ExternalLink className="h-4 w-4 shrink-0" /> เปิดในกรอบพรีวิว (iframe)
+              <ExternalLink className="h-4 w-4 shrink-0 text-amber-500 dark:text-amber-400" />{" "}
+              เปิดในกรอบพรีวิว (iframe)
             </p>
             <p className="opacity-90 leading-relaxed">
               เบราว์เซอร์จะบล็อก Face ID เมื่อเปิดในกรอบพรีวิว กรุณากดปุ่มเปิดในแท็บใหม่ (New Tab)
@@ -139,7 +140,7 @@ export function FaceLockScreen({
             disabled={busy}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground shadow transition hover:bg-primary/90 disabled:opacity-60"
           >
-            <ScanFace className="h-4 w-4" />
+            <ScanFace className="h-4 w-4 text-emerald-100 dark:text-emerald-200" />
             {busy ? "กำลังยืนยัน Face ID…" : "ปลดล็อกด้วย Face ID / Touch ID"}
           </button>
 
@@ -150,7 +151,7 @@ export function FaceLockScreen({
             }}
             className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-secondary py-2.5 text-xs font-semibold text-foreground transition hover:bg-secondary/80"
           >
-            <KeyRound className="h-3.5 w-3.5 text-primary" />
+            <KeyRound className="h-3.5 w-3.5 text-sky-500 dark:text-sky-400" />
             ปลดล็อกด้วยสิทธิ์บัญชีปัจจุบัน
           </button>
         </div>
@@ -163,7 +164,7 @@ export function FaceLockScreen({
             }}
             className="flex items-center gap-1 text-muted-foreground hover:text-destructive transition"
           >
-            <Trash2 className="h-3.5 w-3.5" /> ยกเลิก Face ID
+            <Trash2 className="h-3.5 w-3.5 text-rose-500 dark:text-rose-400" /> ยกเลิก Face ID
           </button>
 
           <button

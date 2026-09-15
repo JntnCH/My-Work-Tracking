@@ -39,7 +39,7 @@ export function renderDashboardCardContent(
       return (
         <div className="clay-card-mint flex h-full min-h-24 flex-col items-center justify-center p-4 text-center sm:p-5">
           <div className="flex w-full items-center justify-center gap-2 whitespace-nowrap text-center text-xs font-bold leading-5">
-            <Coins className="h-4 w-4 shrink-0 stroke-[2.5]" />
+            <Coins className="h-4 w-4 shrink-0 stroke-[2.5] text-amber-500 dark:text-amber-400" />
             <span>รายได้สุทธิรวม</span>
           </div>
           <div
@@ -54,7 +54,7 @@ export function renderDashboardCardContent(
       return (
         <Stat
           compact
-          icon={<CalendarCheck className="h-4 w-4" />}
+          icon={<CalendarCheck className="h-4 w-4 text-emerald-500 dark:text-emerald-400" />}
           label="วันทำงานทั้งหมด"
           value={`${summary.workDays} วัน`}
           testId="stat-days"
@@ -64,7 +64,7 @@ export function renderDashboardCardContent(
       return (
         <Stat
           compact
-          icon={<TrendingUp className="h-4 w-4" />}
+          icon={<TrendingUp className="h-4 w-4 text-orange-500 dark:text-orange-400" />}
           label="วันที่มี OT"
           value={`${summary.daysWithOt} วัน`}
           testId="stat-days-with-ot"
@@ -74,7 +74,7 @@ export function renderDashboardCardContent(
       return (
         <Stat
           compact
-          icon={<CalendarCheck className="h-4 w-4" />}
+          icon={<CalendarCheck className="h-4 w-4 text-teal-500 dark:text-teal-400" />}
           label="วันที่ไม่มี OT"
           value={`${summary.daysWithoutOt} วัน`}
           testId="stat-days-without-ot"
@@ -84,7 +84,7 @@ export function renderDashboardCardContent(
       return (
         <Stat
           compact
-          icon={<ListChecks className="h-4 w-4" />}
+          icon={<ListChecks className="h-4 w-4 text-indigo-500 dark:text-indigo-400" />}
           label="งานที่ทำเสร็จ"
           value={`${summary.totalTasks} งาน`}
           testId="stat-tasks"
@@ -94,7 +94,7 @@ export function renderDashboardCardContent(
       return (
         <Stat
           compact
-          icon={<ListChecks className="h-4 w-4" />}
+          icon={<ListChecks className="h-4 w-4 text-violet-500 dark:text-violet-400" />}
           label="เฉลี่ยต่อวัน"
           value={`${summary.avgTasksPerDay} งาน/วัน`}
           testId="stat-tasks-avg"
@@ -104,7 +104,7 @@ export function renderDashboardCardContent(
       return (
         <Stat
           compact
-          icon={<Clock className="h-4 w-4" />}
+          icon={<Clock className="h-4 w-4 text-sky-500 dark:text-sky-400" />}
           label="ชั่วโมงรวม"
           value={`${summary.totalHours.toFixed(1)} ชม.`}
           testId="stat-hours"
@@ -114,7 +114,7 @@ export function renderDashboardCardContent(
       return (
         <Stat
           compact
-          icon={<TrendingUp className="h-4 w-4" />}
+          icon={<TrendingUp className="h-4 w-4 text-orange-500 dark:text-orange-400" />}
           label={`OT ${summary.totalOtHours.toFixed(1)} ชม.`}
           value={formatTHB(summary.totalOtIncome)}
           testId="stat-ot"
@@ -124,7 +124,7 @@ export function renderDashboardCardContent(
       return (
         <Stat
           compact
-          icon={<Coins className="h-4 w-4" />}
+          icon={<Coins className="h-4 w-4 text-emerald-500 dark:text-emerald-400" />}
           label="เบี้ยเลี้ยง/รายรับอื่น"
           value={formatTHB(summary.totalAllowances)}
           testId="stat-allowance"
@@ -134,7 +134,7 @@ export function renderDashboardCardContent(
       return (
         <Stat
           compact
-          icon={<MinusCircle className="h-4 w-4" />}
+          icon={<MinusCircle className="h-4 w-4 text-rose-500 dark:text-rose-400" />}
           label="รายการหักรวม"
           value={formatTHB(summary.totalDeductions)}
           testId="stat-deduction"

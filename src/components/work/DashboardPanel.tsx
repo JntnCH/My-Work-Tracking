@@ -175,7 +175,9 @@ function DashboardControls({
           data-testid="dashboard-refresh"
           className={controlCls}
         >
-          <RefreshCw className={`h-3.5 w-3.5 shrink-0 ${syncing ? "animate-spin" : ""}`} />
+          <RefreshCw
+            className={`h-3.5 w-3.5 shrink-0 text-sky-500 dark:text-sky-400 ${syncing ? "animate-spin" : ""}`}
+          />
           <span className="truncate">รีเฟรชจากชีต</span>
         </button>
       ) : null}

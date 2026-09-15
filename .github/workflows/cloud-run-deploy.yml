@@ -4,13 +4,12 @@ on:
   push:
     branches:
       - main
-
   workflow_dispatch:
     inputs:
       environment:
-        description: "Deployment environment"
+        description: 'Deployment environment'
         required: true
-        default: "production"
+        default: 'production'
         type: choice
         options:
           - production
@@ -19,231 +18,83 @@ on:
 env:
   GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
   GCP_REGION: ${{ vars.GCP_REGION }}
-  CLOUD_RUN_SERVICE: ${{ vars.CLOUD_RUN_SERVICE || 'my-work-tracking' }}
+  CLOUD_RUN_SERVICE: ${{ vars.CLOUD_RUN_SERVICE }}
   GAR_REPOSITORY: ${{ vars.GAR_REPOSITORY }}
-  IMAGE_NAME: my-work-tracking
-  CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT: ${{ vars.CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT || '' }}
+  IMAGE_NAME: ${{ vars.GAR_REPOSITORY }}/my-work-tracking
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     permissions:
       contents: read
+      id-token: write
 
     steps:
-
-      # --------------------------------------------------
-      # 1. Checkout
-      # --------------------------------------------------
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
 
-      # --------------------------------------------------
-      # 2. Authenticate Google Cloud
-      #    ใช้ Service Account JSON
-      #    ไม่ใช้ Workload Identity Federation
-      # --------------------------------------------------
-      - name: Authenticate to Google Cloud
+      - name: Configure Workload Identity Federation
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
-
-      # --------------------------------------------------
-      # 3. Setup Google Cloud SDK
-      # --------------------------------------------------
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
-
-
-      # --------------------------------------------------
-      # 4. Configure Docker สำหรับ Artifact Registry
-      # --------------------------------------------------
       - name: Configure Docker to use gcloud as credential helper
         run: |
-          gcloud auth configure-docker \
-            ${{ env.GCP_REGION }}-docker.pkg.dev \
-            --quiet
+          gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev
 
-
-      # --------------------------------------------------
-      # 5. Verify Google Cloud authentication
-      # --------------------------------------------------
-      - name: Verify Google Cloud configuration
-        run: |
-          echo "Project: ${{ env.GCP_PROJECT_ID }}"
-          echo "Region: ${{ env.GCP_REGION }}"
-          echo "Cloud Run Service: ${{ env.CLOUD_RUN_SERVICE }}"
-          echo "Artifact Registry: ${{ env.GAR_REPOSITORY }}"
-
-          gcloud config set project "${{ env.GCP_PROJECT_ID }}"
-
-          gcloud auth list
-
-
-      # --------------------------------------------------
-      # 6. Create Artifact Registry Repository (if not exists)
-      # --------------------------------------------------
-      - name: Create Artifact Registry Repository
-        run: |
-          set -e
-          
-          echo "Checking if repository exists: ${{ env.GAR_REPOSITORY }}"
-          
-          # Try to describe the repository
-          if gcloud artifacts repositories describe "${{ env.GAR_REPOSITORY }}" \
-            --location="${{ env.GCP_REGION }}" \
-            --project="${{ env.GCP_PROJECT_ID }}" 2>/dev/null; then
-            echo "✓ Repository already exists"
-          else
-            echo "Repository does not exist, creating it..."
-            gcloud artifacts repositories create "${{ env.GAR_REPOSITORY }}" \
-              --repository-format=docker \
-              --location="${{ env.GCP_REGION }}" \
-              --project="${{ env.GCP_PROJECT_ID }}" \
-              --description="Docker repository for My-Work-Tracking"
-            echo "✓ Repository created successfully"
-          fi
-          
-          # List all repositories to verify
-          echo ""
-          echo "All repositories in this region:"
-          gcloud artifacts repositories list \
-            --location="${{ env.GCP_REGION }}" \
-            --project="${{ env.GCP_PROJECT_ID }}"
-
-
-      # --------------------------------------------------
-      # 7. Build Docker image
-      # --------------------------------------------------
       - name: Build Docker image
         run: |
           docker build \
-            --build-arg VITE_SUPABASE_URL="${{ vars.VITE_SUPABASE_URL }}" \
-            --build-arg VITE_SUPABASE_PUBLISHABLE_KEY="${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}" \
-            --build-arg VITE_FIREBASE_API_KEY="${{ secrets.VITE_FIREBASE_API_KEY }}" \
-            --build-arg VITE_FIREBASE_APP_ID="${{ vars.VITE_FIREBASE_APP_ID }}" \
-            --build-arg VITE_FIREBASE_AUTH_DOMAIN="${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}" \
-            --build-arg VITE_FIREBASE_MEASUREMENT_ID="${{ vars.VITE_FIREBASE_MEASUREMENT_ID }}" \
-            --build-arg VITE_FIREBASE_MESSAGING_SENDER_ID="${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID }}" \
-            --build-arg VITE_FIREBASE_PROJECT_ID="${{ vars.VITE_FIREBASE_PROJECT_ID }}" \
-            --build-arg VITE_FIREBASE_STORAGE_BUCKET="${{ vars.VITE_FIREBASE_STORAGE_BUCKET }}" \
-            --build-arg VITE_LINE_LIFF_ID="${{ secrets.VITE_LINE_LIFF_ID }}" \
-            -t "${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" \
-            -t "${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/${{ env.IMAGE_NAME }}:latest" \
+            --build-arg VITE_SUPABASE_URL=${{ vars.VITE_SUPABASE_URL }} \
+            --build-arg VITE_SUPABASE_PUBLISHABLE_KEY=${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }} \
+            --build-arg VITE_FIREBASE_API_KEY=${{ secrets.VITE_FIREBASE_API_KEY }} \
+            --build-arg VITE_FIREBASE_APP_ID=${{ vars.VITE_FIREBASE_APP_ID }} \
+            --build-arg VITE_FIREBASE_AUTH_DOMAIN=${{ vars.VITE_FIREBASE_AUTH_DOMAIN }} \
+            --build-arg VITE_FIREBASE_MEASUREMENT_ID=${{ vars.VITE_FIREBASE_MEASUREMENT_ID }} \
+            --build-arg VITE_FIREBASE_MESSAGING_SENDER_ID=${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID }} \
+            --build-arg VITE_FIREBASE_PROJECT_ID=${{ vars.VITE_FIREBASE_PROJECT_ID }} \
+            --build-arg VITE_FIREBASE_STORAGE_BUCKET=${{ vars.VITE_FIREBASE_STORAGE_BUCKET }} \
+            --build-arg VITE_LINE_LIFF_ID=${{ secrets.VITE_LINE_LIFF_ID }} \
+            -t ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            -t ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.IMAGE_NAME }}:latest \
             .
 
-
-      # --------------------------------------------------
-      # 8. Push image SHA
-      # --------------------------------------------------
-      - name: Push Docker image
+      - name: Push Docker image to Artifact Registry
         run: |
-          docker push \
-            "${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          docker push ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker push ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.IMAGE_NAME }}:latest
 
-
-      # --------------------------------------------------
-      # 9. Push latest image
-      # --------------------------------------------------
-      - name: Push latest Docker image
-        run: |
-          docker push \
-            "${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/${{ env.IMAGE_NAME }}:latest"
-
-
-      # --------------------------------------------------
-      # 10. Deploy Cloud Run
-      # --------------------------------------------------
       - name: Deploy to Cloud Run
         run: |
-          DEPLOY_CMD="gcloud run deploy ${{ env.CLOUD_RUN_SERVICE }} \
-            --image ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+          gcloud run deploy ${{ env.CLOUD_RUN_SERVICE }} \
+            --image ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
             --region ${{ env.GCP_REGION }} \
             --platform managed \
             --allow-unauthenticated \
             --memory 512Mi \
             --cpu 1 \
             --timeout 3600 \
-            --set-env-vars NODE_ENV=production,LOG_LEVEL=info"
-          
-          # Add service account only if it's specified
-          if [ -n "${{ env.CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT }}" ]; then
-            DEPLOY_CMD="$DEPLOY_CMD --service-account ${{ env.CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT }}"
-          fi
-          
-          eval "$DEPLOY_CMD"
+            --service-account ${{ vars.CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT }} \
+            --update-env-vars NODE_ENV=production,LOG_LEVEL=info
 
-
-      # --------------------------------------------------
-      # 11. ตรวจสอบ Cloud Run
-      # --------------------------------------------------
-      - name: Check Cloud Run deployment
-        run: |
-          gcloud run services describe "${{ env.CLOUD_RUN_SERVICE }}" \
-            --region "${{ env.GCP_REGION }}" \
-            --format="value(status.conditions)"
-
-
-      # --------------------------------------------------
-      # 12. Get Cloud Run URL
-      # --------------------------------------------------
       - name: Get Cloud Run service URL
         id: service-url
         run: |
-          SERVICE_URL=$(gcloud run services describe \
-            "${{ env.CLOUD_RUN_SERVICE }}" \
-            --region "${{ env.GCP_REGION }}" \
-            --format="value(status.url)")
+          SERVICE_URL=$(gcloud run services describe ${{ env.CLOUD_RUN_SERVICE }} \
+            --region ${{ env.GCP_REGION }} \
+            --format 'value(status.url)')
+          echo "url=$SERVICE_URL" >> $GITHUB_OUTPUT
+          echo "✅ Deployed to: $SERVICE_URL"
 
-          echo "url=$SERVICE_URL" >> "$GITHUB_OUTPUT"
-
-          echo "=========================================="
-          echo "Cloud Run URL:"
-          echo "$SERVICE_URL"
-          echo "=========================================="
-
-
-      # --------------------------------------------------
-      # 13. Test HTTP response
-      # --------------------------------------------------
-      - name: Test Cloud Run URL
-        run: |
-          SERVICE_URL="${{ steps.service-url.outputs.url }}"
-
-          echo "Testing:"
-          echo "$SERVICE_URL"
-
-          HTTP_STATUS=$(curl \
-            --silent \
-            --output /dev/null \
-            --write-out "%{http_code}" \
-            --max-time 30 \
-            "$SERVICE_URL")
-
-          echo "HTTP Status: $HTTP_STATUS"
-
-          if [ "$HTTP_STATUS" -lt 200 ] || [ "$HTTP_STATUS" -ge 400 ]; then
-            echo "Cloud Run returned HTTP $HTTP_STATUS"
-            exit 1
-          fi
-
-          echo "Cloud Run is responding successfully."
-
-
-      # --------------------------------------------------
-      # 14. Deployment Summary
-      # --------------------------------------------------
       - name: Deployment Summary
         run: |
-          echo "## 🚀 Cloud Run Deployment Summary" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **Service:** ${{ env.CLOUD_RUN_SERVICE }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **Region:** ${{ env.GCP_REGION }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **Project:** ${{ env.GCP_PROJECT_ID }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **Image:** ${{ env.IMAGE_NAME }}:${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **URL:** ${{ steps.service-url.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **Authentication:** Service Account JSON" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **Workload Identity:** Not used" >> "$GITHUB_STEP_SUMMARY"
+          echo "## 🚀 Cloud Run Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Service**: ${{ env.CLOUD_RUN_SERVICE }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Region**: ${{ env.GCP_REGION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image**: ${{ env.IMAGE_NAME }}:${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL**: ${{ steps.service-url.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY

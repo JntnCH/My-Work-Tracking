@@ -430,7 +430,7 @@ export function CheckInPanel({
                     htmlFor="editCheckInTime"
                     className="flex cursor-pointer items-center gap-1.5"
                   >
-                    <Clock className="h-3.5 w-3.5 text-primary" />
+                    <Clock className="h-3.5 w-3.5 text-sky-500 dark:text-sky-400" />
                     <span>แก้ไขเวลาเข้างาน</span>
                   </label>
                   <span className="text-[10px] font-normal text-muted-foreground">
@@ -471,7 +471,8 @@ export function CheckInPanel({
                 onClick={() => setCatOpen(true)}
                 className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
               >
-                <Settings2 className="h-3.5 w-3.5" /> จัดการประเภทงาน
+                <Settings2 className="h-3.5 w-3.5 text-violet-500 dark:text-violet-400" />{" "}
+                จัดการประเภทงาน
               </button>
             </div>
             <select
@@ -505,9 +506,9 @@ export function CheckInPanel({
                 }
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center gap-1 text-xs font-medium text-success hover:underline"
+                className="flex items-center gap-1 text-xs font-medium text-rose-500 dark:text-rose-400 hover:underline"
               >
-                <MapPin className="h-3.5 w-3.5" /> เปิด Google Maps
+                <MapPin className="h-3.5 w-3.5 text-rose-500 dark:text-rose-400" /> เปิด Google Maps
               </a>
             </div>
             <input
@@ -524,7 +525,8 @@ export function CheckInPanel({
             <div className="mt-2.5 rounded-xl border border-border/80 bg-secondary/50 p-3.5 shadow-sm">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-1.5 text-xs font-bold text-muted-foreground">
-                  <LocateFixed className="h-4 w-4 shrink-0 text-primary" /> ตำแหน่งปัจจุบัน
+                  <LocateFixed className="h-4 w-4 shrink-0 text-emerald-500 dark:text-emerald-400" />{" "}
+                  ตำแหน่งปัจจุบัน
                 </div>
                 <button
                   onClick={() => void fetchGPS()}
@@ -533,7 +535,9 @@ export function CheckInPanel({
                   aria-label="ค้นหาตำแหน่งปัจจุบัน"
                   className="flex shrink-0 items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-bold text-accent-foreground shadow-sm transition hover:brightness-105 active:scale-95 disabled:opacity-60"
                 >
-                  <Crosshair className={`h-4 w-4 ${gpsLoading ? "animate-spin" : ""}`} />
+                  <Crosshair
+                    className={`h-4 w-4 text-cyan-600 dark:text-cyan-300 ${gpsLoading ? "animate-spin" : ""}`}
+                  />
                   {gpsLoading ? "กำลังค้นหา…" : "ค้นหาตำแหน่ง"}
                 </button>
               </div>
@@ -847,7 +851,7 @@ export function CheckInPanel({
                 onClick={() => fileRef.current?.click()}
                 className="flex w-full flex-col items-center gap-2 py-4 text-muted-foreground"
               >
-                <Camera className="h-7 w-7" />
+                <Camera className="h-7 w-7 text-violet-500 dark:text-violet-400" />
                 <span className="text-xs font-medium">ถ่ายรูป / แนบรูปหลักฐาน (ไม่บังคับ)</span>
               </button>
             )}
@@ -947,7 +951,7 @@ function StatusMotion({ running }: { running: boolean }) {
         />
       ) : (
         <>
-          <BedDouble className="sleep-breathe h-7 w-7" />
+          <BedDouble className="sleep-breathe h-7 w-7 text-amber-500/80 dark:text-amber-400/80" />
           <span className="sleep-z absolute -top-1 right-0 text-xs font-black [animation-delay:0ms]">
             z
           </span>
@@ -1028,7 +1032,7 @@ function CheckoutConfirmSheet({
 
         <div className="mb-4 rounded-xl border border-border bg-info-soft px-4 py-3 text-center">
           <p className="flex items-center justify-center gap-1.5 text-xs font-medium text-primary">
-            <Clock className="h-3.5 w-3.5" />
+            <Clock className="h-3.5 w-3.5 text-sky-500 dark:text-sky-400" />
             เวลาทำงาน (รวมพัก)
           </p>
           <p className="text-xl font-bold tabular-nums text-primary">{formatDuration(elapsed)}</p>
