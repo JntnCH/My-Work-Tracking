@@ -15,14 +15,18 @@ import {
 } from "lucide-react";
 import { EngineWorkingAnimation } from "@/components/ui/engine-working-animation";
 import { toast } from "sonner";
-import type { GPSPoint, RateSettings, WorkLog, ActiveCheckIn } from "@/lib/work-log";
+import type { GPSPoint, RateSettings, WorkLog, ActiveCheckIn, WageType } from "@/lib/work-log";
 import {
   BREAK_OPTIONS,
+  DEFAULT_WORK_TYPE_RATES,
   OT_OPTIONS,
+  WAGE_TYPE_OPTIONS,
   calculatePayroll,
   formatDuration,
   fromLocalInput,
+  getEffectiveRateForWorkType,
   parseMapsUrl,
+  storage,
   toLocalInput,
 } from "@/lib/work-log";
 import { CategoryDialog } from "./CategoryDialog";
@@ -99,19 +103,21 @@ export function CheckInPanel({
   const [gps, setGps] = useState<GPSPoint>(EMPTY_GPS);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
-  const [form, setForm] = useState<RateSettings>(rates);
-  const [dailyRateInput, setDailyRateInput] = useState(() => String(rates.dailyRate ?? ""));
+  const [form, setForm] = useState<RateSettings>(() =>
+    getEffectiveRateForWorkType(categories[0] ?? "", rates),
+  );
+  const [dailyRateInput, setDailyRateInput] = useState(() => String(form.dailyRate ?? ""));
   const [travelCostInput, setTravelCostInput] = useState(() =>
-    rates.travelCost ? String(rates.travelCost) : "",
+    form.travelCost ? String(form.travelCost) : "",
   );
   const [foodCostInput, setFoodCostInput] = useState(() =>
-    rates.foodCost ? String(rates.foodCost) : "",
+    form.foodCost ? String(form.foodCost) : "",
   );
   const [otherIncomeInput, setOtherIncomeInput] = useState(() =>
-    rates.otherIncome ? String(rates.otherIncome) : "",
+    form.otherIncome ? String(form.otherIncome) : "",
   );
   const [otherDeductionsInput, setOtherDeductionsInput] = useState(() =>
-    rates.otherDeductions ? String(rates.otherDeductions) : "",
+    form.otherDeductions ? String(form.otherDeductions) : "",
   );
   const [elapsed, setElapsed] = useState(0);
   const [catOpen, setCatOpen] = useState(false);
@@ -119,36 +125,66 @@ export function CheckInPanel({
   const [taskInput, setTaskInput] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Sync state with active shift or category changes
   useEffect(() => {
     if (active) {
-      setWorkType(active.workType || categories[0] || "");
+      const activeType = active.workType || categories[0] || "";
+      setWorkType(activeType);
       setLocationName(active.locationName ?? "");
-      setForm({
+      const wageType: WageType =
+        active.wageType || (active.dailyRate < 100 ? "per_job" : rates.wageType || "daily");
+      const activeRates: RateSettings = {
         dailyRate: active.dailyRate ?? rates.dailyRate,
+        wageType,
         otType: active.otType ?? rates.otType ?? 0,
         travelCost: active.travelCost ?? rates.travelCost ?? 0,
         foodCost: active.foodCost ?? rates.foodCost ?? 0,
         otherIncome: active.otherIncome ?? rates.otherIncome ?? 0,
         otherDeductions: active.otherDeductions ?? rates.otherDeductions ?? 0,
-        breakHours: active.breakHours ?? rates.breakHours ?? 1,
-      });
-      setDailyRateInput(String(active.dailyRate ?? rates.dailyRate ?? ""));
-      setTravelCostInput(active.travelCost ? String(active.travelCost) : "");
-      setFoodCostInput(active.foodCost ? String(active.foodCost) : "");
-      setOtherIncomeInput(active.otherIncome ? String(active.otherIncome) : "");
-      setOtherDeductionsInput(active.otherDeductions ? String(active.otherDeductions) : "");
+        breakHours: active.breakHours ?? rates.breakHours ?? (wageType === "per_job" ? 0 : 1),
+      };
+      setForm(activeRates);
+      setDailyRateInput(String(activeRates.dailyRate ?? ""));
+      setTravelCostInput(activeRates.travelCost ? String(activeRates.travelCost) : "");
+      setFoodCostInput(activeRates.foodCost ? String(activeRates.foodCost) : "");
+      setOtherIncomeInput(activeRates.otherIncome ? String(activeRates.otherIncome) : "");
+      setOtherDeductionsInput(activeRates.otherDeductions ? String(activeRates.otherDeductions) : "");
     } else {
-      setForm(rates);
-      setDailyRateInput(String(rates.dailyRate ?? ""));
-      setTravelCostInput(rates.travelCost ? String(rates.travelCost) : "");
-      setFoodCostInput(rates.foodCost ? String(rates.foodCost) : "");
-      setOtherIncomeInput(rates.otherIncome ? String(rates.otherIncome) : "");
-      setOtherDeductionsInput(rates.otherDeductions ? String(rates.otherDeductions) : "");
+      const effective = getEffectiveRateForWorkType(workType || categories[0] || "", rates);
+      setForm(effective);
+      setDailyRateInput(String(effective.dailyRate ?? ""));
+      setTravelCostInput(effective.travelCost ? String(effective.travelCost) : "");
+      setFoodCostInput(effective.foodCost ? String(effective.foodCost) : "");
+      setOtherIncomeInput(effective.otherIncome ? String(effective.otherIncome) : "");
+      setOtherDeductionsInput(effective.otherDeductions ? String(effective.otherDeductions) : "");
     }
-  }, [active, categories, rates]);
+  }, [active, categories, rates, workType]);
+
+  const handleSelectWorkType = (val: string) => {
+    setWorkType(val);
+    const effective = getEffectiveRateForWorkType(val, rates);
+    setForm(effective);
+    setDailyRateInput(String(effective.dailyRate ?? ""));
+    setTravelCostInput(effective.travelCost ? String(effective.travelCost) : "");
+    setFoodCostInput(effective.foodCost ? String(effective.foodCost) : "");
+
+    if (active) {
+      onEditActiveDetails?.({
+        workType: val,
+        dailyRate: effective.dailyRate,
+        wageType: effective.wageType,
+        breakHours: effective.breakHours,
+        otType: effective.otType,
+        travelCost: effective.travelCost,
+        foodCost: effective.foodCost,
+      });
+    }
+  };
 
   useEffect(() => {
-    if (!categories.includes(workType)) setWorkType(categories[0] ?? "");
+    if (!categories.includes(workType) && categories.length > 0) {
+      handleSelectWorkType(categories[0] ?? "");
+    }
   }, [categories, workType]);
 
   useEffect(() => {
@@ -180,7 +216,6 @@ export function CheckInPanel({
         setGps((current) =>
           current.lat === lat && current.lng === lng ? { ...current, addressName } : current,
         );
-        // Automatically populate location name into the box above if user hasn't typed a custom location
         setLocationName((curr) => {
           if (
             !curr ||
@@ -202,7 +237,6 @@ export function CheckInPanel({
     }
   }, []);
 
-  // Safari may not expose a reliable Permissions API state; never use it as the only gate.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -253,8 +287,6 @@ export function CheckInPanel({
     if (fileRef.current) fileRef.current.value = "";
   };
 
-  const num = (v: string) => (v === "" ? 0 : Number(v));
-
   // Tasks belong to the shift in progress only.
   const tasks = active?.tasks ?? [];
   const setTasks = (next: string[]) => onEditActiveTasks(next);
@@ -272,10 +304,11 @@ export function CheckInPanel({
     const rawDailyRate = dailyRateInput.trim();
     const dailyRate = Number(rawDailyRate);
     if (!rawDailyRate || !Number.isFinite(dailyRate) || dailyRate < 0) {
-      toast.error("กรุณากรอกค่าแรงปกติเป็นตัวเลขที่ไม่ติดลบก่อน Check-in");
+      toast.error("กรุณากรอกค่าแรงเป็นตัวเลขที่ไม่ติดลบก่อน Check-in");
       return;
     }
 
+    const wageType: WageType = form.wageType || (dailyRate < 100 ? "per_job" : "daily");
     const travelCost = travelCostInput.trim() ? Number(travelCostInput) : 0;
     const foodCost = foodCostInput.trim() ? Number(foodCostInput) : 0;
     const otherIncome = otherIncomeInput.trim() ? Number(otherIncomeInput) : 0;
@@ -294,6 +327,20 @@ export function CheckInPanel({
       });
     }
 
+    // Save customized rate for this workType
+    const currentCustom = storage.getWorkTypeRates();
+    storage.setWorkTypeRates({
+      ...currentCustom,
+      [workType]: {
+        dailyRate,
+        wageType,
+        breakHours: form.breakHours ?? (wageType === "per_job" ? 0 : 1),
+        otType: form.otType ?? 0,
+        travelCost: Number.isFinite(travelCost) ? travelCost : 0,
+        foodCost: Number.isFinite(foodCost) ? foodCost : 0,
+      },
+    });
+
     onCheckIn({
       workType,
       locationName: locationName.trim() || nextGPS.addressName || "ไม่ได้ระบุสถานที่",
@@ -302,7 +349,8 @@ export function CheckInPanel({
       rates: {
         ...form,
         dailyRate,
-        breakHours: typeof form.breakHours === "number" ? form.breakHours : 1,
+        wageType,
+        breakHours: typeof form.breakHours === "number" ? form.breakHours : wageType === "per_job" ? 0 : 1,
         travelCost: Number.isFinite(travelCost) ? travelCost : 0,
         foodCost: Number.isFinite(foodCost) ? foodCost : 0,
         otherIncome: Number.isFinite(otherIncome) ? otherIncome : 0,
@@ -317,7 +365,6 @@ export function CheckInPanel({
   const doCheckOut = async () => {
     if (!active || gpsLoading) return false;
 
-    // Always read a fresh position at the moment of Check-out; do not reuse Check-in GPS.
     const checkoutGPS = await fetchGPS();
     if (!checkoutGPS) {
       toast.error("ยังบันทึก Check-out ไม่ได้", {
@@ -328,6 +375,8 @@ export function CheckInPanel({
 
     const rawDailyRate = dailyRateInput.trim();
     const dailyRate = Number(rawDailyRate);
+    const wageType: WageType =
+      form.wageType || active.wageType || (dailyRate < 100 ? "per_job" : "daily");
     const travelCost = travelCostInput.trim() ? Number(travelCostInput) : 0;
     const foodCost = foodCostInput.trim() ? Number(foodCostInput) : 0;
     const otherIncome = otherIncomeInput.trim() ? Number(otherIncomeInput) : 0;
@@ -335,8 +384,12 @@ export function CheckInPanel({
 
     const currentRates: RateSettings = {
       dailyRate: Number.isFinite(dailyRate) ? dailyRate : active.dailyRate || 0,
+      wageType,
       otType: form.otType ?? active.otType ?? 0,
-      breakHours: typeof form.breakHours === "number" ? form.breakHours : (active.breakHours ?? 1),
+      breakHours:
+        typeof form.breakHours === "number"
+          ? form.breakHours
+          : (active.breakHours ?? (wageType === "per_job" ? 0 : 1)),
       travelCost: Number.isFinite(travelCost) ? travelCost : 0,
       foodCost: Number.isFinite(foodCost) ? foodCost : 0,
       otherIncome: Number.isFinite(otherIncome) ? otherIncome : 0,
@@ -353,6 +406,8 @@ export function CheckInPanel({
     setCheckoutOpen(false);
     return true;
   };
+
+  const currentWageType = form.wageType || (form.dailyRate < 100 ? "per_job" : "daily");
 
   return (
     <div className="space-y-5">
@@ -396,14 +451,14 @@ export function CheckInPanel({
               <p className="mt-0.5 truncate text-xs text-muted-foreground sm:text-sm">
                 {active
                   ? `สถานที่: ${active.locationName} | Check-in เมื่อ ${new Date(active.checkInTime).toLocaleTimeString("th-TH", { hour12: false })}`
-                  : "พร้อมเริ่มงาน? กดปุ่ม ค้นหาตำแหน่ง เพื่อบันทึกพิกัดและเวลา แล้วกด Check-in"}
+                  : "พร้อมเริ่มงาน? เลือกชื่องาน แล้วกด Check-in เริ่มงานได้เลย"}
               </p>
             </div>
           </div>
 
           {active ? (
             <div className="grid grid-cols-1 gap-3.5 border-t border-border/70 pt-4 md:grid-cols-2">
-              {/* Timer Box - Centered clearly, balanced spacing, prominent font-mono time */}
+              {/* Timer Box */}
               <div className="flex flex-col items-center justify-center rounded-xl border border-primary/25 bg-gradient-to-b from-info-soft/80 to-info-soft/40 p-4 text-center shadow-sm sm:p-5">
                 <div className="inline-flex items-center justify-center gap-2 text-xs font-bold text-primary sm:text-sm">
                   <span
@@ -423,7 +478,7 @@ export function CheckInPanel({
                 </span>
               </div>
 
-              {/* Edit Check-In Time Box - Matching equal height, clean mobile layout */}
+              {/* Edit Check-In Time Box */}
               <div className="flex flex-col justify-between rounded-xl border border-border/80 bg-secondary/60 p-4 shadow-sm sm:p-5">
                 <div className="flex items-center justify-between gap-1.5 text-xs font-bold text-muted-foreground">
                   <label
@@ -478,11 +533,7 @@ export function CheckInPanel({
             <select
               id="workType"
               value={workType}
-              onChange={(e) => {
-                const val = e.target.value;
-                setWorkType(val);
-                if (active) onEditActiveDetails?.({ workType: val });
-              }}
+              onChange={(e) => handleSelectWorkType(e.target.value)}
               className="w-full rounded-xl border border-input bg-secondary/80 p-2.5 text-sm font-medium focus:border-primary focus:ring-1 focus:ring-primary"
             >
               {categories.map((c) => (
@@ -611,7 +662,7 @@ export function CheckInPanel({
                     addTask();
                   }
                 }}
-                placeholder="เช่น ติดตั้งกล้อง 2 ตัว ชั้น 3"
+                placeholder="เช่น ส่งของรอบ 1, ติดตั้งกล้อง 2 ตัว"
                 className="flex-1 rounded-lg border border-input bg-card p-2 text-sm"
               />
               <button
@@ -651,7 +702,7 @@ export function CheckInPanel({
           </div>
         ) : null}
 
-        {/* Rates */}
+        {/* Rates & Calculation Mode */}
         <div
           className={`space-y-4 rounded-xl border bg-secondary/60 p-4 ${
             active ? "border-primary/50 ring-2 ring-primary/10" : "border-border"
@@ -659,44 +710,111 @@ export function CheckInPanel({
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
-              {active ? "ตั้งค่าก่อน Check-out" : "การคำนวณค่าแรง & OT & รายรับ-รายหัก"}
+              {active ? "ตั้งค่าค่าแรงก่อน Check-out" : "การคำนวณค่าแรง & OT & เบี้ยเลี้ยง"}
             </h3>
-            {active ? (
-              <span className="rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
-                เลือก OT และเวลาพักก่อนกด Check-out
-              </span>
-            ) : null}
+            <span className="rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
+              {currentWageType === "per_job"
+                ? "📌 คิดเหมาจ่ายต่องาน"
+                : currentWageType === "hourly"
+                  ? "⏱️ คิดตามชั่วโมงทำงาน"
+                  : "📅 คิดรายวันปกติ (8 ชม.)"}
+            </span>
           </div>
-          {active ? (
-            <p className="-mt-2 text-xs leading-relaxed text-muted-foreground">
-              เลือกประเภท OT และเวลาพักที่ใช้จริง ระบบจะนำไปคำนวณรายได้ทันทีเมื่อกด Check-out
-            </p>
-          ) : null}
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <Field label="ค่าแรงปกติ (บาท/วัน)" id="dailyRate">
-              <input
-                id="dailyRate"
-                type="number"
-                min="0"
-                value={dailyRateInput}
-                onChange={(e) => {
-                  const raw = e.target.value;
-                  setDailyRateInput(raw);
-                  if (raw === "") {
-                    setForm((f) => ({ ...f, dailyRate: 0 }));
-                    if (active) onEditActiveDetails?.({ dailyRate: 0 });
-                    return;
-                  }
 
-                  const dailyRate = Number(raw);
-                  if (Number.isFinite(dailyRate)) {
-                    setForm((f) => ({ ...f, dailyRate }));
-                    if (active) onEditActiveDetails?.({ dailyRate });
+          {/* Wage Mode Selector */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-muted-foreground flex items-center justify-between">
+              <span>รูปแบบการคำนวณค่าแรง</span>
+              <span className="text-[11px] font-medium text-muted-foreground">
+                {WAGE_TYPE_OPTIONS.find((o) => o.value === currentWageType)?.hint}
+              </span>
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {WAGE_TYPE_OPTIONS.map((opt) => {
+                const isSelected = currentWageType === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      const nextBreak = opt.value === "per_job" ? 0 : (form.breakHours ?? 1);
+                      setForm((f) => ({
+                        ...f,
+                        wageType: opt.value,
+                        breakHours: nextBreak,
+                      }));
+                      if (active) {
+                        onEditActiveDetails?.({
+                          wageType: opt.value,
+                          breakHours: nextBreak,
+                        });
+                      }
+                    }}
+                    className={`flex flex-col items-center justify-center rounded-xl p-2.5 text-xs font-bold transition-all border cursor-pointer ${
+                      isSelected
+                        ? "border-primary bg-primary/15 text-primary shadow-sm ring-2 ring-primary/30"
+                        : "border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground"
+                    }`}
+                  >
+                    <span>{opt.shortLabel}</span>
+                    <span className="text-[10px] font-normal opacity-80">{opt.unit}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <Field
+              label={
+                currentWageType === "per_job"
+                  ? "ค่าแรงต่องาน (บาท/งาน)"
+                  : currentWageType === "hourly"
+                    ? "ค่าแรงต่อชั่วโมง (บาท/ชม.)"
+                    : "ค่าแรงปกติ (บาท/วัน)"
+              }
+              id="dailyRate"
+            >
+              <div className="relative">
+                <input
+                  id="dailyRate"
+                  type="number"
+                  min="0"
+                  placeholder={
+                    currentWageType === "per_job"
+                      ? "เช่น 40"
+                      : currentWageType === "hourly"
+                        ? "เช่น 40"
+                        : "เช่น 500"
                   }
-                }}
-                className={inputCls}
-              />
+                  value={dailyRateInput}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    setDailyRateInput(raw);
+                    if (raw === "") {
+                      setForm((f) => ({ ...f, dailyRate: 0 }));
+                      if (active) onEditActiveDetails?.({ dailyRate: 0 });
+                      return;
+                    }
+
+                    const dailyRate = Number(raw);
+                    if (Number.isFinite(dailyRate)) {
+                      setForm((f) => ({ ...f, dailyRate }));
+                      if (active) onEditActiveDetails?.({ dailyRate });
+                    }
+                  }}
+                  className={`${inputCls} pr-14`}
+                />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">
+                  {currentWageType === "per_job"
+                    ? "฿/งาน"
+                    : currentWageType === "hourly"
+                      ? "฿/ชม."
+                      : "฿/วัน"}
+                </span>
+              </div>
             </Field>
+
             <Field label="ประเภท OT (ตัวคูณ)" id="otType">
               <select
                 id="otType"
@@ -717,12 +835,13 @@ export function CheckInPanel({
                 ))}
               </select>
             </Field>
+
             <Field label="การหักพักกลางวัน" id="breakHours">
               <select
                 id="breakHours"
                 data-testid="checkout-break-hours"
                 aria-label="เลือกเวลาพักที่ต้องการหักก่อน Check-out"
-                value={form.breakHours ?? 1}
+                value={form.breakHours ?? (currentWageType === "per_job" ? 0 : 1)}
                 onChange={(e) => {
                   const nextBreak = Number(e.target.value);
                   setForm((f) => ({ ...f, breakHours: nextBreak }));
@@ -738,6 +857,7 @@ export function CheckInPanel({
               </select>
             </Field>
           </div>
+
           <div className="grid grid-cols-2 gap-3 border-t border-border pt-3 md:grid-cols-4">
             <Field label="ค่าเดินทาง (บาท)" id="travelCost">
               <input
@@ -822,6 +942,33 @@ export function CheckInPanel({
               />
             </Field>
           </div>
+
+          {/* Live Calculation Preview Banner */}
+          <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 font-medium">
+              <span className="text-primary font-bold">
+                {currentWageType === "per_job"
+                  ? "📌 เหมาต่องาน:"
+                  : currentWageType === "hourly"
+                    ? "⏱️ รายชั่วโมง:"
+                    : "📅 รายวัน:"}
+              </span>
+              <span>
+                {currentWageType === "per_job"
+                  ? `จ่ายเต็ม ฿${Number(dailyRateInput) || form.dailyRate || 0} ต่องาน`
+                  : currentWageType === "hourly"
+                    ? `฿${Number(dailyRateInput) || form.dailyRate || 0}/ชม.`
+                    : `฿${Number(dailyRateInput) || form.dailyRate || 0}/วัน (เฉลี่ย ฿${Math.round(((Number(dailyRateInput) || form.dailyRate || 0) / 8) * 10) / 10}/ชม.)`}
+              </span>
+            </div>
+            <div className="font-bold text-success">
+              {currentWageType === "per_job"
+                ? `ค่าแรงรวมสุทธิ ฿${(Number(dailyRateInput) || form.dailyRate || 0) + (Number(travelCostInput) || 0) + (Number(foodCostInput) || 0) + (Number(otherIncomeInput) || 0) - (Number(otherDeductionsInput) || 0)}`
+                : active
+                  ? `ประมาณการตอนนี้: ฿${calculatePayroll(active.checkInTime, new Date().toISOString(), { dailyRate: Number(dailyRateInput) || form.dailyRate || 0, wageType: currentWageType, otType: form.otType, breakHours: form.breakHours, travelCost: Number(travelCostInput) || 0, foodCost: Number(foodCostInput) || 0, otherIncome: Number(otherIncomeInput) || 0, otherDeductions: Number(otherDeductionsInput) || 0 }).netIncome}`
+                  : `คำนวณตามเวลาทำงานจริง`}
+            </div>
+          </div>
         </div>
 
         {/* Evidence */}
@@ -899,18 +1046,37 @@ export function CheckInPanel({
       {checkoutOpen && active ? (
         <CheckoutConfirmSheet
           elapsed={elapsed}
+          wageType={currentWageType}
+          dailyRate={Number(dailyRateInput) || form.dailyRate || 0}
           otType={form.otType ?? 0}
-          breakHours={typeof form.breakHours === "number" ? form.breakHours : 1}
+          breakHours={
+            typeof form.breakHours === "number"
+              ? form.breakHours
+              : currentWageType === "per_job"
+                ? 0
+                : 1
+          }
           preview={calculatePayroll(active.checkInTime, new Date().toISOString(), {
             dailyRate: Number(dailyRateInput) || active.dailyRate || 0,
+            wageType: currentWageType,
             otType: form.otType ?? 0,
-            breakHours: typeof form.breakHours === "number" ? form.breakHours : 1,
+            breakHours:
+              typeof form.breakHours === "number"
+                ? form.breakHours
+                : currentWageType === "per_job"
+                  ? 0
+                  : 1,
             travelCost: travelCostInput.trim() ? Number(travelCostInput) || 0 : 0,
             foodCost: foodCostInput.trim() ? Number(foodCostInput) || 0 : 0,
             otherIncome: otherIncomeInput.trim() ? Number(otherIncomeInput) || 0 : 0,
             otherDeductions: otherDeductionsInput.trim() ? Number(otherDeductionsInput) || 0 : 0,
           })}
           confirming={gpsLoading}
+          onChangeWageType={(nextWageType) => {
+            const nextBreak = nextWageType === "per_job" ? 0 : (form.breakHours ?? 1);
+            setForm((f) => ({ ...f, wageType: nextWageType, breakHours: nextBreak }));
+            onEditActiveDetails?.({ wageType: nextWageType, breakHours: nextBreak });
+          }}
           onChangeOt={(nextOt) => {
             setForm((f) => ({ ...f, otType: nextOt }));
             onEditActiveDetails?.({ otType: nextOt });
@@ -970,7 +1136,7 @@ function StatusMotion({ running }: { running: boolean }) {
 const inputCls =
   "w-full rounded-xl border border-input bg-card px-3 py-2.5 text-sm font-semibold transition focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-60";
 
-function Field({ label, id, children }: { label: string; id: string; children: React.ReactNode }) {
+function Field({ label, id, children }: { label: string; id?: string; children: React.ReactNode }) {
   return (
     <div>
       <label htmlFor={id} className="mb-1.5 block text-xs font-semibold text-muted-foreground">
@@ -983,20 +1149,26 @@ function Field({ label, id, children }: { label: string; id: string; children: R
 
 function CheckoutConfirmSheet({
   elapsed,
+  wageType,
+  dailyRate,
   otType,
   breakHours,
   preview,
   confirming,
+  onChangeWageType,
   onChangeOt,
   onChangeBreak,
   onCancel,
   onConfirm,
 }: {
   elapsed: number;
+  wageType: WageType;
+  dailyRate: number;
   otType: number;
   breakHours: number;
   preview: ReturnType<typeof calculatePayroll>;
   confirming: boolean;
+  onChangeWageType: (value: WageType) => void;
   onChangeOt: (value: number) => void;
   onChangeBreak: (value: number) => void;
   onCancel: () => void;
@@ -1016,7 +1188,7 @@ function CheckoutConfirmSheet({
               ก่อน Check-out
             </h3>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              เลือกประเภท OT และการหักเวลาพัก แล้วค่อยยืนยันจบงาน
+              ตรวจสอบรูปแบบค่าแรง และเวลาพัก แล้วกดยืนยันบันทึกจบงาน
             </p>
           </div>
           <button
@@ -1039,54 +1211,84 @@ function CheckoutConfirmSheet({
         </div>
 
         <div className="space-y-3">
-          <Field label="ประเภท OT (ตัวคูณ)" id="confirmOtType">
-            <select
-              id="confirmOtType"
-              data-testid="confirm-ot-type"
-              aria-label="เลือกประเภท OT ก่อน Check-out"
-              value={otType}
-              disabled={confirming}
-              onChange={(e) => onChangeOt(Number(e.target.value))}
-              className={inputCls}
-            >
-              {OT_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
+          {/* Wage Type Toggle */}
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-muted-foreground">
+              รูปแบบค่าแรง (เรท: ฿{dailyRate})
+            </label>
+            <div className="grid grid-cols-3 gap-1.5">
+              {WAGE_TYPE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  disabled={confirming}
+                  onClick={() => onChangeWageType(opt.value)}
+                  className={`rounded-lg py-1.5 px-2 text-xs font-bold transition border ${
+                    wageType === opt.value
+                      ? "border-primary bg-primary/20 text-primary"
+                      : "border-border bg-card text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {opt.shortLabel}
+                </button>
               ))}
-            </select>
-          </Field>
-          <Field label="การหักพักกลางวัน" id="confirmBreakHours">
-            <select
-              id="confirmBreakHours"
-              data-testid="confirm-break-hours"
-              aria-label="เลือกเวลาพักที่ต้องการหักก่อน Check-out"
-              value={breakHours}
-              disabled={confirming}
-              onChange={(e) => onChangeBreak(Number(e.target.value))}
-              className={inputCls}
-            >
-              {BREAK_OPTIONS.map((b) => (
-                <option key={b.value} value={b.value}>
-                  {b.label}
-                </option>
-              ))}
-            </select>
-          </Field>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="ประเภท OT (ตัวคูณ)" id="confirmOtType">
+              <select
+                id="confirmOtType"
+                data-testid="confirm-ot-type"
+                aria-label="เลือกประเภท OT ก่อน Check-out"
+                value={otType}
+                disabled={confirming || wageType === "per_job"}
+                onChange={(e) => onChangeOt(Number(e.target.value))}
+                className={inputCls}
+              >
+                {OT_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="การหักพักกลางวัน" id="confirmBreakHours">
+              <select
+                id="confirmBreakHours"
+                data-testid="confirm-break-hours"
+                aria-label="เลือกเวลาพักที่ต้องการหักก่อน Check-out"
+                value={breakHours}
+                disabled={confirming}
+                onChange={(e) => onChangeBreak(Number(e.target.value))}
+                className={inputCls}
+              >
+                {BREAK_OPTIONS.map((b) => (
+                  <option key={b.value} value={b.value}>
+                    {b.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
         </div>
 
         <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl border border-border bg-secondary/60 p-3 text-center">
           <div>
             <p className="text-[10px] font-semibold text-muted-foreground">ชั่วโมงทำงาน</p>
-            <p className="text-sm font-bold tabular-nums">{preview.workingHours.toFixed(2)}</p>
+            <p className="text-sm font-bold tabular-nums">{preview.workingHours.toFixed(2)} ชม.</p>
           </div>
           <div>
-            <p className="text-[10px] font-semibold text-muted-foreground">ชั่วโมง OT</p>
-            <p className="text-sm font-bold tabular-nums">{preview.otHours.toFixed(2)}</p>
+            <p className="text-[10px] font-semibold text-muted-foreground">
+              {wageType === "per_job" ? "ค่าแรงต่องาน" : "ค่าแรง+OT"}
+            </p>
+            <p className="text-sm font-bold tabular-nums text-foreground">
+              ฿{(preview.baseWage + preview.otIncome).toLocaleString("th-TH")}
+            </p>
           </div>
           <div>
-            <p className="text-[10px] font-semibold text-muted-foreground">รายได้ประมาณ</p>
-            <p className="text-sm font-bold tabular-nums text-success">
+            <p className="text-[10px] font-semibold text-muted-foreground">รายได้สุทธิ</p>
+            <p className="text-base font-extrabold tabular-nums text-success">
               ฿{preview.netIncome.toLocaleString("th-TH")}
             </p>
           </div>
@@ -1097,7 +1299,7 @@ function CheckoutConfirmSheet({
             type="button"
             onClick={onCancel}
             disabled={confirming}
-            className="rounded-xl border border-border bg-secondary py-3 text-sm font-bold disabled:opacity-50"
+            className="rounded-xl border border-border bg-secondary py-3 text-sm font-bold disabled:opacity-50 cursor-pointer"
           >
             ยกเลิก
           </button>
@@ -1106,7 +1308,7 @@ function CheckoutConfirmSheet({
             onClick={onConfirm}
             disabled={confirming}
             data-testid="confirm-checkout"
-            className="rounded-xl bg-destructive py-3 text-sm font-extrabold text-destructive-foreground disabled:opacity-60"
+            className="rounded-xl bg-destructive py-3 text-sm font-extrabold text-destructive-foreground disabled:opacity-60 cursor-pointer hover:brightness-105 transition"
           >
             {confirming ? "กำลังบันทึกพิกัด…" : "ยืนยัน Check-out"}
           </button>

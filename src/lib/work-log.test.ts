@@ -76,6 +76,34 @@ describe("Work Tracker payroll", () => {
     expect(log?.otType).toBe(0);
   });
 
+  it("calculates per_job flat wage correctly (e.g. 40 THB for short job)", () => {
+    const result = calculatePayroll("2026-10-04T23:19:00.000Z", "2026-10-04T23:46:00.000Z", {
+      ...DEFAULT_RATES,
+      dailyRate: 40,
+      wageType: "per_job",
+      otType: 0,
+      breakHours: 0,
+    });
+
+    expect(result.baseWage).toBe(40);
+    expect(result.otIncome).toBe(0);
+    expect(result.netIncome).toBe(40);
+  });
+
+  it("calculates hourly wage correctly for 1 hour of work at 40 THB/hr", () => {
+    const result = calculatePayroll("2026-10-04T08:00:00.000Z", "2026-10-04T09:00:00.000Z", {
+      ...DEFAULT_RATES,
+      dailyRate: 40,
+      wageType: "hourly",
+      otType: 0,
+      breakHours: 0,
+    });
+
+    expect(result.workingHours).toBe(1);
+    expect(result.baseWage).toBe(40);
+    expect(result.netIncome).toBe(40);
+  });
+
   it("parses CSV rows with quoted fields and numbers correctly", () => {
     const csv = `รหัส,วันที่,เวลาเข้า,เวลาออก,ประเภทงาน,สถานที่,พิกัดเข้า,พิกัดออก,ชั่วโมงรวม,ชั่วโมงปกติ,ชั่วโมง OT,ตัวคูณ OT,ค่าแรงพื้นฐาน,ค่า OT,ค่าเดินทาง,ค่าอาหาร,รายรับอื่น,รายการหัก,รายได้สุทธิ,จำนวนงานที่ทำเสร็จ,รายละเอียดงาน
 LOG-1786264136771,2026-08-02,08:30:00,17:30:00,คลัง QT,"บ้านคลองสกัด 25, ตำบลบางเสาธง","13.648316, 100.787597","13.648316, 100.787597",9,8,0,0,500,0,0,0,0,0,500,1,สำเร็จ

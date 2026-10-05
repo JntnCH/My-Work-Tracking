@@ -757,12 +757,13 @@ export function useWorkTracker(userId: string | null, isGuest = false) {
         checkInGPS: input.gps,
         checkInPhoto: input.photo,
         dailyRate: input.rates.dailyRate,
+        wageType: input.rates.wageType || (input.rates.dailyRate < 100 ? "per_job" : "daily"),
         otType: input.rates.otType,
         travelCost: input.rates.travelCost,
         foodCost: input.rates.foodCost,
         otherIncome: input.rates.otherIncome,
         otherDeductions: input.rates.otherDeductions,
-        breakHours: input.rates.breakHours ?? DEFAULT_RATES.breakHours,
+        breakHours: input.rates.breakHours ?? (input.rates.wageType === "per_job" ? 0 : DEFAULT_RATES.breakHours),
         tasks: input.tasks.filter((t) => t.trim()),
       };
       setActive(record);

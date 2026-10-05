@@ -14,9 +14,11 @@ import {
 import { toast } from "sonner";
 import {
   type WorkLog,
+  type WageType,
   BREAK_OPTIONS,
   DEFAULT_SEED_LOGS,
   OT_OPTIONS,
+  WAGE_TYPE_OPTIONS,
   buildCSV,
   formatTHB,
   formatThaiDateTime,
@@ -45,6 +47,7 @@ type Draft = {
   outAt: string;
   workType: string;
   locationName: string;
+  wageType: WageType;
   dailyRate: string;
   otType: string;
   breakHours: string;
@@ -62,6 +65,7 @@ const emptyDraft: Draft = {
   outAt: "",
   workType: "",
   locationName: "",
+  wageType: "daily",
   dailyRate: "",
   otType: "1.5",
   breakHours: "1",
@@ -148,14 +152,17 @@ export function HistoryPanel({
   const startEdit = (log: WorkLog) => {
     setEditing(log.id);
     setTaskSelection("");
+    const wageType: WageType =
+      log.wageType || (log.dailyRate < 100 && log.workingHours <= 1 ? "per_job" : "daily");
     setDraft({
       inAt: toLocalInput(log.checkInTime),
       outAt: toLocalInput(log.checkOutTime),
       workType: log.workType ?? "",
       locationName: log.locationName ?? "",
+      wageType,
       dailyRate: log.dailyRate !== undefined && log.dailyRate !== null ? String(log.dailyRate) : "",
       otType: String(log.otType ?? 1.5),
-      breakHours: String(log.breakHours ?? 1),
+      breakHours: String(log.breakHours ?? (wageType === "per_job" ? 0 : 1)),
       travelCost: log.travelCost ? String(log.travelCost) : "",
       foodCost: log.foodCost ? String(log.foodCost) : "",
       otherIncome: log.otherIncome ? String(log.otherIncome) : "",
@@ -195,10 +202,15 @@ export function HistoryPanel({
       checkOutTime: outISO,
       workType: draft.workType.trim(),
       locationName: draft.locationName.trim(),
+      wageType: draft.wageType,
       dailyRate: toNum(draft.dailyRate),
       otType: draft.otType !== "" && draft.otType !== undefined ? toNum(draft.otType) : 0,
       breakHours:
-        draft.breakHours !== "" && draft.breakHours !== undefined ? toNum(draft.breakHours) : 1,
+        draft.breakHours !== "" && draft.breakHours !== undefined
+          ? toNum(draft.breakHours)
+          : draft.wageType === "per_job"
+            ? 0
+            : 1,
       travelCost: toNum(draft.travelCost),
       foodCost: toNum(draft.foodCost),
       otherIncome: toNum(draft.otherIncome),
@@ -399,6 +411,13 @@ export function HistoryPanel({
                     <span className="clay-badge-archived text-[10px] px-2.5 py-0.5">
                       {taskCount(log)} งาน
                     </span>
+                    <span className="rounded-full bg-primary/10 border border-primary/25 text-primary text-[10px] font-bold px-2.5 py-0.5 shadow-2xs">
+                      {log.wageType === "per_job" || (log.dailyRate < 100 && (log.workingHours || 0) <= 1)
+                        ? `📌 เหมาต่องาน ฿${log.dailyRate || log.baseWage}`
+                        : log.wageType === "hourly"
+                          ? `⏱️ ฿${log.dailyRate || Math.round((log.baseWage / (log.workingHours || 1)))}/ชม.`
+                          : `📅 ฿${log.dailyRate || 500}/วัน`}
+                    </span>
                     {log.syncedAt ? (
                       <span className="clay-badge-active text-[10px] px-2.5 py-0.5">
                         <span className="h-1.5 w-1.5 rounded-full bg-[#10B981] shadow-xs" />
@@ -563,16 +582,58 @@ export function HistoryPanel({
                   </section>
 
                   <section className="space-y-2">
-                    <h4 className="text-xs font-bold text-primary">ค่าแรงและเบี้ยเลี้ยง</h4>
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-primary">ค่าแรงและเบี้ยเลี้ยง</h4>
+                      <span className="text-[11px] font-semibold text-primary">
+                        {draft.wageType === "per_job"
+                          ? "📌 เหมาต่องาน"
+                          : draft.wageType === "hourly"
+                            ? "⏱️ รายชั่วโมง"
+                            : "📅 รายวัน"}
+                      </span>
+                    </div>
+
+                    {/* Wage mode selection */}
+                    <div className="grid grid-cols-3 gap-1.5 pb-1">
+                      {WAGE_TYPE_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => {
+                            setDraft({
+                              ...draft,
+                              wageType: opt.value,
+                              breakHours: opt.value === "per_job" ? "0" : draft.breakHours,
+                            });
+                          }}
+                          className={`rounded-lg py-1.5 px-2 text-xs font-bold transition border ${
+                            draft.wageType === opt.value
+                              ? "border-primary bg-primary/20 text-primary"
+                              : "border-border bg-card text-muted-foreground hover:bg-muted"
+                          }`}
+                        >
+                          {opt.shortLabel}
+                        </button>
+                      ))}
+                    </div>
+
                     <div className="grid grid-cols-2 gap-2">
-                      <Field label="ค่าแรง/วัน (บาท)">
+                      <Field
+                        label={
+                          draft.wageType === "per_job"
+                            ? "ค่าแรงต่องาน (บาท)"
+                            : draft.wageType === "hourly"
+                              ? "ค่าแรงต่อชั่วโมง (บาท/ชม.)"
+                              : "ค่าแรง/วัน (บาท)"
+                        }
+                      >
                         <input
                           type="number"
                           inputMode="decimal"
                           min="0"
                           step="any"
                           placeholder="0"
-                          aria-label="ค่าแรงต่อวัน"
+                          aria-label="ค่าแรง"
                           value={draft.dailyRate}
                           onChange={(e) => setDraft({ ...draft, dailyRate: e.target.value })}
                           className={inputCls}
@@ -582,6 +643,7 @@ export function HistoryPanel({
                         <select
                           aria-label="ตัวคูณ OT"
                           value={draft.otType}
+                          disabled={draft.wageType === "per_job"}
                           onChange={(e) => setDraft({ ...draft, otType: e.target.value })}
                           className={inputCls}
                         >

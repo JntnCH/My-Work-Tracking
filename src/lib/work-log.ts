@@ -3,6 +3,32 @@
  * for the Work Tracker (Check-in / Check-out) app.
  */
 
+export type WageType = "per_job" | "hourly" | "daily";
+
+export const WAGE_TYPE_OPTIONS = [
+  {
+    value: "per_job" as WageType,
+    label: "เหมาต่องาน / รายรอบ (บาท/งาน)",
+    shortLabel: "เหมาต่องาน",
+    unit: "บาท/งาน",
+    hint: "จ่ายเต็มตามค่าแรงที่ระบุ ไม่ขึ้นกับจำนวนชั่วโมง",
+  },
+  {
+    value: "hourly" as WageType,
+    label: "รายชั่วโมง (บาท/ชั่วโมง)",
+    shortLabel: "รายชั่วโมง",
+    unit: "บาท/ชม.",
+    hint: "คิดตามชั่วโมงทำงานจริง (ชม. ทำงาน x ค่าแรง/ชม.)",
+  },
+  {
+    value: "daily" as WageType,
+    label: "รายวันปกติ (บาท/วัน ÷ 8 ชม.)",
+    shortLabel: "รายวัน",
+    unit: "บาท/วัน",
+    hint: "หาร 8 ชั่วโมงต่อวัน และคิด OT เมื่อเกิน 8 ชม.",
+  },
+] as const;
+
 export type GPSPoint = {
   lat: string | null;
   lng: string | null;
@@ -20,6 +46,7 @@ export type ActiveCheckIn = {
   checkInGPS: GPSPoint;
   checkInPhoto: string | null;
   dailyRate: number;
+  wageType?: WageType;
   otType: number;
   travelCost: number;
   foodCost: number;
@@ -54,12 +81,14 @@ export const STORAGE_KEYS = {
   active: "work_tracker_active",
   categories: "work_tracker_categories",
   settings: "work_tracker_settings",
+  workTypeRates: "work_tracker_work_type_rates",
   theme: "work_tracker_theme",
   sheet: "work_tracker_sheet",
   serviceAccount: "work_tracker_service_account",
 } as const;
 
 export const DEFAULT_CATEGORIES = [
+  "ตลาดเฟส 2 เอื้อวัดศรี",
   "ร้านก๋วยเตี๋ยว (จ่ามุน)",
   "ร้านก๋วยเตี๋ยว",
   "คลัง QT",
@@ -80,15 +109,16 @@ export const OT_OPTIONS = [
 ];
 
 export const BREAK_OPTIONS = [
-  { value: 1, label: "หักเวลาพัก 1 ชม. (อัตโนมัติ)" },
   { value: 0, label: "ไม่หักเวลาพัก (0 ชม.)" },
   { value: 0.5, label: "หักเวลาพัก 30 นาที (0.5 ชม.)" },
+  { value: 1, label: "หักเวลาพัก 1 ชม." },
   { value: 1.5, label: "หักเวลาพัก 1.5 ชม." },
   { value: 2, label: "หักเวลาพัก 2 ชม." },
 ];
 
 export type RateSettings = {
   dailyRate: number;
+  wageType?: WageType;
   otType: number;
   travelCost: number;
   foodCost: number;
@@ -99,12 +129,36 @@ export type RateSettings = {
 
 export const DEFAULT_RATES: RateSettings = {
   dailyRate: 500,
+  wageType: "daily",
   otType: 0,
   travelCost: 0,
   foodCost: 0,
   otherIncome: 0,
   otherDeductions: 0,
   breakHours: 1,
+};
+
+export type WorkTypeRateConfig = {
+  dailyRate: number;
+  wageType: WageType;
+  breakHours?: number;
+  otType?: number;
+  travelCost?: number;
+  foodCost?: number;
+};
+
+export const DEFAULT_WORK_TYPE_RATES: Record<string, WorkTypeRateConfig> = {
+  "ตลาดเฟส 2 เอื้อวัดศรี": { dailyRate: 40, wageType: "per_job", breakHours: 0, otType: 0 },
+  "ร้านก๋วยเตี๋ยว (จ่ามุน)": { dailyRate: 400, wageType: "daily", breakHours: 1, otType: 0 },
+  "ร้านก๋วยเตี๋ยว": { dailyRate: 400, wageType: "daily", breakHours: 1, otType: 0 },
+  "คลัง QT": { dailyRate: 500, wageType: "daily", breakHours: 1, otType: 0 },
+  "ACOM": { dailyRate: 400, wageType: "daily", breakHours: 1, otType: 1.5, travelCost: 50 },
+  "คลัง ACOM": { dailyRate: 500, wageType: "daily", breakHours: 1, otType: 0 },
+  "คลังเซ็นทรัล": { dailyRate: 550, wageType: "daily", breakHours: 1, otType: 0 },
+  "M SENKO": { dailyRate: 550, wageType: "daily", breakHours: 1, otType: 0 },
+  "SHOPEE (คลังเก่า)": { dailyRate: 500, wageType: "daily", breakHours: 1, otType: 0 },
+  "คลังคูเน่": { dailyRate: 500, wageType: "daily", breakHours: 1, otType: 0 },
+  "คลังอีฟแอนด์บอย": { dailyRate: 500, wageType: "daily", breakHours: 1, otType: 0 },
 };
 
 /* ------------------------------------------------------------------ */
@@ -123,41 +177,83 @@ export type PayrollResult = {
   netIncome: number;
 };
 
-/** Calculates hours & money for one shift. Break deduction configurable (defaults to 1h). */
+/**
+ * Calculates hours & money for one shift.
+ * Supports 3 wage calculation modes:
+ * 1. "per_job" (เหมาต่องาน/รายรอบ): baseWage = dailyRate
+ * 2. "hourly" (รายชั่วโมง): baseWage = workingHours * dailyRate
+ * 3. "daily" (รายวันปกติ): baseWage = workingHours * (dailyRate / 8)
+ */
 export function calculatePayroll(
   checkInISO: string,
   checkOutISO: string,
   rates: Pick<
     RateSettings,
-    "dailyRate" | "otType" | "travelCost" | "foodCost" | "otherIncome" | "otherDeductions"
+    "dailyRate" | "otType" | "travelCost" | "foodCost" | "otherIncome" | "otherDeductions" | "wageType"
   > & { breakHours?: number },
 ): PayrollResult {
   const diffMs = new Date(checkOutISO).getTime() - new Date(checkInISO).getTime();
   const grossHours = Math.max(diffMs, 0) / (1000 * 60 * 60);
 
+  // If wageType is not explicitly set, deduce smartly:
+  // Rates under 100 with short shifts (< 3 hrs) default to per_job if dailyRate is set
+  const wageType: WageType = rates.wageType || "daily";
+
   const breakDeduction =
-    typeof rates.breakHours === "number" ? Math.max(rates.breakHours, 0) : BREAK_HOURS;
+    typeof rates.breakHours === "number"
+      ? Math.max(rates.breakHours, 0)
+      : wageType === "per_job"
+        ? 0
+        : BREAK_HOURS;
+
   let net = grossHours >= breakDeduction ? grossHours - breakDeduction : grossHours;
   net = Math.max(round2(net), 0);
 
   let workingHours = net;
   let otHours = 0;
-  if (net > NORMAL_HOURS_PER_DAY) {
-    workingHours = NORMAL_HOURS_PER_DAY;
-    otHours = round2(net - NORMAL_HOURS_PER_DAY);
+  let baseWage = 0;
+  let otIncome = 0;
+  const otMultiplier = rates.otType !== undefined ? rates.otType : 0;
+
+  if (wageType === "per_job") {
+    // Flat / Per Job: user gets the full agreed job wage regardless of shift duration
+    baseWage = rates.dailyRate;
+    workingHours = net;
+    otHours = 0;
+    otIncome = 0;
+  } else if (wageType === "hourly") {
+    // Hourly calculation: rate is per hour worked
+    if (net > NORMAL_HOURS_PER_DAY) {
+      workingHours = NORMAL_HOURS_PER_DAY;
+      otHours = round2(net - NORMAL_HOURS_PER_DAY);
+    } else {
+      workingHours = net;
+      otHours = 0;
+    }
+    const hourlyRate = rates.dailyRate;
+    baseWage = workingHours * hourlyRate;
+    otIncome = otHours * hourlyRate * otMultiplier;
+  } else {
+    // Daily calculation: rate is for a full 8-hour shift
+    if (net > NORMAL_HOURS_PER_DAY) {
+      workingHours = NORMAL_HOURS_PER_DAY;
+      otHours = round2(net - NORMAL_HOURS_PER_DAY);
+    } else {
+      workingHours = net;
+      otHours = 0;
+    }
+    const hourlyRate = rates.dailyRate / NORMAL_HOURS_PER_DAY;
+    baseWage = workingHours * hourlyRate;
+    otIncome = otHours * hourlyRate * otMultiplier;
   }
 
-  const hourlyRate = rates.dailyRate / NORMAL_HOURS_PER_DAY;
-  const baseWage = workingHours * hourlyRate;
-  const otMultiplier = rates.otType !== undefined ? rates.otType : 0;
-  const otIncome = otHours * hourlyRate * otMultiplier;
   const netIncome =
     baseWage +
     otIncome +
-    rates.travelCost +
-    rates.foodCost +
-    rates.otherIncome -
-    rates.otherDeductions;
+    (rates.travelCost || 0) +
+    (rates.foodCost || 0) +
+    (rates.otherIncome || 0) -
+    (rates.otherDeductions || 0);
 
   return {
     grossHours: round2(grossHours),
@@ -448,6 +544,10 @@ export const storage = {
   setCategories: (c: string[]) => write(STORAGE_KEYS.categories, c),
   getRates: () => read<RateSettings>(STORAGE_KEYS.settings, DEFAULT_RATES),
   setRates: (r: RateSettings) => write(STORAGE_KEYS.settings, r),
+  getWorkTypeRates: () =>
+    read<Record<string, WorkTypeRateConfig>>(STORAGE_KEYS.workTypeRates, DEFAULT_WORK_TYPE_RATES),
+  setWorkTypeRates: (rates: Record<string, WorkTypeRateConfig>) =>
+    write(STORAGE_KEYS.workTypeRates, rates),
   getTheme: <T>(fallback: T) => read<T>(STORAGE_KEYS.theme, fallback),
   setTheme: (theme: unknown) => write(STORAGE_KEYS.theme, theme),
   getSheetId: () => read<string>(STORAGE_KEYS.sheet, ""),
@@ -455,6 +555,31 @@ export const storage = {
   getServiceAccount: () => read<string>(STORAGE_KEYS.serviceAccount, ""),
   setServiceAccount: (jsonOrKey: string) => write(STORAGE_KEYS.serviceAccount, jsonOrKey),
 };
+
+/** Returns the customized rate settings for a given work type, falling back to base rates. */
+export function getEffectiveRateForWorkType(
+  workTypeName: string,
+  baseRates: RateSettings,
+): RateSettings {
+  const customRates = storage.getWorkTypeRates();
+  const found = customRates[workTypeName] || DEFAULT_WORK_TYPE_RATES[workTypeName];
+  if (found) {
+    return {
+      dailyRate: found.dailyRate,
+      wageType: found.wageType,
+      breakHours: found.breakHours !== undefined ? found.breakHours : baseRates.breakHours,
+      otType: found.otType !== undefined ? found.otType : baseRates.otType,
+      travelCost: found.travelCost !== undefined ? found.travelCost : baseRates.travelCost,
+      foodCost: found.foodCost !== undefined ? found.foodCost : baseRates.foodCost,
+      otherIncome: baseRates.otherIncome,
+      otherDeductions: baseRates.otherDeductions,
+    };
+  }
+  return {
+    ...baseRates,
+    wageType: baseRates.wageType || (baseRates.dailyRate < 100 ? "per_job" : "daily"),
+  };
+}
 
 /* ------------------------------------------------------------------ */
 /* datetime-local helpers                                               */
