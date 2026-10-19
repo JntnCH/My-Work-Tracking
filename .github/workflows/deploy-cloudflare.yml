@@ -1,0 +1,31 @@
+name: Deploy to Cloudflare Workers
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Authenticate with Cloudflare and run wrangler publish
+        uses: cloudflare/wrangler-action@v2
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+
+      - name: Publish with wrangler
+        run: npx wrangler publish
