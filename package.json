@@ -13,7 +13,11 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "test": "vitest run",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "build:cloudflare": "CLOUDFLARE=1 NODE_ENV=production vite build --mode production",
+    "deploy:cloudflare": "npm run build:cloudflare && wrangler deploy",
+    "preview:cloudflare": "CLOUDFLARE=1 vite preview",
+    "cf-typegen": "wrangler types"
   },
   "dependencies": {
     "@line/liff": "^2.30.0",
@@ -90,6 +94,8 @@
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.56.1",
     "vite": "^8.1.5",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "@cloudflare/vite-plugin": "^1.13.0",
+    "wrangler": "^4.42.0"
   }
 }
