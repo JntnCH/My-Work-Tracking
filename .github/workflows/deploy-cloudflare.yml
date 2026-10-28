@@ -14,13 +14,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: "22"
+          bun-version: latest
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund --legacy-peer-deps
+        run: bun install --frozen-lockfile
 
       - name: Build for Cloudflare
         env:
@@ -36,7 +36,7 @@ jobs:
           VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
           VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.VITE_FIREBASE_STORAGE_BUCKET }}
           VITE_LINE_LIFF_ID: ${{ secrets.VITE_LINE_LIFF_ID }}
-        run: npm run build:cloudflare
+        run: bun run build:cloudflare
 
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
