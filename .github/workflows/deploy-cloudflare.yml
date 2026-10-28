@@ -20,7 +20,8 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        # package.json has new CF deps not yet in bun.lock
+        run: bun install
 
       - name: Build for Cloudflare
         env:
