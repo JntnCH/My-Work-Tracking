@@ -1,1 +1,513 @@
-RESTORED_FROM_LOCAL
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import type { ConnectionTestResult } from "@/lib/sheets-diagnostics";
+import { DEFAULT_SERVICE_ACCOUNT_JSON } from "@/lib/default-service-account";
+
+const SHEET_TITLE = "WorkLogs";
+const SETTINGS_TITLE = "Settings";
+const GOOGLE_SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
+
+const HEADERS = [
+  "รหัส",
+  "วันที่",
+  "เวลาเข้า",
+  "เวลาออก",
+  "ประเภทงาน",
+  "สถานที่",
+  "พิกัดเข้า",
+  "พิกัดออก",
+  "ชั่วโมงรวม",
+  "ชั่วโมงปกติ",
+  "ชั่วโมง OT",
+  "ตัวคูณ OT",
+  "ค่าแรงพื้นฐาน",
+  "ค่า OT",
+  "ค่าเดินทาง",
+  "ค่าอาหาร",
+  "รายรับอื่น",
+  "รายการหัก",
+  "รายได้สุทธิ",
+  "จำนวนงานที่ทำเสร็จ",
+  "รายละเอียดงาน",
+];
+
+type ServiceAccountCredentials = {
+  client_email?: string;
+  private_key?: string;
+};
+
+type GoogleError = {
+  code?: number;
+  response?: { status?: number; data?: { error?: { message?: string } } };
+  message?: string;
+};
+
+export const sheetsAuthSchema = z.object({
+  accessToken: z.string().optional(),
+  serviceAccountJson: z.string().optional(),
+  serviceAccountEmail: z.string().optional(),
+  serviceAccountPrivateKey: z.string().optional(),
+});
+
+export type SheetsAuthInput = z.infer<typeof sheetsAuthSchema>;
+
+export const spreadsheetInputSchema = sheetsAuthSchema.extend({
+  spreadsheetId: z.string().min(10).transform(normalizeSpreadsheetId),
+});
+
+export function normalizeSpreadsheetId(value: string) {
+  const trimmed = value.trim();
+  const match = trimmed.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  return match?.[1] ?? trimmed;
+}
+
+function serviceAccountCredentials(auth?: SheetsAuthInput): {
+  clientEmail: string;
+  privateKey: string;
+} {
+  const json =
+    auth?.serviceAccountJson?.trim() ||
+    process.env["GOOGLE_SERVICE_ACCOUNT_JSON"]?.trim() ||
+    DEFAULT_SERVICE_ACCOUNT_JSON;
+  let credentials: ServiceAccountCredentials = {};
+
+  if (json) {
+    try {
+      credentials = JSON.parse(json) as ServiceAccountCredentials;
+    } catch {
+      throw new Error(
+        "Google Sheets ยังไม่พร้อมใช้งาน: Service Account JSON ไม่ใช่รูปแบบ JSON ที่ถูกต้อง",
+      );
+    }
+  }
+
+  const clientEmail =
+    credentials.client_email ??
+    auth?.serviceAccountEmail?.trim() ??
+    process.env["GOOGLE_SERVICE_ACCOUNT_EMAIL"] ??
+    process.env["GOOGLE_CLIENT_EMAIL"];
+  const privateKey =
+    credentials.private_key ??
+    auth?.serviceAccountPrivateKey?.trim() ??
+    process.env["GOOGLE_PRIVATE_KEY"];
+
+  if (!clientEmail || !privateKey) {
+    throw new Error(
+      `ยังไม่ได้เชื่อมต่อ Google Sheets: กรุณาวาง Service Account JSON หรือกดปุ่ม "เข้าสู่ระบบ Google เพื่อเปิดสิทธิ์ชีต" ในหน้าตั้งค่า`,
+    );
+  }
+
+  return {
+    clientEmail: clientEmail.trim(),
+    privateKey: privateKey.trim().replace(/\\n/g, "\n"),
+  };
+}
+
+async function sheetsClient(auth?: SheetsAuthInput | string) {
+  const { createSheetsClient } = await import("@/lib/sheets-fetch-client");
+  const authPayload: SheetsAuthInput =
+    typeof auth === "string" ? { accessToken: auth } : (auth ?? {});
+  return createSheetsClient(authPayload, {
+    envJson: process.env["GOOGLE_SERVICE_ACCOUNT_JSON"],
+    fallbackJson: DEFAULT_SERVICE_ACCOUNT_JSON,
+  });
+}
+
+function googleSheetsError(error: unknown) {
+  const apiError = error as GoogleError;
+  const status = apiError.response?.status ?? apiError.code;
+  const apiMessage = apiError.response?.data?.error?.message;
+  const message = String(apiMessage ?? apiError.message ?? "ไม่ทราบสาเหตุ")
+    .replace(/[\u0000-\u001F]/g, "")
+    .slice(0, 400);
+
+  if (status === 401) {
+    return "Google authentication ไม่ผ่าน: ตรวจสอบ Service Account email และ private key หรือล็อกอินใหม่อีกครั้ง";
+  }
+  if (status === 403) {
+    return "Google Sheets ปฏิเสธการเข้าถึง (403): แชร์ชีตให้ openclaw-gcp-272026@openclaw-gcp-272026.iam.gserviceaccount.com เป็น Editor";
+  }
+  if (status === 404) {
+    return "ไม่พบ Spreadsheet หรือแท็บที่ระบุ: ตรวจสอบ Spreadsheet ID และแท็บ WorkLogs";
+  }
+  if (status === 400) {
+    return `Google Sheets API error [400]: ${message || "คำขอไม่ถูกต้อง — ตรวจ Spreadsheet ID"}`;
+  }
+  return `Google Sheets API error${status ? ` [${status}]` : ""}: ${message}`;
+}
+
+async function ensureSheet(
+  sheets: Awaited<ReturnType<typeof sheetsClient>>,
+  spreadsheetId: string,
+  title: string,
+) {
+  const meta = await sheets.spreadsheets.get({
+    spreadsheetId,
+    fields: "spreadsheetId,spreadsheetUrl,properties.title,sheets.properties",
+  });
+  const existing = meta.data.sheets?.find((sheet: { properties?: { title?: string } }) => sheet.properties?.title === title);
+  if (existing) return meta;
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [{ addSheet: { properties: { title } } }],
+    },
+  });
+  return meta;
+}
+
+function spreadsheetResult(
+  meta: {
+    data: {
+      spreadsheetId?: string | null;
+      spreadsheetUrl?: string | null;
+      properties?: { title?: string | null } | null;
+    };
+  },
+  spreadsheetId: string,
+) {
+  return {
+    spreadsheetId: meta.data.spreadsheetId ?? spreadsheetId,
+    url: meta.data.spreadsheetUrl ?? `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
+    title: meta.data.properties?.title ?? "",
+  };
+}
+
+export const createWorkSpreadsheet = createServerFn({ method: "POST" })
+  .validator((input: unknown) =>
+    sheetsAuthSchema
+      .extend({
+        title: z.string().min(1).max(120).optional(),
+      })
+      .parse(input ?? {}),
+  )
+  .handler(async ({ data }) => {
+    try {
+      const sheets = await sheetsClient(data);
+      const created = await sheets.spreadsheets.create({
+        requestBody: {
+          properties: { title: data.title || `Work Tracker ${new Date().getFullYear()}` },
+          sheets: [{ properties: { title: SHEET_TITLE } }],
+        },
+        fields: "spreadsheetId,spreadsheetUrl,properties.title",
+      });
+      const spreadsheetId = created.data.spreadsheetId;
+      if (!spreadsheetId) throw new Error("Google Sheets ไม่ส่ง Spreadsheet ID กลับมา");
+
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `${SHEET_TITLE}!A1:U1`,
+        valueInputOption: "RAW",
+        requestBody: { values: [HEADERS] },
+      });
+
+      return {
+        spreadsheetId,
+        url:
+          created.data.spreadsheetUrl ??
+          `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
+        title: created.data.properties?.title ?? "",
+      };
+    } catch (error) {
+      throw new Error(googleSheetsError(error));
+    }
+  });
+
+export const prepareSpreadsheet = createServerFn({ method: "POST" })
+  .validator((input: unknown) => spreadsheetInputSchema.parse(input))
+  .handler(async ({ data }) => {
+    try {
+      const sheets = await sheetsClient(data);
+      const meta = await ensureSheet(sheets, data.spreadsheetId, SHEET_TITLE);
+      const existing = await sheets.spreadsheets.values.get({
+        spreadsheetId: data.spreadsheetId,
+        range: `${SHEET_TITLE}!A1:U1`,
+      });
+
+      if (!existing.data.values?.length) {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: data.spreadsheetId,
+          range: `${SHEET_TITLE}!A1:U1`,
+          valueInputOption: "RAW",
+          requestBody: { values: [HEADERS] },
+        });
+      }
+
+      return spreadsheetResult(meta, data.spreadsheetId);
+    } catch (error) {
+      throw new Error(googleSheetsError(error));
+    }
+  });
+
+export const appendWorkLogRows = createServerFn({ method: "POST" })
+  .validator((input: unknown) =>
+    spreadsheetInputSchema
+      .extend({
+        rows: z
+          .array(z.array(z.union([z.string(), z.number()])))
+          .min(1)
+          .max(500),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    try {
+      const sheets = await sheetsClient(data);
+      const result = await sheets.spreadsheets.values.append({
+        spreadsheetId: data.spreadsheetId,
+        range: `${SHEET_TITLE}!A:U`,
+        valueInputOption: "RAW",
+        insertDataOption: "INSERT_ROWS",
+        requestBody: { values: data.rows },
+      });
+      return {
+        updatedRows: result.data.updates?.updatedRows ?? 0,
+        updatedRange: result.data.updates?.updatedRange ?? "",
+      };
+    } catch (error) {
+      throw new Error(googleSheetsError(error));
+    }
+  });
+
+export const replaceWorkLogRows = createServerFn({ method: "POST" })
+  .validator((input: unknown) =>
+    spreadsheetInputSchema
+      .extend({
+        rows: z.array(z.array(z.union([z.string(), z.number()]))).max(5000),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    try {
+      const sheets = await sheetsClient(data);
+      await sheets.spreadsheets.values.clear({
+        spreadsheetId: data.spreadsheetId,
+        range: `${SHEET_TITLE}!A2:U`,
+        requestBody: {},
+      });
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: data.spreadsheetId,
+        range: `${SHEET_TITLE}!A1:U1`,
+        valueInputOption: "RAW",
+        requestBody: { values: [HEADERS] },
+      });
+      if (data.rows.length > 0) {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: data.spreadsheetId,
+          range: `${SHEET_TITLE}!A2:U${data.rows.length + 1}`,
+          valueInputOption: "RAW",
+          requestBody: { values: data.rows },
+        });
+      }
+      return { writtenRows: data.rows.length };
+    } catch (error) {
+      throw new Error(googleSheetsError(error));
+    }
+  });
+
+export function categoriesFromWorkLogRows(rows: unknown[][]): string[] {
+  return [...new Set(rows.map((row) => String(row[4] ?? "").trim()).filter(Boolean))];
+}
+
+export const readCategoryList = createServerFn({ method: "POST" })
+  .validator((input: unknown) => spreadsheetInputSchema.parse(input))
+  .handler(async ({ data }) => {
+    let sheets: Awaited<ReturnType<typeof sheetsClient>>;
+    try {
+      sheets = await sheetsClient(data);
+    } catch (error) {
+      console.warn("Google Sheets client unavailable for category import:", googleSheetsError(error));
+      return { categories: [] as string[] };
+    }
+
+    try {
+      const settingsRes = await sheets.spreadsheets.values.get({
+        spreadsheetId: data.spreadsheetId,
+        range: `${SETTINGS_TITLE}!A2:A200`,
+      });
+      const settingsCategories = (settingsRes.data.values ?? [])
+        .map((row: unknown[]) => String(row[0] ?? "").trim())
+        .filter(Boolean);
+      if (settingsCategories.length > 0) return { categories: [...new Set(settingsCategories)] };
+    } catch (error) {
+      console.warn("Google Sheets Settings category read warning:", googleSheetsError(error));
+    }
+
+    try {
+      const logsRes = await sheets.spreadsheets.values.get({
+        spreadsheetId: data.spreadsheetId,
+        range: `${SHEET_TITLE}!A2:U`,
+        valueRenderOption: "UNFORMATTED_VALUE",
+      });
+      return { categories: categoriesFromWorkLogRows(logsRes.data.values ?? []) };
+    } catch (error) {
+      console.warn("Google Sheets WorkLogs category fallback warning:", googleSheetsError(error));
+      return { categories: [] as string[] };
+    }
+  });
+
+export const writeCategoryList = createServerFn({ method: "POST" })
+  .validator((input: unknown) =>
+    spreadsheetInputSchema
+      .extend({
+        categories: z.array(z.string().min(1).max(120)).max(200),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    try {
+      const sheets = await sheetsClient(data);
+      await ensureSheet(sheets, data.spreadsheetId, SETTINGS_TITLE);
+      await sheets.spreadsheets.values.clear({
+        spreadsheetId: data.spreadsheetId,
+        range: `${SETTINGS_TITLE}!A2:A200`,
+        requestBody: {},
+      });
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: data.spreadsheetId,
+        range: `${SETTINGS_TITLE}!A1:A${Math.max(1, data.categories.length + 1)}`,
+        valueInputOption: "RAW",
+        requestBody: {
+          values: [["ประเภทงาน"], ...data.categories.map((category: string) => [category])],
+        },
+      });
+      return { saved: data.categories.length };
+    } catch (error) {
+      throw new Error(googleSheetsError(error));
+    }
+  });
+
+export const readWorkLogRows = createServerFn({ method: "POST" })
+  .validator((input: unknown) => spreadsheetInputSchema.parse(input))
+  .handler(async ({ data }) => {
+    try {
+      const sheets = await sheetsClient(data);
+      const res = await sheets.spreadsheets.values.get({
+        spreadsheetId: data.spreadsheetId,
+        range: `${SHEET_TITLE}!A2:U`,
+        valueRenderOption: "UNFORMATTED_VALUE",
+      });
+      const rows: unknown[][] = res.data.values ?? [];
+      return { rows: rows.map((row: unknown[]) => row.map((cell) => (cell == null ? "" : String(cell)))) };
+    } catch (error) {
+      throw new Error(googleSheetsError(error));
+    }
+  });
+
+export const testGoogleSheetsConnection = createServerFn({ method: "POST" })
+  .validator((input: unknown) => spreadsheetInputSchema.parse(input))
+  .handler(async ({ data }): Promise<ConnectionTestResult> => {
+    const result: ConnectionTestResult = {
+      googleAccount: false,
+      serviceAccount: false,
+      spreadsheetId: data.spreadsheetId.length >= 10,
+      spreadsheetAccess: false,
+      readTest: false,
+      writeTest: false,
+      updateTest: false,
+      deleteTest: false,
+      errorDetails: "",
+    };
+
+    let temporarySheetId: number | null = null;
+    let sheets: Awaited<ReturnType<typeof sheetsClient>> | null = null;
+
+    try {
+      sheets = await sheetsClient(data);
+      result.googleAccount = true;
+      result.serviceAccount = true;
+
+      const meta = await sheets.spreadsheets.get({
+        spreadsheetId: data.spreadsheetId,
+        fields: "spreadsheetId,spreadsheetUrl,properties.title,sheets.properties",
+      });
+      result.spreadsheetAccess = meta.data.spreadsheetId === data.spreadsheetId;
+
+      const workLogsRead = await sheets.spreadsheets.values.get({
+        spreadsheetId: data.spreadsheetId,
+        range: `${SHEET_TITLE}!A1:U1`,
+        valueRenderOption: "UNFORMATTED_VALUE",
+      });
+      result.readTest = Array.isArray(workLogsRead.data.values);
+
+      const temporaryTitle = `ConnectionTest_${Date.now()}`;
+      const created = await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: data.spreadsheetId,
+        requestBody: {
+          requests: [{ addSheet: { properties: { title: temporaryTitle } } }],
+        },
+      });
+      temporarySheetId = created.data.replies?.[0]?.addSheet?.properties?.sheetId ?? null;
+      if (temporarySheetId === null) {
+        throw new Error("สร้างชีตชั่วคราวสำหรับ Write Test ไม่สำเร็จ");
+      }
+
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: data.spreadsheetId,
+        range: `${temporaryTitle}!A1:C2`,
+        valueInputOption: "RAW",
+        requestBody: {
+          values: [
+            ["test_id", "operation", "value"],
+            ["connection-test", "write", "created"],
+          ],
+        },
+      });
+      result.writeTest = true;
+
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: data.spreadsheetId,
+        range: `${temporaryTitle}!C2`,
+        valueInputOption: "RAW",
+        requestBody: { values: [["updated"]] },
+      });
+      const updated = await sheets.spreadsheets.values.get({
+        spreadsheetId: data.spreadsheetId,
+        range: `${temporaryTitle}!C2`,
+        valueRenderOption: "UNFORMATTED_VALUE",
+      });
+      result.updateTest = updated.data.values?.[0]?.[0] === "updated";
+    } catch (error) {
+      result.errorDetails = googleSheetsError(error);
+    } finally {
+      if (temporarySheetId !== null && sheets) {
+        try {
+          await sheets.spreadsheets.batchUpdate({
+            spreadsheetId: data.spreadsheetId,
+            requestBody: { requests: [{ deleteSheet: { sheetId: temporarySheetId } }] },
+          });
+          result.deleteTest = true;
+        } catch (error) {
+          const cleanupError = googleSheetsError(error);
+          result.errorDetails = result.errorDetails
+            ? `${result.errorDetails}; Cleanup failed: ${cleanupError}`
+            : `Cleanup failed: ${cleanupError}`;
+        }
+      }
+    }
+
+    return result;
+  });
+
+export const fetchSpreadsheetDataFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) =>
+    spreadsheetInputSchema
+      .extend({
+        range: z.string().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const sheets = await sheetsClient(data);
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: data.spreadsheetId,
+      range: data.range || "Sheet1",
+      valueRenderOption: "UNFORMATTED_VALUE",
+    });
+    return {
+      spreadsheetId: data.spreadsheetId,
+      range: data.range || "Sheet1",
+      values: res.data.values ?? [],
+    };
+  });
